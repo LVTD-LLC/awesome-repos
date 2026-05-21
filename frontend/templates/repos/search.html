@@ -1,0 +1,102 @@
+{% extends "base_landing.html" %}
+
+{% block meta %}
+<title>Search awesome repositories · Awesome Repos</title>
+<meta name="description" content="Search GitHub repositories discovered across curated awesome lists." />
+{% endblock meta %}
+
+{% block content %}
+<section class="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
+  <div class="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+    <div>
+      <p class="text-sm font-semibold uppercase tracking-wide text-green-600">Awesome Repos</p>
+      <h1 class="mt-2 text-4xl font-bold tracking-tight text-gray-950 dark:text-white">Search curated GitHub repositories</h1>
+      <p class="mt-3 max-w-2xl text-gray-600 dark:text-gray-300">Filter by stars, language, freshness, archive status, source awesome list, and how often a repo appears across lists.</p>
+    </div>
+    <div class="grid grid-cols-2 gap-3 text-sm md:text-right">
+      <div class="rounded-2xl border border-gray-200 p-4 dark:border-gray-800">
+        <div class="text-2xl font-bold">{{ total_repositories }}</div>
+        <div class="text-gray-500">repos indexed</div>
+      </div>
+      <div class="rounded-2xl border border-gray-200 p-4 dark:border-gray-800">
+        <div class="text-2xl font-bold">{{ total_lists }}</div>
+        <div class="text-gray-500">awesome lists</div>
+      </div>
+    </div>
+  </div>
+
+  <form method="get" class="mb-8 rounded-3xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-900">
+    <div class="grid gap-3 md:grid-cols-6">
+      <input name="q" value="{{ request.GET.q }}" placeholder="Search name, description, language, topics" class="rounded-xl border border-gray-300 bg-white px-4 py-3 md:col-span-2 dark:border-gray-700 dark:bg-gray-950" />
+      <select name="list" class="rounded-xl border border-gray-300 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-950">
+        <option value="">Any list</option>
+        {% for awesome_list in awesome_lists %}
+          <option value="{{ awesome_list.slug }}" {% if request.GET.list == awesome_list.slug %}selected{% endif %}>{{ awesome_list.name }}{% if awesome_list.repo_count %} ({{ awesome_list.repo_count }}){% endif %}</option>
+        {% endfor %}
+      </select>
+      <select name="language" class="rounded-xl border border-gray-300 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-950">
+        <option value="">Any language</option>
+        {% for language in languages %}
+          <option value="{{ language }}" {% if request.GET.language == language %}selected{% endif %}>{{ language }}</option>
+        {% endfor %}
+      </select>
+      <input type="number" min="0" name="min_stars" value="{{ request.GET.min_stars }}" placeholder="Min stars" class="rounded-xl border border-gray-300 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-950" />
+      <button class="rounded-xl bg-green-600 px-5 py-3 font-semibold text-white hover:bg-green-700">Search</button>
+    </div>
+    <div class="mt-3 grid gap-3 md:grid-cols-4">
+      <select name="updated_days" class="rounded-xl border border-gray-300 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-950">
+        <option value="">Updated any time</option>
+        <option value="30" {% if request.GET.updated_days == "30" %}selected{% endif %}>Updated in 30 days</option>
+        <option value="90" {% if request.GET.updated_days == "90" %}selected{% endif %}>Updated in 90 days</option>
+        <option value="365" {% if request.GET.updated_days == "365" %}selected{% endif %}>Updated in 1 year</option>
+      </select>
+      <select name="archived" class="rounded-xl border border-gray-300 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-950">
+        <option value="">Archived or active</option>
+        <option value="no" {% if request.GET.archived == "no" %}selected{% endif %}>Active only</option>
+        <option value="yes" {% if request.GET.archived == "yes" %}selected{% endif %}>Archived only</option>
+      </select>
+      <select name="sort" class="rounded-xl border border-gray-300 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-950">
+        <option value="stars" {% if request.GET.sort == "stars" or not request.GET.sort %}selected{% endif %}>Sort by stars</option>
+        <option value="recent" {% if request.GET.sort == "recent" %}selected{% endif %}>Recently updated</option>
+        <option value="created" {% if request.GET.sort == "created" %}selected{% endif %}>Recently created</option>
+        <option value="awesome" {% if request.GET.sort == "awesome" %}selected{% endif %}>Most awesome-list mentions</option>
+        <option value="name" {% if request.GET.sort == "name" %}selected{% endif %}>Name</option>
+      </select>
+      <a href="{% url 'repos:search' %}" class="rounded-xl border border-gray-300 px-5 py-3 text-center font-semibold hover:bg-gray-100 dark:border-gray-700 dark:hover:bg-gray-800">Reset</a>
+    </div>
+  </form>
+
+  <div class="space-y-4">
+    {% for repo in repositories %}
+      <article class="rounded-3xl border border-gray-200 p-5 transition hover:border-green-300 dark:border-gray-800 dark:hover:border-green-800">
+        <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+          <div>
+            <a href="{{ repo.get_absolute_url }}" class="text-xl font-bold text-gray-950 hover:text-green-700 dark:text-white">{{ repo.full_name }}</a>
+            <p class="mt-2 text-gray-600 dark:text-gray-300">{{ repo.description|default:"No description." }}</p>
+            <div class="mt-3 flex flex-wrap gap-2 text-xs text-gray-600 dark:text-gray-400">
+              {% if repo.language %}<span class="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-800">{{ repo.language }}</span>{% endif %}
+              {% if repo.is_archived %}<span class="rounded-full bg-yellow-100 px-3 py-1 text-yellow-800">archived</span>{% endif %}
+              <span class="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-800">{{ repo.awesome_count }} awesome list{{ repo.awesome_count|pluralize }}</span>
+              {% if repo.github_pushed_at %}<span class="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-800">updated {{ repo.github_pushed_at|date:"Y-m-d" }}</span>{% endif %}
+            </div>
+          </div>
+          <div class="shrink-0 text-left md:text-right">
+            <div class="text-2xl font-bold">★ {{ repo.stars }}</div>
+            <a href="{{ repo.url }}" target="_blank" rel="noopener" class="text-sm font-semibold text-green-700 hover:underline">GitHub ↗</a>
+          </div>
+        </div>
+      </article>
+    {% empty %}
+      <div class="rounded-3xl border border-dashed border-gray-300 p-10 text-center dark:border-gray-700">No repositories match this search yet.</div>
+    {% endfor %}
+  </div>
+
+  {% if is_paginated %}
+    <nav class="mt-8 flex items-center justify-center gap-3">
+      {% if page_obj.has_previous %}<a class="rounded-full border px-4 py-2" href="?page={{ page_obj.previous_page_number }}&{{ request.GET.urlencode }}">Previous</a>{% endif %}
+      <span class="text-sm text-gray-500">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+      {% if page_obj.has_next %}<a class="rounded-full border px-4 py-2" href="?page={{ page_obj.next_page_number }}&{{ request.GET.urlencode }}">Next</a>{% endif %}
+    </nav>
+  {% endif %}
+</section>
+{% endblock content %}
