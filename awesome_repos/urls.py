@@ -44,6 +44,7 @@ urlpatterns += [
     
     path("api/", include("apps.api.urls")),
     
+    path("", include("apps.repos.urls")),
     path("", include("apps.pages.urls")),
     path("", include("apps.core.urls")),
     

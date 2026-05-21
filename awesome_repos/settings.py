@@ -118,6 +118,7 @@ CUSTOM_APPS = [
     "apps.api.ApiConfig",
     
     "apps.pages.PagesConfig",
+    "apps.repos.apps.ReposConfig",
     
     
 ]
