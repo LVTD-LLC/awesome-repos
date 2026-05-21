@@ -1,0 +1,36 @@
+# Changelog
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project tries to adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## Types of changes
+
+**Added** for new features.
+**Changed** for changes in existing functionality.
+**Deprecated** for soon-to-be removed features.
+**Removed** for now removed features.
+**Fixed** for any bug fixes.
+**Security** in case of vulnerabilities.
+
+
+## [Unreleased]
+### Changed
+- Frontend assets now use Tailwind CLI plus Django staticfiles instead of a JavaScript bundler.
+- AI-assisted development guidance now uses tool-neutral `AGENTS.md` files
+  instead of agent-vendor-specific instruction files.
+- Deployments now use one shared Docker image, one CapRover deploy workflow, and explicit `APP_PROCESS_TYPE` guards to choose server vs. worker at runtime.
+- Align template runtimes on Python 3.14.5, Django 6.0.5, Node.js 24.15.0 LTS, PostgreSQL 18, and Redis 8.6.3.
+- Sentry setup now includes release metadata, configurable tracing/profiling/log settings, logging breadcrumbs/events, and the `before_send` hook by default.
+
+### Added
+- Fly.io deployment support with `fly.toml`, web and worker process groups, migration release commands, and `DATABASE_URL` support.
+- HTMX, django-htmx middleware, Alpine.js, and frontend rules for Django-native interactivity.
+- `ALLOW_SIGNUPS` environment flag (default `True`) to pause new email/social registrations while keeping existing user logins available.
+- Superuser-only admin blog API for creating, listing, reading, updating, patching, deleting, reviewing, and publishing blog posts when the blog app is generated.
+
+### Removed
+- Stimulus, Webpack, `python-webpack-boilerplate`, manifest loading, and generated Webpack configuration.
+
+### Fixed
+- Local Docker Compose now waits for the frontend watcher to finish its first asset build, and `npm run watch` now keeps browser modules in sync while editing JavaScript.
