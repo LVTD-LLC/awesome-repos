@@ -8,7 +8,7 @@ urlpatterns = [
     path("", views.RepositorySearchView.as_view(), name="search"),
     path(
         "repos/",
-        RedirectView.as_view(pattern_name="repos:search", permanent=False),
+        RedirectView.as_view(pattern_name="repos:search", permanent=True),
         name="legacy_search",
     ),
     path("repos/<str:owner>/<str:name>/", views.RepositoryDetailView.as_view(), name="repo_detail"),

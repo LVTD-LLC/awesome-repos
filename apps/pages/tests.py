@@ -187,7 +187,7 @@ def test_dashboard_does_not_show_email_confirmation_reminder(client):
 
 
 def test_landing_page_does_not_show_sign_in_or_sign_up_buttons(client):
-    response = client.get(reverse("landing"))
+    response = client.get(reverse("repos:search"))
 
     assert response.status_code == 200
     content = response.content.decode()

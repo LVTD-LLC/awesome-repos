@@ -2101,7 +2101,7 @@ def test_repository_search_is_root_page(client):
 def test_legacy_repos_page_redirects_to_root(client):
     response = client.get("/repos/")
 
-    assert response.status_code == 302
+    assert response.status_code == 301
     assert response["Location"] == "/"
 
 

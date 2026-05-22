@@ -21,6 +21,6 @@ def test_delete_account_deletes_user(auth_client, user):
     response = auth_client.post(url, data={"confirmation": "DELETE"})
 
     assert response.status_code == 302
-    assert response["Location"].startswith(reverse("landing"))
+    assert response["Location"].startswith(reverse("repos:search"))
 
     assert not get_user_model().objects.filter(id=user.id).exists()
