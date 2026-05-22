@@ -256,10 +256,18 @@ class AdminPanelView(UserPassesTestMixin, TemplateView):
         form = AwesomeListCreateForm(request.POST)
         if form.is_valid():
             awesome_list = form.save()
-            async_task(
-                "apps.repos.tasks.sync_awesome_list_task",
-                awesome_list.id,
-                group="Scan awesome list",
+            transaction.on_commit(
+                lambda: async_task(
+                    "apps.repos.tasks.sync_awesome_list_task",
+                    awesome_list.id,
+                    group="Scan awesome list",
+                )
+            )
+            logger.info(
+                "Admin queued awesome-list scan",
+                awesome_list_id=awesome_list.id,
+                awesome_list_slug=awesome_list.slug,
+                source_url=awesome_list.source_url,
             )
             messages.success(
                 request,
@@ -269,4 +277,3 @@ class AdminPanelView(UserPassesTestMixin, TemplateView):
 
         context = self.get_context_data(awesome_list_form=form)
         return self.render_to_response(context)
-

@@ -1,14 +1,37 @@
 from apps.repos.models import AwesomeList, Repository
 from apps.repos.services import refresh_repositories, sync_awesome_list
+from awesome_repos.utils import get_awesome_repos_logger
+
+logger = get_awesome_repos_logger(__name__)
 
 
 def sync_awesome_list_task(awesome_list_id: int, limit: int | None = None):
     awesome_list = AwesomeList.objects.get(id=awesome_list_id)
     try:
-        return sync_awesome_list(awesome_list, limit=limit)
+        logger.info(
+            "awesome_list_scan_task_started",
+            awesome_list_id=awesome_list_id,
+            awesome_list_slug=awesome_list.slug,
+            limit=limit,
+        )
+        result = sync_awesome_list(awesome_list, limit=limit)
+        logger.info(
+            "awesome_list_scan_task_finished",
+            awesome_list_id=awesome_list_id,
+            awesome_list_slug=awesome_list.slug,
+            result=result,
+        )
+        return result
     except Exception as exc:
         awesome_list.last_error = str(exc)
         awesome_list.save(update_fields=["last_error", "updated_at"])
+        logger.error(
+            "awesome_list_scan_task_failed",
+            awesome_list_id=awesome_list_id,
+            awesome_list_slug=awesome_list.slug,
+            error=str(exc),
+            exc_info=True,
+        )
         raise
 
 
