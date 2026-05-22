@@ -161,6 +161,41 @@ def test_admin_panel_shows_github_rate_limit_card(client, monkeypatch, sync_stat
     assert "5000" in content
 
 
+@pytest.mark.django_db
+def test_admin_panel_bounds_recent_awesome_lists_height(
+    client,
+    monkeypatch,
+    sync_state_transitions,
+):
+    user = get_user_model().objects.create_superuser(
+        username="admin",
+        email="admin@example.com",
+        password="password123",
+    )
+    client.force_login(user)
+    for index in range(3):
+        AwesomeList.objects.create(
+            name=f"Awesome List {index}",
+            slug=f"awesome-list-{index}",
+            source_url=f"https://github.com/example/awesome-list-{index}",
+            repo_full_name=f"example/awesome-list-{index}",
+        )
+    monkeypatch.setattr(
+        "apps.core.views.github_rate_limit_status",
+        lambda: {
+            "ok": False,
+            "error": "",
+        },
+    )
+
+    response = client.get(reverse("admin_panel"))
+    content = response.content.decode()
+
+    assert response.status_code == 200
+    assert "Recent awesome lists" in content
+    assert "max-h-96 space-y-4 overflow-y-auto pr-2" in content
+
+
 @override_settings(SITE_URL="http://example.com")
 def test_build_absolute_public_url_upgrades_non_local_http():
     assert build_absolute_public_url("/api/user") == "https://example.com/api/user"
