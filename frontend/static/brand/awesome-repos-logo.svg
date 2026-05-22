@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="780" height="180" viewBox="0 0 780 180" role="img" aria-labelledby="title desc">
+  <title id="title">Awesome Repos logo</title>
+  <desc id="desc">Awesome Repos wordmark with a simple starred repository list mark.</desc>
+  <rect x="24" y="24" width="132" height="132" rx="31" fill="#0F172A"/>
+  <path d="M59 61v47" fill="none" stroke="#22C55E" stroke-width="8.5" stroke-linecap="round"/>
+  <circle cx="59" cy="61" r="8.5" fill="#22C55E"/>
+  <circle cx="59" cy="84" r="8.5" fill="#22C55E"/>
+  <circle cx="59" cy="107" r="8.5" fill="#22C55E"/>
+  <path d="M76 61h46M76 84h36M76 107h24" fill="none" stroke="#F8FAFC" stroke-width="10.5" stroke-linecap="round"/>
+  <path d="m120 104 4.3 8.7 9.6 1.4-6.9 6.7 1.6 9.5-8.6-4.5-8.6 4.5 1.6-9.5-6.9-6.7 9.6-1.4L120 104Z" fill="#F59E0B"/>
+  <text x="188" y="111" fill="#0F172A" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="62" font-weight="800">Awesome Repos</text>
+</svg>

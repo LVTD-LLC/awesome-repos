@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="#" width="230" alt="Awesome Repos Logo">
+  <img src="frontend/static/brand/awesome-repos-logo.svg" width="360" alt="Awesome Repos Logo">
 </p>
 
 <!--  -->
@@ -231,6 +231,5 @@ If you generated the project with `use_ci = y`, it includes a GitHub Actions wor
 It boots Postgres + Redis, runs `python manage.py makemigrations --check --dry-run`, then `python manage.py check`, and then runs `pytest`.
 
 If you don’t want CI, set `use_ci = n` during Cookiecutter generation and the workflow will be removed.
-
 
 
