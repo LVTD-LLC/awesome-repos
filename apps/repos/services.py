@@ -182,7 +182,7 @@ def fetch_repository_readme(full_name: str) -> str:
     if data.get("encoding") == "base64" and content:
         try:
             return base64.b64decode(content).decode("utf-8", errors="replace")
-        except binascii.Error, ValueError:
+        except (binascii.Error, ValueError):
             logger.warning(
                 "repository_readme_decode_failed",
                 repo_full_name=full_name,
