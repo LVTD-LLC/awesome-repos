@@ -20,10 +20,10 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Awesome Repos: added an admin-panel flow to create new awesome-list sources and queue their initial scan.
 - Awesome Repos admin panel now shows GitHub API rate-limit status for the configured scanner token.
 - Awesome Repos admin panel now lets superusers retry scans for existing awesome-list repos.
-- Awesome Repos: added a daily scheduled task that queues per-list missing repository discovery and only ingests newly discovered repositories.
+- Awesome Repos: added a daily scheduled task that queues a capped number of newly discovered repositories from awesome-list READMEs.
 - Awesome Repos: added pgvector-backed repository embeddings from GitHub descriptions and READMEs via OpenRouter/PydanticAI.
 - Awesome Repos: record repository metadata snapshots on every GitHub refresh and show tracked star growth in repository search/detail pages.
-- Awesome Repos: added a monthly repository metadata refresh schedule that fans out one background task per saved repository.
+- Awesome Repos: added a daily budgeted repository metadata refresh that walks the oldest-synced repositories first and skips README refreshes by default.
 - Awesome Repos: store each ingested repository README alongside the GitHub API metadata.
 - Awesome Repos: generate repository discovery tags from descriptions and READMEs, and add filters for generated tags and GitHub topics.
 

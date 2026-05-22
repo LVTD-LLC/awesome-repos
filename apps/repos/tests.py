@@ -24,6 +24,7 @@ from apps.repos.models import (
     RepositorySnapshot,
 )
 from apps.repos.services import (
+    GitHubAPIError,
     add_repository_to_awesome_list,
     discover_missing_awesome_list_repositories,
     extract_github_repos,
@@ -43,7 +44,11 @@ from apps.repos.tags import (
     repository_tagging_model_id,
     save_repository_tags,
 )
-from apps.repos.tasks import refresh_repositories_task, refresh_repository_task
+from apps.repos.tasks import (
+    daily_repository_refresh_limit,
+    refresh_repositories_task,
+    refresh_repository_task,
+)
 from apps.repos.views import repository_json_value_counts
 
 
@@ -392,7 +397,50 @@ def test_upsert_repository_from_github_preserves_readme_when_refresh_fails(monke
 
 
 @pytest.mark.django_db
-def test_enqueue_awesome_list_missing_repo_syncs_task_queues_active_lists(monkeypatch):
+def test_upsert_repository_from_github_can_refresh_metadata_without_readme(monkeypatch):
+    previous_readme_synced_at = timezone.now() - timedelta(days=1)
+    repo = Repository.objects.create(
+        full_name="django/django",
+        owner="django",
+        name="django",
+        url="https://github.com/django/django",
+        readme="# Existing README\n",
+        readme_path="README.md",
+        readme_url="https://raw.githubusercontent.com/django/django/main/README.md",
+        readme_synced_at=previous_readme_synced_at,
+        readme_last_error="old README error",
+        stars=10,
+    )
+    monkeypatch.setattr(
+        "apps.repos.services.fetch_json",
+        lambda url: github_repo_payload(stars=15, forks=4, watchers=2),
+    )
+
+    def fail_readme_fetch(full_name):
+        raise AssertionError(f"should not fetch README for {full_name}")
+
+    monkeypatch.setattr(
+        "apps.repos.services.fetch_repository_readme_data",
+        fail_readme_fetch,
+    )
+
+    repo = upsert_repository_from_github(repo.full_name, include_readme=False)
+
+    assert repo.stars == 15
+    assert repo.readme == "# Existing README\n"
+    assert repo.readme_path == "README.md"
+    assert repo.readme_url == "https://raw.githubusercontent.com/django/django/main/README.md"
+    assert repo.readme_last_error == "old README error"
+    assert repo.readme_synced_at == previous_readme_synced_at
+    assert RepositorySnapshot.objects.filter(repository=repo).count() == 1
+
+
+@pytest.mark.django_db
+def test_enqueue_awesome_list_missing_repo_syncs_task_queues_daily_budget(
+    monkeypatch,
+    settings,
+):
+    settings.GITHUB_DAILY_DISCOVERY_REPOSITORY_LIMIT = 1
     active = AwesomeList.objects.create(
         name="Awesome Django",
         slug="awesome-django",
@@ -406,24 +454,45 @@ def test_enqueue_awesome_list_missing_repo_syncs_task_queues_active_lists(monkey
     )
     queued = []
 
+    def fake_discover(awesome_list, limit=None):
+        assert awesome_list == active
+        assert limit == 5
+        return {
+            "awesome_list": awesome_list.slug,
+            "discovered": 2,
+            "missing": ["django/django", "encode/httpx"],
+            "missing_count": 2,
+            "linked_existing": 0,
+            "skipped_existing": 0,
+        }
+
     def fake_async_task(func_path, *args, **kwargs):
         queued.append((func_path, args, kwargs))
         return f"task-{len(queued)}"
 
+    monkeypatch.setattr(
+        "apps.repos.tasks.discover_missing_awesome_list_repositories",
+        fake_discover,
+    )
     monkeypatch.setattr("apps.repos.tasks.async_task", fake_async_task)
 
     from apps.repos.tasks import enqueue_awesome_list_missing_repo_syncs_task
 
     result = enqueue_awesome_list_missing_repo_syncs_task(limit_per_list=5)
 
-    assert result == {"queued": 1, "task_ids": ["task-1"]}
+    assert result == {
+        "queued": 1,
+        "task_ids": ["task-1"],
+        "checked_lists": 1,
+        "failure_count": 0,
+        "failures": [],
+    }
     assert queued == [
         (
-            "apps.repos.tasks.enqueue_missing_repositories_for_awesome_list_task",
-            (active.id,),
+            "apps.repos.tasks.add_missing_repository_to_awesome_list_task",
+            (active.id, "django/django"),
             {
-                "limit": 5,
-                "group": "Daily awesome-list missing repo discovery",
+                "group": "Add missing awesome-list repos",
             },
         )
     ]
@@ -1040,7 +1109,8 @@ def test_refresh_repository_task_updates_single_repository(monkeypatch):
     )
     refreshed = []
 
-    def fake_upsert_repository_from_github(full_name):
+    def fake_upsert_repository_from_github(full_name, *, include_readme=True):
+        assert include_readme is True
         refreshed.append(full_name)
         return repository
 
@@ -1113,7 +1183,7 @@ def test_refresh_repository_task_logs_and_reraises_failures(monkeypatch):
 
     dummy_logger = DummyLogger()
 
-    def fake_upsert_repository_from_github(full_name):
+    def fake_upsert_repository_from_github(full_name, *, include_readme=True):
         raise RuntimeError(f"could not refresh {full_name}")
 
     monkeypatch.setattr("apps.repos.tasks.logger", dummy_logger)
@@ -1138,8 +1208,18 @@ def test_refresh_repository_task_logs_and_reraises_failures(monkeypatch):
     ]
 
 
+def test_daily_repository_refresh_limit_uses_target_days_and_cap(settings):
+    settings.GITHUB_REPOSITORY_REFRESH_TARGET_DAYS = 14
+    settings.GITHUB_DAILY_REPOSITORY_REFRESH_LIMIT = 1000
+
+    assert daily_repository_refresh_limit(0) == 0
+    assert daily_repository_refresh_limit(10) == 1
+    assert daily_repository_refresh_limit(10_000) == 715
+    assert daily_repository_refresh_limit(30_000) == 1000
+
+
 @pytest.mark.django_db
-def test_refresh_repositories_task_queues_one_task_per_repository(monkeypatch):
+def test_refresh_repositories_task_refreshes_oldest_metadata_only(monkeypatch):
     stale = Repository.objects.create(
         full_name="owner/stale",
         owner="owner",
@@ -1147,55 +1227,99 @@ def test_refresh_repositories_task_queues_one_task_per_repository(monkeypatch):
         url="https://github.com/owner/stale",
         last_synced_at=timezone.now() - timedelta(days=7),
     )
-    fresh = Repository.objects.create(
+    Repository.objects.create(
         full_name="owner/fresh",
         owner="owner",
         name="fresh",
         url="https://github.com/owner/fresh",
         last_synced_at=timezone.now(),
     )
-    queued = []
+    refreshed = []
 
-    def fake_async_task(func_path, repository_id, full_name, **kwargs):
-        task_id = f"task-{repository_id}"
-        queued.append((func_path, repository_id, full_name, kwargs, task_id))
-        return task_id
+    def fake_upsert_repository_from_github(full_name, *, include_readme=True):
+        refreshed.append((full_name, include_readme))
+        return Repository.objects.get(full_name=full_name)
 
-    monkeypatch.setattr("apps.repos.tasks.async_task", fake_async_task)
+    monkeypatch.setattr(
+        "apps.repos.tasks.upsert_repository_from_github",
+        fake_upsert_repository_from_github,
+    )
+    monkeypatch.setattr("apps.repos.tasks.github_rate_limit_remaining", lambda: None)
 
-    result = refresh_repositories_task()
+    result = refresh_repositories_task(limit=1)
 
-    assert queued == [
-        (
-            "apps.repos.tasks.refresh_repository_task",
-            stale.id,
-            "owner/stale",
-            {"group": "Refresh repositories"},
-            f"task-{stale.id}",
-        ),
-        (
-            "apps.repos.tasks.refresh_repository_task",
-            fresh.id,
-            "owner/fresh",
-            {"group": "Refresh repositories"},
-            f"task-{fresh.id}",
-        ),
-    ]
+    assert refreshed == [("owner/stale", False)]
     assert result == {
-        "queued": 2,
+        "synced": 1,
+        "failure_count": 0,
+        "failures": [],
+        "limit": 1,
+        "total_repositories": 2,
+        "include_readme": False,
+        "stopped_for_rate_limit": False,
+        "rate_limit_remaining": None,
         "repositories": [
             {
                 "repository_id": stale.id,
                 "full_name": "owner/stale",
-                "task_id": f"task-{stale.id}",
-            },
-            {
-                "repository_id": fresh.id,
-                "full_name": "owner/fresh",
-                "task_id": f"task-{fresh.id}",
             },
         ],
     }
+
+
+@pytest.mark.django_db
+def test_refresh_repositories_task_stops_before_reserved_rate_limit(monkeypatch, settings):
+    settings.GITHUB_REPOSITORY_REFRESH_MIN_RATE_LIMIT_REMAINING = 1000
+    Repository.objects.create(
+        full_name="owner/stale",
+        owner="owner",
+        name="stale",
+        url="https://github.com/owner/stale",
+    )
+
+    def fail_upsert(full_name, *, include_readme=True):
+        raise AssertionError(f"should not refresh {full_name}")
+
+    monkeypatch.setattr("apps.repos.tasks.upsert_repository_from_github", fail_upsert)
+    monkeypatch.setattr("apps.repos.tasks.github_rate_limit_remaining", lambda: 999)
+
+    result = refresh_repositories_task(limit=1)
+
+    assert result["synced"] == 0
+    assert result["failure_count"] == 0
+    assert result["stopped_for_rate_limit"] is True
+    assert result["rate_limit_remaining"] == 999
+
+
+@pytest.mark.django_db
+def test_refresh_repositories_task_stops_on_rate_limit_error(monkeypatch):
+    Repository.objects.create(
+        full_name="owner/stale",
+        owner="owner",
+        name="stale",
+        url="https://github.com/owner/stale",
+    )
+
+    def fail_upsert(full_name, *, include_readme=True):
+        raise GitHubAPIError(
+            "403 Forbidden | rate_limit_remaining=0",
+            status_code=403,
+            rate_limit_remaining="0",
+        )
+
+    monkeypatch.setattr("apps.repos.tasks.upsert_repository_from_github", fail_upsert)
+    remaining_values = iter([None, 0])
+    monkeypatch.setattr(
+        "apps.repos.tasks.github_rate_limit_remaining",
+        lambda: next(remaining_values, 0),
+    )
+
+    result = refresh_repositories_task(limit=1)
+
+    assert result["synced"] == 0
+    assert result["failure_count"] == 1
+    assert result["stopped_for_rate_limit"] is True
+    assert result["rate_limit_remaining"] == 0
 
 
 @pytest.mark.django_db
