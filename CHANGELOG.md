@@ -25,6 +25,7 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Awesome Repos: record repository metadata snapshots on every GitHub refresh and show tracked star growth in repository search/detail pages.
 - Awesome Repos: added a monthly repository metadata refresh schedule that fans out one background task per saved repository.
 - Awesome Repos: store each ingested repository README alongside the GitHub API metadata.
+- Awesome Repos: generate repository discovery tags from descriptions and READMEs, and add filters for generated tags and GitHub topics.
 
 ### Changed
 - Awesome Repos: moved repository search filters into a compact vertical modal opened from a single filter button.
@@ -32,6 +33,7 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Awesome-list scans now log start/finish/failure details and surface empty scans or sync failures in the admin panel.
 
 ### Fixed
+- Awesome Repos admin panel now bounds the Recent awesome lists card height so long list histories do not stretch the dashboard row.
 - Awesome Repos: include `django.contrib.postgres` so pgvector HNSW indexes pass Django production checks.
 - Awesome Repos: removed manifest-dependent logo static references so production template rendering works after `collectstatic`.
 
