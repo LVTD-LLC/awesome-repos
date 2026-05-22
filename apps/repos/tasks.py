@@ -95,12 +95,16 @@ def enqueue_missing_repositories_for_awesome_list_task(
 
         result["queued"] = len(task_ids)
         result["task_ids"] = task_ids
-        result["missing"] = result["missing"][:25]
+        logged_result = {
+            **result,
+            "missing": result["missing"][:25],
+            "task_ids": task_ids[:25],
+        }
         logger.info(
             "awesome_list_missing_repo_discovery_task_finished",
             awesome_list_id=awesome_list_id,
             awesome_list_slug=awesome_list.slug,
-            result=result,
+            result=logged_result,
         )
         return result
     except Exception as exc:
@@ -118,21 +122,34 @@ def enqueue_missing_repositories_for_awesome_list_task(
 
 def add_missing_repository_to_awesome_list_task(awesome_list_id: int, repo_full_name: str):
     awesome_list = AwesomeList.objects.get(id=awesome_list_id)
-    logger.info(
-        "awesome_list_missing_repo_add_task_started",
-        awesome_list_id=awesome_list_id,
-        awesome_list_slug=awesome_list.slug,
-        repo_full_name=repo_full_name,
-    )
-    result = add_repository_to_awesome_list(awesome_list, repo_full_name)
-    logger.info(
-        "awesome_list_missing_repo_add_task_finished",
-        awesome_list_id=awesome_list_id,
-        awesome_list_slug=awesome_list.slug,
-        repo_full_name=repo_full_name,
-        result=result,
-    )
-    return result
+    try:
+        logger.info(
+            "awesome_list_missing_repo_add_task_started",
+            awesome_list_id=awesome_list_id,
+            awesome_list_slug=awesome_list.slug,
+            repo_full_name=repo_full_name,
+        )
+        result = add_repository_to_awesome_list(awesome_list, repo_full_name)
+        logger.info(
+            "awesome_list_missing_repo_add_task_finished",
+            awesome_list_id=awesome_list_id,
+            awesome_list_slug=awesome_list.slug,
+            repo_full_name=repo_full_name,
+            result=result,
+        )
+        return result
+    except Exception as exc:
+        awesome_list.last_error = str(exc)
+        awesome_list.save(update_fields=["last_error", "updated_at"])
+        logger.error(
+            "awesome_list_missing_repo_add_task_failed",
+            awesome_list_id=awesome_list_id,
+            awesome_list_slug=awesome_list.slug,
+            repo_full_name=repo_full_name,
+            error=str(exc),
+            exc_info=True,
+        )
+        raise
 
 
 def refresh_repositories_task(limit: int | None = None):

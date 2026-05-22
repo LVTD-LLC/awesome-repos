@@ -246,6 +246,84 @@ def test_enqueue_missing_repositories_for_awesome_list_task_queues_missing_repos
 
 
 @pytest.mark.django_db
+def test_enqueue_missing_repositories_for_awesome_list_task_truncates_logged_ids(
+    monkeypatch,
+):
+    awesome_list = AwesomeList.objects.create(
+        name="Awesome Python",
+        slug="awesome-python",
+        source_url="https://github.com/vinta/awesome-python",
+    )
+    missing = [f"owner/repo-{index}" for index in range(30)]
+    log_events = []
+
+    def fake_discover(awesome_list, limit=None):
+        return {
+            "awesome_list": awesome_list.slug,
+            "discovered": len(missing),
+            "missing": missing,
+            "missing_count": len(missing),
+            "linked_existing": 0,
+            "skipped_existing": 0,
+        }
+
+    def fake_async_task(func_path, *args, **kwargs):
+        return f"task-{args[1]}"
+
+    class FakeLogger:
+        def info(self, event, **kwargs):
+            log_events.append((event, kwargs))
+
+        def error(self, event, **kwargs):
+            log_events.append((event, kwargs))
+
+    monkeypatch.setattr(
+        "apps.repos.tasks.discover_missing_awesome_list_repositories",
+        fake_discover,
+    )
+    monkeypatch.setattr("apps.repos.tasks.async_task", fake_async_task)
+    monkeypatch.setattr("apps.repos.tasks.logger", FakeLogger())
+
+    from apps.repos.tasks import enqueue_missing_repositories_for_awesome_list_task
+
+    result = enqueue_missing_repositories_for_awesome_list_task(awesome_list.id)
+    finished_event = [
+        kwargs
+        for event, kwargs in log_events
+        if event == "awesome_list_missing_repo_discovery_task_finished"
+    ][0]
+
+    assert result["queued"] == 30
+    assert len(result["task_ids"]) == 30
+    assert len(result["missing"]) == 30
+    assert finished_event["result"]["queued"] == 30
+    assert len(finished_event["result"]["task_ids"]) == 25
+    assert len(finished_event["result"]["missing"]) == 25
+
+
+@pytest.mark.django_db
+def test_add_missing_repository_to_awesome_list_task_persists_last_error(monkeypatch):
+    awesome_list = AwesomeList.objects.create(
+        name="Awesome Django",
+        slug="awesome-django",
+        source_url="https://github.com/wsvincent/awesome-django",
+    )
+
+    def fail_add_repository(awesome_list, repo_full_name):
+        raise RuntimeError(f"GitHub failed for {repo_full_name}")
+
+    monkeypatch.setattr("apps.repos.tasks.add_repository_to_awesome_list", fail_add_repository)
+
+    from apps.repos.tasks import add_missing_repository_to_awesome_list_task
+
+    with pytest.raises(RuntimeError, match="GitHub failed for django/django"):
+        add_missing_repository_to_awesome_list_task(awesome_list.id, "django/django")
+
+    awesome_list.refresh_from_db()
+    assert awesome_list.last_error == "GitHub failed for django/django"
+
+
+@pytest.mark.django_db
 def test_fetch_json_uses_github_token(monkeypatch):
     captured = {}
 
