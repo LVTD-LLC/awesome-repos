@@ -36,6 +36,7 @@ from apps.repos.services import (
     repository_performance_summary,
     repository_search_queryset,
     sync_awesome_list,
+    update_awesome_list_metadata,
     upsert_repository_from_github,
 )
 from apps.repos.tags import (
@@ -45,7 +46,7 @@ from apps.repos.tags import (
     save_repository_tags,
 )
 from apps.repos.tasks import refresh_repositories_task, refresh_repository_task
-from apps.repos.views import repository_json_value_counts
+from apps.repos.views import awesome_list_directory_totals, repository_json_value_counts
 
 
 @pytest.fixture(autouse=True)
@@ -192,6 +193,37 @@ def test_sync_awesome_list_stores_list_activity_metadata(monkeypatch):
     assert awesome_list.github_pushed_at is not None
     assert awesome_list.last_error == ""
     assert awesome_list.items.count() == 1
+
+
+@pytest.mark.django_db
+def test_update_awesome_list_metadata_preserves_missing_commit_count():
+    awesome_list = AwesomeList.objects.create(
+        name="Awesome Django",
+        slug="awesome-django",
+        source_url="https://github.com/wsvincent/awesome-django",
+        repo_full_name="wsvincent/awesome-django",
+        commits_count=350,
+    )
+    awesome_list.commits_count = None
+
+    update_awesome_list_metadata(
+        awesome_list,
+        {
+            "full_name": "wsvincent/awesome-django",
+            "description": "Curated Django resources.",
+            "stargazers_count": 1200,
+            "forks_count": 100,
+            "open_issues_count": 7,
+            "default_branch": "main",
+        },
+        repo_full_name="wsvincent/awesome-django",
+        readme_repository_count=42,
+        scanned_at=timezone.now(),
+    )
+
+    awesome_list.refresh_from_db()
+    assert awesome_list.commits_count == 350
+    assert awesome_list.readme_repository_count == 42
 
 
 @pytest.mark.django_db
@@ -435,6 +467,11 @@ def test_fetch_github_commit_count_uses_last_link_page(monkeypatch):
     assert fetch_github_commit_count("owner/repo", "main") == 456
     assert captured["url"].startswith("https://api.github.com/repos/owner/repo/commits?")
     assert "per_page=1" in captured["url"]
+
+
+def test_fetch_github_commit_count_requires_default_branch():
+    with pytest.raises(ValueError, match="default branch"):
+        fetch_github_commit_count("owner/repo", "")
 
 
 @pytest.mark.django_db
@@ -1405,6 +1442,36 @@ def test_repository_json_value_counts_aggregates_server_side():
 def test_repository_json_value_counts_rejects_unknown_fields():
     with pytest.raises(ValueError, match="Unsupported repository JSON filter field"):
         repository_json_value_counts("readme")
+
+
+@pytest.mark.django_db
+def test_awesome_list_directory_totals_aggregates_in_one_query():
+    awesome_list = AwesomeList.objects.create(
+        name="Awesome Django",
+        slug="awesome-django",
+        source_url="https://github.com/wsvincent/awesome-django",
+        stars=1200,
+        readme_repository_count=42,
+        last_scanned_at=timezone.now(),
+    )
+    repo = Repository.objects.create(
+        full_name="django/django",
+        owner="django",
+        name="django",
+        url="https://github.com/django/django",
+        stars=80000,
+    )
+    AwesomeListItem.objects.create(awesome_list=awesome_list, repository=repo)
+
+    with CaptureQueriesContext(connection) as queries:
+        totals = awesome_list_directory_totals()
+
+    assert len(queries) == 1
+    assert totals["total_lists"] == 1
+    assert totals["total_readme_repositories"] == 42
+    assert totals["total_list_stars"] == 1200
+    assert totals["total_indexed_links"] == 1
+    assert totals["latest_scan"] is not None
 
 
 @pytest.mark.django_db

@@ -108,8 +108,11 @@ def _last_page_from_link_header(link_header: str) -> int | None:
     return None
 
 
-def fetch_github_commit_count(full_name: str, default_branch: str = "") -> int:
-    query = urlencode({"sha": default_branch or "main", "per_page": 1})
+def fetch_github_commit_count(full_name: str, default_branch: str) -> int:
+    if not default_branch:
+        raise ValueError("Cannot fetch commit count without a default branch.")
+
+    query = urlencode({"sha": default_branch, "per_page": 1})
     url = f"https://api.github.com/repos/{full_name}/commits?{query}"
     request = Request(url, headers=github_headers())
     try:
@@ -206,15 +209,16 @@ def fetch_awesome_readme(full_name: str) -> tuple[str, dict]:
     for _filename, url in readme_candidate_urls(full_name, branch):
         try:
             readme = fetch_text(url)
-            try:
-                repo_meta["commits_count"] = fetch_github_commit_count(full_name, branch)
-            except Exception as exc:  # noqa: BLE001 - commit count is useful but optional
-                logger.warning(
-                    "awesome_list_commit_count_fetch_failed",
-                    repo_full_name=full_name,
-                    error=str(exc),
-                    exc_info=True,
-                )
+            if repo_meta.get("default_branch"):
+                try:
+                    repo_meta["commits_count"] = fetch_github_commit_count(full_name, branch)
+                except Exception as exc:  # noqa: BLE001 - commit count is useful but optional
+                    logger.warning(
+                        "awesome_list_commit_count_fetch_failed",
+                        repo_full_name=full_name,
+                        error=str(exc),
+                        exc_info=True,
+                    )
             return readme, repo_meta
         except (RuntimeError, URLError, TimeoutError) as exc:
             last_error = exc
@@ -296,8 +300,29 @@ def update_awesome_list_metadata(
     awesome_list.forks = meta.get("forks_count") or 0
     awesome_list.open_issues = meta.get("open_issues_count") or 0
     awesome_list.watchers = meta.get("subscribers_count") or meta.get("watchers_count") or 0
+    update_fields = [
+        "repo_full_name",
+        "description",
+        "topics",
+        "stars",
+        "forks",
+        "open_issues",
+        "watchers",
+        "readme_repository_count",
+        "default_branch",
+        "is_archived",
+        "is_disabled",
+        "github_created_at",
+        "github_updated_at",
+        "github_pushed_at",
+        "last_scanned_at",
+        "last_error",
+        "raw",
+        "updated_at",
+    ]
     if meta.get("commits_count") is not None:
         awesome_list.commits_count = meta["commits_count"]
+        update_fields.append("commits_count")
     awesome_list.readme_repository_count = readme_repository_count
     awesome_list.default_branch = meta.get("default_branch") or ""
     awesome_list.is_archived = bool(meta.get("archived"))
@@ -308,29 +333,7 @@ def update_awesome_list_metadata(
     awesome_list.last_scanned_at = scanned_at
     awesome_list.last_error = last_error
     awesome_list.raw = meta
-    awesome_list.save(
-        update_fields=[
-            "repo_full_name",
-            "description",
-            "topics",
-            "stars",
-            "forks",
-            "open_issues",
-            "watchers",
-            "commits_count",
-            "readme_repository_count",
-            "default_branch",
-            "is_archived",
-            "is_disabled",
-            "github_created_at",
-            "github_updated_at",
-            "github_pushed_at",
-            "last_scanned_at",
-            "last_error",
-            "raw",
-            "updated_at",
-        ]
-    )
+    awesome_list.save(update_fields=update_fields)
 
 
 def record_repository_snapshot(

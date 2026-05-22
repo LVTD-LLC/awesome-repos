@@ -35,6 +35,37 @@ def repository_json_value_counts(
         return [{"name": name, "count": count} for name, count in cursor.fetchall()]
 
 
+def awesome_list_directory_totals() -> dict:
+    list_table = connection.ops.quote_name(AwesomeList._meta.db_table)
+    item_table = connection.ops.quote_name(AwesomeListItem._meta.db_table)
+    query = f"""
+        SELECT
+            COUNT(*) AS total_lists,
+            COALESCE(SUM(readme_repository_count), 0) AS total_readme_repositories,
+            COALESCE(SUM(stars), 0) AS total_list_stars,
+            MAX(last_scanned_at) AS latest_scan,
+            (SELECT COUNT(*) FROM {item_table}) AS total_indexed_links
+        FROM {list_table}
+    """
+    with connection.cursor() as cursor:
+        cursor.execute(query)
+        (
+            total_lists,
+            total_readme_repositories,
+            total_list_stars,
+            latest_scan,
+            total_indexed_links,
+        ) = cursor.fetchone()
+
+    return {
+        "total_lists": total_lists,
+        "total_readme_repositories": total_readme_repositories,
+        "total_list_stars": total_list_stars,
+        "latest_scan": latest_scan,
+        "total_indexed_links": total_indexed_links,
+    }
+
+
 class RepositorySearchView(ListView):
     template_name = "repos/search.html"
     context_object_name = "repositories"
@@ -97,17 +128,13 @@ class AwesomeListListView(ListView):
         context = super().get_context_data(**kwargs)
         params = self.request.GET.copy()
         params.pop("page", None)
-        totals = AwesomeList.objects.aggregate(
-            readme_repository_count=Sum("readme_repository_count"),
-            stars=Sum("stars"),
-            latest_scan=Max("last_scanned_at"),
-        )
+        totals = awesome_list_directory_totals()
         context["params"] = params
         context["querystring"] = params.urlencode()
-        context["total_lists"] = AwesomeList.objects.count()
-        context["total_indexed_links"] = AwesomeListItem.objects.count()
-        context["total_readme_repositories"] = totals["readme_repository_count"] or 0
-        context["total_list_stars"] = totals["stars"] or 0
+        context["total_lists"] = totals["total_lists"]
+        context["total_indexed_links"] = totals["total_indexed_links"]
+        context["total_readme_repositories"] = totals["total_readme_repositories"]
+        context["total_list_stars"] = totals["total_list_stars"]
         context["latest_scan"] = totals["latest_scan"]
         return context
 

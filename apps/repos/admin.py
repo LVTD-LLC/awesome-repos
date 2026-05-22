@@ -35,7 +35,7 @@ class AwesomeListAdmin(admin.ModelAdmin):
         "item_count",
     )
     prepopulated_fields = {"slug": ("name",)}
-    search_fields = ("name", "slug", "repo_full_name", "source_url", "description", "topics")
+    search_fields = ("name", "slug", "repo_full_name", "source_url", "description")
     list_filter = ("is_active", "is_archived", "is_disabled")
     readonly_fields = (
         "topics",
