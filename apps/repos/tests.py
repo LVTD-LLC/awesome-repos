@@ -38,7 +38,19 @@ from apps.repos.services import (
     sync_awesome_list,
     upsert_repository_from_github,
 )
+from apps.repos.tags import (
+    build_repository_tagging_payload,
+    normalize_repository_tags,
+    repository_tagging_model_id,
+    save_repository_tags,
+)
 from apps.repos.tasks import refresh_repositories_task, refresh_repository_task
+from apps.repos.views import repository_json_value_counts
+
+
+@pytest.fixture(autouse=True)
+def disable_repository_tagging(settings):
+    settings.REPOSITORY_TAGGING_ENABLED = False
 
 
 @pytest.mark.parametrize(
@@ -926,6 +938,167 @@ def test_repository_embedding_text_handles_null_description(settings):
     assert text == "Repository: owner/repo\n\nREADME:\n# README"
 
 
+def test_normalize_repository_tags_dedupes_and_limits(settings):
+    settings.REPOSITORY_TAGGING_MAX_TAGS = 3
+
+    assert normalize_repository_tags(
+        ["Web Framework", "web/framework", "Django Admin!", "C++", "REST API"]
+    ) == ["web-framework", "django-admin", "c++"]
+
+
+@pytest.mark.django_db
+def test_save_repository_tags_persists_generated_tags(monkeypatch, settings):
+    settings.REPOSITORY_TAGGING_ENABLED = True
+    settings.REPOSITORY_TAGGING_PROVIDER = "openai"
+    settings.REPOSITORY_TAGGING_MODEL_LABEL = "fast"
+    settings.REPOSITORY_TAGGING_MAX_CHARS = 16000
+    settings.REPOSITORY_TAGGING_MAX_TAGS = 8
+    repo = Repository.objects.create(
+        full_name="django/django",
+        owner="django",
+        name="django",
+        url="https://github.com/django/django",
+        description="The Web framework",
+        readme="# Django\nDjango includes an ORM and admin interface.",
+    )
+    captured = {}
+
+    def fake_generate_repository_tags(text):
+        captured["text"] = text
+        return ["web-framework", "orm", "admin-ui"]
+
+    monkeypatch.setattr(
+        "apps.repos.tags.generate_repository_tags",
+        fake_generate_repository_tags,
+    )
+
+    tags = save_repository_tags(repo, repo.readme)
+
+    repo.refresh_from_db()
+    assert tags == ["web-framework", "orm", "admin-ui"]
+    assert repo.generated_tags == tags
+    assert repo.generated_tags_model == repository_tagging_model_id()
+    assert repo.generated_tags_source_hash
+    assert repo.generated_tags_synced_at is not None
+    assert repo.generated_tags_last_error == ""
+    assert "The Web framework" in captured["text"]
+    assert "Django includes an ORM" in captured["text"]
+
+
+@pytest.mark.django_db
+def test_save_repository_tags_skips_unchanged_source(monkeypatch, settings):
+    settings.REPOSITORY_TAGGING_ENABLED = True
+    settings.REPOSITORY_TAGGING_PROVIDER = "openai"
+    settings.REPOSITORY_TAGGING_MODEL_LABEL = "fast"
+    settings.REPOSITORY_TAGGING_MAX_CHARS = 16000
+    settings.REPOSITORY_TAGGING_MAX_TAGS = 8
+    repo = Repository.objects.create(
+        full_name="django/django",
+        owner="django",
+        name="django",
+        url="https://github.com/django/django",
+        description="The Web framework",
+        readme="# Django",
+    )
+    calls = 0
+
+    def fake_generate_repository_tags(text):
+        nonlocal calls
+        calls += 1
+        return ["web-framework"]
+
+    monkeypatch.setattr(
+        "apps.repos.tags.generate_repository_tags",
+        fake_generate_repository_tags,
+    )
+
+    first = save_repository_tags(repo, repo.readme)
+    repo.refresh_from_db()
+    second = save_repository_tags(repo, repo.readme)
+
+    assert calls == 1
+    assert first == ["web-framework"]
+    assert second == first
+
+
+@pytest.mark.django_db(transaction=True)
+def test_upsert_repository_from_github_syncs_generated_tags_from_readme(
+    monkeypatch,
+    settings,
+):
+    settings.REPOSITORY_TAGGING_ENABLED = True
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    captured = {}
+
+    def fake_fetch_json(url):
+        if url.endswith("/readme"):
+            return {
+                "encoding": "base64",
+                "content": base64.b64encode(b"# Django\n").decode("ascii"),
+            }
+        return github_repo_api_payload()
+
+    def fake_sync_repository_tags(repository, readme_text):
+        captured["repo"] = repository.full_name
+        captured["description"] = repository.description
+        captured["readme_text"] = readme_text
+        captured["tag_sync_in_atomic"] = connection.in_atomic_block
+
+    monkeypatch.setattr("apps.repos.services.fetch_json", fake_fetch_json)
+    monkeypatch.setattr("apps.repos.services.sync_repository_tags", fake_sync_repository_tags)
+
+    repo = upsert_repository_from_github("django/django")
+
+    assert repo.description == "The Web framework"
+    assert captured == {
+        "repo": "django/django",
+        "description": "The Web framework",
+        "readme_text": "# Django\n",
+        "tag_sync_in_atomic": False,
+    }
+
+
+@pytest.mark.django_db
+def test_tag_repositories_command_reports_unchanged_tags(monkeypatch, settings):
+    settings.REPOSITORY_TAGGING_ENABLED = True
+    settings.REPOSITORY_TAGGING_PROVIDER = "openai"
+    settings.REPOSITORY_TAGGING_MODEL_LABEL = "fast"
+    settings.REPOSITORY_TAGGING_MAX_CHARS = 16000
+    settings.REPOSITORY_TAGGING_MAX_TAGS = 8
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    repo = Repository.objects.create(
+        full_name="django/django",
+        owner="django",
+        name="django",
+        url="https://github.com/django/django",
+        description="The Web framework",
+        readme="# Django",
+        generated_tags=["web-framework"],
+        generated_tags_model=repository_tagging_model_id(),
+        generated_tags_synced_at=timezone.now(),
+    )
+    payload = build_repository_tagging_payload(repo, repo.readme)
+    assert payload is not None
+    repo.generated_tags_source_hash = payload.text_hash
+    repo.save(update_fields=["generated_tags_source_hash", "updated_at"])
+
+    def fail_generate_repository_tags(text):
+        raise AssertionError("unchanged generated tags should not be regenerated")
+
+    monkeypatch.setattr(
+        "apps.repos.tags.generate_repository_tags",
+        fail_generate_repository_tags,
+    )
+
+    stdout = StringIO()
+    call_command("tag_repositories", stdout=stdout)
+
+    output = stdout.getvalue()
+    assert "'tagged': 0" in output
+    assert "'skipped': 0" in output
+    assert "'unchanged': 1" in output
+
+
 @pytest.mark.django_db
 def test_embed_repositories_command_reports_unchanged_embeddings(monkeypatch, settings):
     settings.OPENROUTER_API_KEY = "or-test"
@@ -1188,6 +1361,67 @@ def test_repository_search_filters_and_sorts():
 
 
 @pytest.mark.django_db
+def test_repository_search_filters_by_topic_and_generated_tag():
+    django_repo = Repository.objects.create(
+        full_name="django/django",
+        owner="django",
+        name="django",
+        url="https://github.com/django/django",
+        description="Django tool",
+        topics=["django", "python", "web"],
+        generated_tags=["web-framework", "orm"],
+        stars=50,
+    )
+    node_repo = Repository.objects.create(
+        full_name="nodejs/node",
+        owner="nodejs",
+        name="node",
+        url="https://github.com/nodejs/node",
+        description="JavaScript runtime",
+        topics=["javascript", "runtime"],
+        generated_tags=["server-runtime"],
+        stars=100,
+    )
+
+    assert list(repository_search_queryset({"topic": "django"})) == [django_repo]
+    assert list(repository_search_queryset({"generated_tag": "server runtime"})) == [node_repo]
+    assert list(repository_search_queryset({"q": "orm"})) == [django_repo]
+
+
+@pytest.mark.django_db
+def test_repository_json_value_counts_aggregates_server_side():
+    Repository.objects.create(
+        full_name="django/django",
+        owner="django",
+        name="django",
+        url="https://github.com/django/django",
+        topics=["django", "python", "web"],
+        generated_tags=["web-framework", "orm"],
+    )
+    Repository.objects.create(
+        full_name="django/channels",
+        owner="django",
+        name="channels",
+        url="https://github.com/django/channels",
+        topics=["django", "python", "async"],
+        generated_tags=["web-framework", "websocket"],
+    )
+
+    assert repository_json_value_counts("topics")[:2] == [
+        {"name": "django", "count": 2},
+        {"name": "python", "count": 2},
+    ]
+    assert repository_json_value_counts("generated_tags", limit=1) == [
+        {"name": "web-framework", "count": 2}
+    ]
+
+
+def test_repository_json_value_counts_rejects_unknown_fields():
+    with pytest.raises(ValueError, match="Unsupported repository JSON filter field"):
+        repository_json_value_counts("readme")
+
+
+@pytest.mark.django_db
 def test_repository_search_semantic_mode_orders_by_vector(monkeypatch, settings):
     settings.OPENROUTER_API_KEY = "or-test"
     settings.REPOSITORY_EMBEDDINGS_ENABLED = True
@@ -1359,11 +1593,16 @@ def test_search_page_renders(client):
         url="https://github.com/django/django",
         description="The Web framework",
         language="Python",
+        topics=["django", "python"],
+        generated_tags=["web-framework"],
         stars=80000,
     )
     response = client.get(reverse("repos:search"), {"q": "framework"})
     assert response.status_code == 200
     assert b"django/django" in response.content
+    assert b"Any GitHub topic" in response.content
+    assert b"django (1)" in response.content
+    assert b"web-framework (1)" in response.content
 
 
 @pytest.mark.django_db

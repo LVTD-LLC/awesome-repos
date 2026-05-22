@@ -5,7 +5,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("repos", "0006_repository_readme_repository_readme_last_error_and_more"),
+        ("repos", "0007_repository_generated_tags_and_more"),
     ]
 
     operations = [

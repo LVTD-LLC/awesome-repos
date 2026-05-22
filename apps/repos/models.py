@@ -1,3 +1,4 @@
+from django.contrib.postgres.indexes import GinIndex
 from django.db import models
 from django.urls import reverse
 from django.utils import timezone
@@ -58,6 +59,11 @@ class Repository(BaseModel):
     readme_last_error = models.TextField(blank=True, default="")
     uses_ai_for_development = models.BooleanField(default=False)
     ai_development_signals = models.JSONField(default=list, blank=True)
+    generated_tags = models.JSONField(default=list, blank=True)
+    generated_tags_model = models.CharField(max_length=255, blank=True, default="")
+    generated_tags_source_hash = models.CharField(max_length=64, blank=True, default="")
+    generated_tags_synced_at = models.DateTimeField(null=True, blank=True)
+    generated_tags_last_error = models.TextField(blank=True, default="")
     raw = models.JSONField(default=dict, blank=True)
 
     class Meta:
@@ -68,6 +74,8 @@ class Repository(BaseModel):
             models.Index(fields=["is_archived"]),
             models.Index(fields=["language"]),
             models.Index(fields=["uses_ai_for_development"]),
+            GinIndex(fields=["topics"], name="repo_topics_gin_idx"),
+            GinIndex(fields=["generated_tags"], name="repo_gen_tags_gin_idx"),
         ]
 
     def __str__(self):
