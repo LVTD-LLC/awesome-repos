@@ -237,11 +237,9 @@ def record_repository_snapshot(
 
 
 @transaction.atomic
-def upsert_repository_from_github(full_name: str) -> Repository:
-    data = fetch_json(f"https://api.github.com/repos/{full_name}")
+def _upsert_repository_metadata(data: dict, *, synced_at) -> Repository:
     full_name = data["full_name"]
     license_data = data.get("license") or {}
-    synced_at = timezone.now()
     repo, _ = Repository.objects.update_or_create(
         full_name=full_name,
         defaults={
@@ -270,14 +268,19 @@ def upsert_repository_from_github(full_name: str) -> Repository:
         },
     )
     record_repository_snapshot(repo, captured_at=synced_at)
+    return repo
 
+
+def upsert_repository_from_github(full_name: str) -> Repository:
+    data = fetch_json(f"https://api.github.com/repos/{full_name}")
+    repo = _upsert_repository_metadata(data, synced_at=timezone.now())
     if repository_embeddings_configured():
         try:
-            readme_text = fetch_repository_readme(full_name)
+            readme_text = fetch_repository_readme(repo.full_name)
         except Exception as exc:  # noqa: BLE001 - README/embedding should not block metadata sync
             logger.warning(
                 "repository_readme_fetch_failed",
-                repo_full_name=full_name,
+                repo_full_name=repo.full_name,
                 error=str(exc),
                 exc_info=True,
             )

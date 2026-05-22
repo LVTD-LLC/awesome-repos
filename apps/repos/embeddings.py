@@ -80,12 +80,19 @@ def repository_embedding_is_current(
     repository: Repository,
     payload: EmbeddingPayload,
 ) -> bool:
+    return get_current_repository_embedding(repository, payload) is not None
+
+
+def get_current_repository_embedding(
+    repository: Repository,
+    payload: EmbeddingPayload,
+) -> RepositoryEmbedding | None:
     return RepositoryEmbedding.objects.filter(
         repository=repository,
         model=settings.REPOSITORY_EMBEDDING_MODEL,
         dimensions=settings.REPOSITORY_EMBEDDING_DIMENSIONS,
         source_text_hash=payload.text_hash,
-    ).exists()
+    ).first()
 
 
 def _embedding_model() -> OpenAIEmbeddingModel:
@@ -130,8 +137,10 @@ def save_repository_embedding(
             "for the current pgvector column."
         )
 
-    if not force and repository_embedding_is_current(repository, payload):
-        return RepositoryEmbedding.objects.get(repository=repository)
+    if not force:
+        current_embedding = get_current_repository_embedding(repository, payload)
+        if current_embedding is not None:
+            return current_embedding
 
     response = generate_embedding(payload.text, input_type="document")
     if len(response.vector) != dimensions:

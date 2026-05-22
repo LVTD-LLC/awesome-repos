@@ -530,7 +530,7 @@ def github_repo_api_payload():
     }
 
 
-@pytest.mark.django_db
+@pytest.mark.django_db(transaction=True)
 def test_upsert_repository_from_github_syncs_embedding_from_readme(monkeypatch, settings):
     settings.OPENROUTER_API_KEY = "or-test"
     settings.REPOSITORY_EMBEDDINGS_ENABLED = True
@@ -538,16 +538,19 @@ def test_upsert_repository_from_github_syncs_embedding_from_readme(monkeypatch, 
 
     def fake_fetch_json(url):
         if url.endswith("/readme"):
+            captured["readme_fetch_in_atomic"] = connection.in_atomic_block
             return {
                 "encoding": "base64",
                 "content": base64.b64encode(b"# Django\n").decode("ascii"),
             }
+        captured["metadata_fetch_in_atomic"] = connection.in_atomic_block
         return github_repo_api_payload()
 
     def fake_sync_repository_embedding(repository, readme_text):
         captured["repo"] = repository.full_name
         captured["description"] = repository.description
         captured["readme_text"] = readme_text
+        captured["embedding_sync_in_atomic"] = connection.in_atomic_block
 
     monkeypatch.setattr("apps.repos.services.fetch_json", fake_fetch_json)
     monkeypatch.setattr(
@@ -559,9 +562,12 @@ def test_upsert_repository_from_github_syncs_embedding_from_readme(monkeypatch, 
 
     assert repo.description == "The Web framework"
     assert captured == {
+        "metadata_fetch_in_atomic": False,
+        "readme_fetch_in_atomic": False,
         "repo": "django/django",
         "description": "The Web framework",
         "readme_text": "# Django\n",
+        "embedding_sync_in_atomic": False,
     }
 
 
