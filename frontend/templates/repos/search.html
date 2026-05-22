@@ -77,11 +77,17 @@
               {% if repo.language %}<span class="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-800">{{ repo.language }}</span>{% endif %}
               {% if repo.is_archived %}<span class="rounded-full bg-yellow-100 px-3 py-1 text-yellow-800">archived</span>{% endif %}
               <span class="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-800">{{ repo.awesome_count }} awesome list{{ repo.awesome_count|pluralize }}</span>
+              {% if repo.snapshot_count %}<span class="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-800">{{ repo.snapshot_count }} history point{{ repo.snapshot_count|pluralize }}</span>{% endif %}
               {% if repo.github_pushed_at %}<span class="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-800">updated {{ repo.github_pushed_at|date:"Y-m-d" }}</span>{% endif %}
             </div>
           </div>
           <div class="shrink-0 text-left md:text-right">
             <div class="text-2xl font-bold">★ {{ repo.stars }}</div>
+            {% if repo.stars_since_first > 0 %}
+              <div class="text-sm font-semibold text-green-700 dark:text-green-400">+{{ repo.stars_since_first }} tracked</div>
+            {% elif repo.snapshot_count > 1 %}
+              <div class="text-sm text-gray-500 dark:text-gray-400">0 tracked</div>
+            {% endif %}
             <a href="{{ repo.url }}" target="_blank" rel="noopener" class="text-sm font-semibold text-green-700 hover:underline">GitHub ↗</a>
           </div>
         </div>

@@ -5,7 +5,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from apps.repos.forms import AwesomeListCreateForm
-from apps.repos.models import AwesomeList, AwesomeListItem, Repository
+from apps.repos.models import AwesomeList, AwesomeListItem, Repository, RepositorySnapshot
 from apps.repos.services import (
     add_repository_to_awesome_list,
     discover_missing_awesome_list_repositories,
@@ -13,8 +13,10 @@ from apps.repos.services import (
     fetch_json,
     github_rate_limit_status,
     parse_github_repo_url,
+    repository_performance_summary,
     repository_search_queryset,
     sync_awesome_list,
+    upsert_repository_from_github,
 )
 
 
@@ -155,6 +157,73 @@ def test_add_repository_to_awesome_list_skips_existing_repo_refresh(monkeypatch)
     assert result["link_created"] is True
     repo.refresh_from_db()
     assert repo.stars == 100
+
+
+def github_repo_payload(full_name="django/django", stars=80000, forks=32000, watchers=1200):
+    owner, name = full_name.split("/", 1)
+    return {
+        "full_name": full_name,
+        "owner": {"login": owner},
+        "name": name,
+        "html_url": f"https://github.com/{full_name}",
+        "description": "The Web framework for perfectionists with deadlines.",
+        "homepage": "https://www.djangoproject.com/",
+        "language": "Python",
+        "license": {"spdx_id": "BSD-3-Clause", "name": "BSD 3-Clause License"},
+        "topics": ["django", "python", "web"],
+        "stargazers_count": stars,
+        "forks_count": forks,
+        "open_issues_count": 128,
+        "subscribers_count": watchers,
+        "watchers_count": stars,
+        "default_branch": "main",
+        "archived": False,
+        "disabled": False,
+        "fork": False,
+        "created_at": "2005-07-13T00:00:00Z",
+        "updated_at": "2026-05-20T00:00:00Z",
+        "pushed_at": "2026-05-21T00:00:00Z",
+    }
+
+
+@pytest.mark.django_db
+def test_upsert_repository_from_github_records_snapshot(monkeypatch):
+    monkeypatch.setattr(
+        "apps.repos.services.fetch_json",
+        lambda url: github_repo_payload(stars=80000, forks=32000, watchers=1200),
+    )
+
+    repo = upsert_repository_from_github("django/django")
+
+    snapshot = RepositorySnapshot.objects.get(repository=repo)
+    assert repo.stars == 80000
+    assert repo.forks == 32000
+    assert repo.watchers == 1200
+    assert snapshot.stars == repo.stars
+    assert snapshot.forks == repo.forks
+    assert snapshot.watchers == repo.watchers
+    assert snapshot.captured_at == repo.last_synced_at
+
+
+@pytest.mark.django_db
+def test_upsert_repository_from_github_records_snapshot_for_each_refresh(monkeypatch):
+    payloads = [
+        github_repo_payload(stars=10, forks=3, watchers=1),
+        github_repo_payload(stars=15, forks=4, watchers=2),
+    ]
+
+    def fake_fetch_json(url):
+        return payloads.pop(0)
+
+    monkeypatch.setattr("apps.repos.services.fetch_json", fake_fetch_json)
+
+    repo = upsert_repository_from_github("django/django")
+    repo = upsert_repository_from_github("django/django")
+
+    assert repo.stars == 15
+    assert list(
+        repo.snapshots.order_by("created_at").values_list("stars", "forks", "watchers")
+    ) == [(10, 3, 1), (15, 4, 2)]
 
 
 @pytest.mark.django_db
@@ -413,6 +482,72 @@ def test_repository_search_filters_and_sorts():
 
 
 @pytest.mark.django_db
+def test_repository_search_queryset_annotates_tracked_growth():
+    repo = Repository.objects.create(
+        full_name="django/django",
+        owner="django",
+        name="django",
+        url="https://github.com/django/django",
+        description="Django tool",
+        language="Python",
+        stars=75,
+    )
+    RepositorySnapshot.objects.create(
+        repository=repo,
+        captured_at=timezone.now() - timedelta(days=2),
+        stars=50,
+    )
+    RepositorySnapshot.objects.create(
+        repository=repo,
+        captured_at=timezone.now() - timedelta(days=1),
+        stars=75,
+    )
+
+    result = repository_search_queryset({"q": "django"}).get()
+
+    assert result.snapshot_count == 2
+    assert result.first_snapshot_stars == 50
+    assert result.stars_since_first == 25
+
+
+@pytest.mark.django_db
+def test_repository_performance_summary_returns_recent_growth():
+    repo = Repository.objects.create(
+        full_name="django/django",
+        owner="django",
+        name="django",
+        url="https://github.com/django/django",
+        stars=75,
+        forks=12,
+        watchers=5,
+    )
+    RepositorySnapshot.objects.create(
+        repository=repo,
+        captured_at=timezone.now() - timedelta(days=2),
+        stars=50,
+        forks=10,
+        watchers=4,
+    )
+    RepositorySnapshot.objects.create(
+        repository=repo,
+        captured_at=timezone.now() - timedelta(days=1),
+        stars=75,
+        forks=12,
+        watchers=5,
+    )
+
+    summary = repository_performance_summary(repo)
+
+    assert summary["snapshot_count"] == 2
+    assert summary["stars_since_first"] == 25
+    assert summary["stars_since_first_label"] == "+25"
+    assert summary["forks_since_first"] == 2
+    assert summary["watchers_since_first"] == 1
+    assert summary["history"][0]["stars_delta"] == 25
+    assert summary["history"][1]["stars_delta_label"] == "baseline"
+
+
+@pytest.mark.django_db
 def test_search_page_renders(client):
     Repository.objects.create(
         full_name="django/django",
@@ -426,3 +561,40 @@ def test_search_page_renders(client):
     response = client.get(reverse("repos:search"), {"q": "framework"})
     assert response.status_code == 200
     assert b"django/django" in response.content
+
+
+@pytest.mark.django_db
+def test_repository_detail_page_renders_performance_history(client):
+    repo = Repository.objects.create(
+        full_name="django/django",
+        owner="django",
+        name="django",
+        url="https://github.com/django/django",
+        description="The Web framework",
+        language="Python",
+        stars=75,
+        forks=12,
+        watchers=5,
+    )
+    RepositorySnapshot.objects.create(
+        repository=repo,
+        captured_at=timezone.now() - timedelta(days=2),
+        stars=50,
+        forks=10,
+        watchers=4,
+    )
+    RepositorySnapshot.objects.create(
+        repository=repo,
+        captured_at=timezone.now() - timedelta(days=1),
+        stars=75,
+        forks=12,
+        watchers=5,
+    )
+
+    response = client.get(
+        reverse("repos:repo_detail", kwargs={"owner": "django", "name": "django"})
+    )
+
+    assert response.status_code == 200
+    assert b"Tracked growth" in response.content
+    assert b"+25" in response.content

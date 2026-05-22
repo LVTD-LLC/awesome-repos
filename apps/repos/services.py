@@ -13,7 +13,7 @@ from django.db.models import Count
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
-from apps.repos.models import AwesomeList, AwesomeListItem, Repository
+from apps.repos.models import AwesomeList, AwesomeListItem, Repository, RepositorySnapshot
 from awesome_repos.utils import get_awesome_repos_logger
 
 logger = get_awesome_repos_logger(__name__)
@@ -166,10 +166,41 @@ def dt(value: str | None):
     return parsed
 
 
+def record_repository_snapshot(
+    repository: Repository,
+    *,
+    captured_at=None,
+    source: str = "github_api",
+) -> RepositorySnapshot:
+    captured_at = captured_at or timezone.now()
+    return RepositorySnapshot.objects.create(
+        repository=repository,
+        captured_at=captured_at,
+        source=source,
+        description=repository.description,
+        homepage_url=repository.homepage_url,
+        language=repository.language,
+        license_name=repository.license_name,
+        topics=repository.topics,
+        stars=repository.stars,
+        forks=repository.forks,
+        open_issues=repository.open_issues,
+        watchers=repository.watchers,
+        default_branch=repository.default_branch,
+        is_archived=repository.is_archived,
+        is_disabled=repository.is_disabled,
+        is_fork=repository.is_fork,
+        github_created_at=repository.github_created_at,
+        github_updated_at=repository.github_updated_at,
+        github_pushed_at=repository.github_pushed_at,
+    )
+
+
 def upsert_repository_from_github(full_name: str) -> Repository:
     data = fetch_json(f"https://api.github.com/repos/{full_name}")
     full_name = data["full_name"]
     license_data = data.get("license") or {}
+    synced_at = timezone.now()
     repo, _ = Repository.objects.update_or_create(
         full_name=full_name,
         defaults={
@@ -193,11 +224,65 @@ def upsert_repository_from_github(full_name: str) -> Repository:
             "github_created_at": dt(data.get("created_at")),
             "github_updated_at": dt(data.get("updated_at")),
             "github_pushed_at": dt(data.get("pushed_at")),
-            "last_synced_at": timezone.now(),
+            "last_synced_at": synced_at,
             "raw": data,
         },
     )
+    record_repository_snapshot(repo, captured_at=synced_at)
     return repo
+
+
+def _format_delta(value: int | None) -> str:
+    if value is None:
+        return "baseline"
+    if value > 0:
+        return f"+{value}"
+    return str(value)
+
+
+def repository_performance_summary(repository: Repository, limit: int = 12) -> dict:
+    snapshot_qs = repository.snapshots.order_by("-captured_at", "-id")
+    recent_snapshots = list(snapshot_qs[:limit])
+    first_snapshot = repository.snapshots.order_by("captured_at", "id").first()
+    latest_snapshot = recent_snapshots[0] if recent_snapshots else None
+    previous_snapshot = recent_snapshots[1] if len(recent_snapshots) > 1 else None
+
+    history = []
+    for index, snapshot in enumerate(recent_snapshots):
+        older_snapshot = recent_snapshots[index + 1] if index + 1 < len(recent_snapshots) else None
+        stars_delta = snapshot.stars - older_snapshot.stars if older_snapshot else None
+        forks_delta = snapshot.forks - older_snapshot.forks if older_snapshot else None
+        history.append(
+            {
+                "snapshot": snapshot,
+                "stars_delta": stars_delta,
+                "stars_delta_label": _format_delta(stars_delta),
+                "forks_delta": forks_delta,
+                "forks_delta_label": _format_delta(forks_delta),
+            }
+        )
+
+    stars_since_first = repository.stars - first_snapshot.stars if first_snapshot else 0
+    forks_since_first = repository.forks - first_snapshot.forks if first_snapshot else 0
+    watchers_since_first = repository.watchers - first_snapshot.watchers if first_snapshot else 0
+    stars_since_previous = repository.stars - previous_snapshot.stars if previous_snapshot else None
+
+    return {
+        "has_history": bool(recent_snapshots),
+        "snapshot_count": repository.snapshots.count(),
+        "first_snapshot": first_snapshot,
+        "latest_snapshot": latest_snapshot,
+        "previous_snapshot": previous_snapshot,
+        "stars_since_first": stars_since_first,
+        "stars_since_first_label": _format_delta(stars_since_first),
+        "forks_since_first": forks_since_first,
+        "forks_since_first_label": _format_delta(forks_since_first),
+        "watchers_since_first": watchers_since_first,
+        "watchers_since_first_label": _format_delta(watchers_since_first),
+        "stars_since_previous": stars_since_previous,
+        "stars_since_previous_label": _format_delta(stars_since_previous),
+        "history": history,
+    }
 
 
 @transaction.atomic
@@ -414,7 +499,30 @@ def refresh_repositories(queryset=None, limit: int | None = None) -> dict:
 
 
 def repository_search_queryset(params):
-    qs = Repository.objects.annotate(awesome_count=Count("awesome_items", distinct=True))
+    first_snapshot = RepositorySnapshot.objects.filter(repository=models.OuterRef("pk")).order_by(
+        "captured_at", "id"
+    )
+    qs = Repository.objects.annotate(
+        awesome_count=Count("awesome_items", distinct=True),
+        snapshot_count=Count("snapshots", distinct=True),
+        first_snapshot_at=models.Subquery(
+            first_snapshot.values("captured_at")[:1],
+            output_field=models.DateTimeField(),
+        ),
+        first_snapshot_stars=models.Subquery(
+            first_snapshot.values("stars")[:1],
+            output_field=models.PositiveIntegerField(),
+        ),
+    ).annotate(
+        stars_since_first=models.Case(
+            models.When(
+                first_snapshot_stars__isnull=False,
+                then=models.F("stars") - models.F("first_snapshot_stars"),
+            ),
+            default=models.Value(0),
+            output_field=models.IntegerField(),
+        )
+    )
     q = (params.get("q") or "").strip()
     if q:
         qs = qs.filter(
