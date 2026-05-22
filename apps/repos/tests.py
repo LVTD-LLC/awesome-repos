@@ -1892,6 +1892,43 @@ def test_repository_json_value_counts_aggregates_server_side():
     ]
 
 
+@pytest.mark.django_db
+def test_repository_json_value_counts_can_scope_to_awesome_list():
+    django_list = AwesomeList.objects.create(
+        name="Awesome Django",
+        slug="awesome-django",
+        source_url="https://github.com/wsvincent/awesome-django",
+    )
+    node_list = AwesomeList.objects.create(
+        name="Awesome Node",
+        slug="awesome-node",
+        source_url="https://github.com/sindresorhus/awesome-nodejs",
+    )
+    django_repo = Repository.objects.create(
+        full_name="django/django",
+        owner="django",
+        name="django",
+        url="https://github.com/django/django",
+        topics=["django", "python"],
+    )
+    node_repo = Repository.objects.create(
+        full_name="nodejs/node",
+        owner="nodejs",
+        name="node",
+        url="https://github.com/nodejs/node",
+        topics=["javascript", "runtime"],
+    )
+    AwesomeListItem.objects.create(awesome_list=django_list, repository=django_repo)
+    AwesomeListItem.objects.create(awesome_list=node_list, repository=node_repo)
+
+    counts = repository_json_value_counts("topics", awesome_list=django_list)
+
+    assert counts == [
+        {"name": "django", "count": 1},
+        {"name": "python", "count": 1},
+    ]
+
+
 def test_repository_json_value_counts_rejects_unknown_fields():
     with pytest.raises(ValueError, match="Unsupported repository JSON filter field"):
         repository_json_value_counts("readme")
@@ -2344,6 +2381,169 @@ def test_awesome_list_detail_page_renders_activity_metrics(client):
     assert b"Commits" in response.content
     assert b"django/django" in response.content
     assert b"Python" in response.content
+
+
+@pytest.mark.django_db
+def test_awesome_list_detail_page_filters_repositories(client):
+    awesome_list = AwesomeList.objects.create(
+        name="Awesome Django",
+        slug="awesome-django",
+        source_url="https://github.com/wsvincent/awesome-django",
+        last_scanned_at=timezone.now(),
+    )
+    django_repo = Repository.objects.create(
+        full_name="django/django",
+        owner="django",
+        name="django",
+        url="https://github.com/django/django",
+        description="The Django web framework",
+        language="Python",
+        topics=["django", "python"],
+        generated_tags=["web-framework"],
+        stars=80000,
+        commit_count=90000,
+        github_pushed_at=timezone.now(),
+        uses_ai_for_development=True,
+    )
+    node_repo = Repository.objects.create(
+        full_name="nodejs/node",
+        owner="nodejs",
+        name="node",
+        url="https://github.com/nodejs/node",
+        description="JavaScript runtime",
+        language="JavaScript",
+        topics=["javascript", "runtime"],
+        generated_tags=["server-runtime"],
+        stars=110000,
+        commit_count=120000,
+        github_pushed_at=timezone.now() - timedelta(days=500),
+        is_archived=True,
+    )
+    AwesomeListItem.objects.create(awesome_list=awesome_list, repository=django_repo)
+    AwesomeListItem.objects.create(awesome_list=awesome_list, repository=node_repo)
+
+    response = client.get(
+        reverse("repos:list_detail", kwargs={"slug": "awesome-django"}),
+        {
+            "q": "django",
+            "language": "Python",
+            "topic": "django",
+            "generated_tag": "web-framework",
+            "min_stars": "50",
+            "updated_days": "30",
+            "archived": "no",
+            "ai_development": "yes",
+            "sort": "commits",
+        },
+    )
+
+    assert response.status_code == 200
+    content = response.content.decode()
+    assert "django/django" in content
+    assert "nodejs/node" not in content
+    assert "django (1)" in content
+    assert "web-framework (1)" in content
+    assert response.context["filters_applied"] is True
+    assert response.context["page_obj"].paginator.count == 1
+    assert response.context["repo_stats"]["active_count"] == 1
+    assert response.context["repo_stats"]["archived_count"] == 1
+
+
+@pytest.mark.django_db
+def test_awesome_list_detail_page_sorts_by_cross_list_mentions(client):
+    awesome_list = AwesomeList.objects.create(
+        name="Awesome Django",
+        slug="awesome-django",
+        source_url="https://github.com/wsvincent/awesome-django",
+    )
+    other_list = AwesomeList.objects.create(
+        name="Awesome Python",
+        slug="awesome-python",
+        source_url="https://github.com/vinta/awesome-python",
+    )
+    popular = Repository.objects.create(
+        full_name="owner/popular",
+        owner="owner",
+        name="popular",
+        url="https://github.com/owner/popular",
+        stars=10,
+    )
+    solo = Repository.objects.create(
+        full_name="owner/solo",
+        owner="owner",
+        name="solo",
+        url="https://github.com/owner/solo",
+        stars=100,
+    )
+    AwesomeListItem.objects.create(awesome_list=awesome_list, repository=popular)
+    AwesomeListItem.objects.create(awesome_list=other_list, repository=popular)
+    AwesomeListItem.objects.create(awesome_list=awesome_list, repository=solo)
+
+    response = client.get(
+        reverse("repos:list_detail", kwargs={"slug": "awesome-django"}),
+        {"sort": "awesome"},
+    )
+
+    assert response.status_code == 200
+    repos = list(response.context["page_obj"].object_list)
+    assert [repo.full_name for repo in repos] == ["owner/popular", "owner/solo"]
+    assert repos[0].awesome_count == 2
+    assert b"2 list mentions" in response.content
+
+
+@pytest.mark.django_db
+def test_awesome_list_detail_page_ignores_extreme_updated_days_filter(client):
+    awesome_list = AwesomeList.objects.create(
+        name="Awesome Django",
+        slug="awesome-django",
+        source_url="https://github.com/wsvincent/awesome-django",
+    )
+    repo = Repository.objects.create(
+        full_name="django/django",
+        owner="django",
+        name="django",
+        url="https://github.com/django/django",
+        github_pushed_at=timezone.now(),
+    )
+    AwesomeListItem.objects.create(awesome_list=awesome_list, repository=repo)
+
+    response = client.get(
+        reverse("repos:list_detail", kwargs={"slug": "awesome-django"}),
+        {"updated_days": "1000000000"},
+    )
+
+    assert response.status_code == 200
+    assert response.context["page_obj"].paginator.count == 1
+    assert b"django/django" in response.content
+
+
+@pytest.mark.django_db
+def test_awesome_list_detail_page_preserves_filters_in_pagination_links(client):
+    awesome_list = AwesomeList.objects.create(
+        name="Awesome Django",
+        slug="awesome-django",
+        source_url="https://github.com/wsvincent/awesome-django",
+    )
+    for index in range(51):
+        repo = Repository.objects.create(
+            full_name=f"owner/repo-{index:02d}",
+            owner="owner",
+            name=f"repo-{index:02d}",
+            url=f"https://github.com/owner/repo-{index:02d}",
+            description="Owner maintained Django package",
+            language="Python",
+            stars=index,
+        )
+        AwesomeListItem.objects.create(awesome_list=awesome_list, repository=repo)
+
+    response = client.get(
+        reverse("repos:list_detail", kwargs={"slug": "awesome-django"}),
+        {"page": "2", "q": "owner", "sort": "name"},
+    )
+
+    assert response.status_code == 200
+    assert response.context["page_obj"].paginator.count == 51
+    assert "?page=1&amp;q=owner&amp;sort=name" in response.content.decode()
 
 
 @pytest.mark.django_db
