@@ -4,8 +4,8 @@ from apps.repos.models import AwesomeList, Repository
 from apps.repos.services import (
     add_repository_to_awesome_list,
     discover_missing_awesome_list_repositories,
-    refresh_repositories,
     sync_awesome_list,
+    upsert_repository_from_github,
 )
 from awesome_repos.utils import get_awesome_repos_logger
 
@@ -152,8 +152,61 @@ def add_missing_repository_to_awesome_list_task(awesome_list_id: int, repo_full_
         raise
 
 
-def refresh_repositories_task(limit: int | None = None):
-    return refresh_repositories(
-        Repository.objects.order_by("last_synced_at", "full_name"),
-        limit=limit,
+def refresh_repository_task(repository_id: int, full_name: str):
+    logger.info(
+        "repository_refresh_task_started",
+        repository_id=repository_id,
+        repository_full_name=full_name,
     )
+    try:
+        refreshed = upsert_repository_from_github(full_name)
+        logger.info(
+            "repository_refresh_task_finished",
+            requested_repository_id=repository_id,
+            repository_id=refreshed.id,
+            repository_full_name=refreshed.full_name,
+        )
+        return {
+            "repository_id": refreshed.id,
+            "full_name": refreshed.full_name,
+        }
+    except Exception as exc:
+        logger.error(
+            "repository_refresh_task_failed",
+            repository_id=repository_id,
+            repository_full_name=full_name,
+            error=str(exc),
+            exc_info=True,
+        )
+        raise
+
+
+def refresh_repositories_task(limit: int | None = None):
+    queryset = Repository.objects.order_by("last_synced_at", "full_name").values_list(
+        "id",
+        "full_name",
+    )
+    if limit is not None:
+        queryset = queryset[:limit]
+
+    queued = []
+    for repository_id, full_name in queryset.iterator():
+        task_id = async_task(
+            "apps.repos.tasks.refresh_repository_task",
+            repository_id,
+            full_name,
+            group="Refresh repositories",
+        )
+        queued.append(
+            {
+                "repository_id": repository_id,
+                "full_name": full_name,
+                "task_id": task_id,
+            }
+        )
+
+    logger.info("repository_refresh_fanout_finished", queued=len(queued), limit=limit)
+    return {
+        "queued": len(queued),
+        "repositories": queued[:25],
+    }
