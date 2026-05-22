@@ -25,10 +25,10 @@
     </div>
   </div>
 
-  <form method="get" class="mb-8 rounded-3xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-900">
+  <form method="get" x-data="{ searchMode: '{{ request.GET.mode|escapejs }}' }" class="mb-8 rounded-3xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-900">
     <div class="grid gap-3 md:grid-cols-7">
       <input name="q" value="{{ request.GET.q }}" placeholder="Search name, description, language, topics, tags" class="rounded-xl border border-gray-300 bg-white px-4 py-3 md:col-span-2 dark:border-gray-700 dark:bg-gray-950" />
-      <select name="mode" aria-label="Search mode" class="rounded-xl border border-gray-300 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-950">
+      <select name="mode" aria-label="Search mode" x-model="searchMode" class="rounded-xl border border-gray-300 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-950">
         <option value="" {% if request.GET.mode != "semantic" %}selected{% endif %}>Keyword match</option>
         <option value="semantic" {% if request.GET.mode == "semantic" %}selected{% endif %}>Semantic relevance</option>
       </select>
@@ -70,7 +70,7 @@
         <option value="no" {% if request.GET.archived == "no" %}selected{% endif %}>Active only</option>
         <option value="yes" {% if request.GET.archived == "yes" %}selected{% endif %}>Archived only</option>
       </select>
-      <select name="sort" class="rounded-xl border border-gray-300 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-950">
+      <select name="sort" x-bind:disabled="searchMode === 'semantic'" class="rounded-xl border border-gray-300 bg-white px-4 py-3 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400 dark:border-gray-700 dark:bg-gray-950 disabled:dark:bg-gray-900 disabled:dark:text-gray-500" {% if request.GET.mode == "semantic" %}disabled{% endif %}>
         <option value="stars" {% if request.GET.sort == "stars" or not request.GET.sort %}selected{% endif %}>Sort by stars</option>
         <option value="recent" {% if request.GET.sort == "recent" %}selected{% endif %}>Recently updated</option>
         <option value="created" {% if request.GET.sort == "created" %}selected{% endif %}>Recently created</option>

@@ -1,4 +1,5 @@
 import base64
+import re
 from datetime import timedelta
 from io import StringIO
 
@@ -1492,8 +1493,15 @@ def test_search_page_exposes_semantic_search_filter(client):
     response = client.get(reverse("repos:search"), {"q": "framework", "mode": "semantic"})
 
     assert response.status_code == 200
-    assert b'name="mode"' in response.content
-    assert b'<option value="semantic" selected>Semantic relevance</option>' in response.content
+    content = response.content.decode()
+    assert 'name="mode"' in content
+    assert 'x-model="searchMode"' in content
+    assert '<option value="semantic" selected>Semantic relevance</option>' in content
+
+    sort_select = re.search(r'<select\b[^>]*\bname="sort"[^>]*>', content)
+    assert sort_select is not None
+    assert 'x-bind:disabled="searchMode === \'semantic\'"' in sort_select.group(0)
+    assert re.search(r"\sdisabled(?=[\s>])", sort_select.group(0))
 
 
 @pytest.mark.django_db
