@@ -76,6 +76,8 @@ class Repository(BaseModel):
     readme_url = models.URLField(max_length=500, blank=True, default="")
     readme_synced_at = models.DateTimeField(null=True, blank=True)
     readme_last_error = models.TextField(blank=True, default="")
+    uses_ai_for_development = models.BooleanField(default=False)
+    ai_development_signals = models.JSONField(default=list, blank=True)
     generated_tags = models.JSONField(default=list, blank=True)
     generated_tags_model = models.CharField(max_length=255, blank=True, default="")
     generated_tags_source_hash = models.CharField(max_length=64, blank=True, default="")
@@ -90,6 +92,7 @@ class Repository(BaseModel):
             models.Index(fields=["-github_pushed_at"]),
             models.Index(fields=["is_archived"]),
             models.Index(fields=["language"]),
+            models.Index(fields=["uses_ai_for_development"]),
             GinIndex(fields=["topics"], name="repo_topics_gin_idx"),
             GinIndex(fields=["generated_tags"], name="repo_gen_tags_gin_idx"),
         ]

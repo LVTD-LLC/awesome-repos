@@ -19,8 +19,6 @@ class TestHomeView:
         response = auth_client.get(url)
         assert "pages/home.html" in [t.name for t in response.templates]
 
-    
-
     def test_rotate_api_key_stores_hash_and_shows_key_once(self, auth_client, profile):
         response = auth_client.post(reverse("rotate_api_key"), follow=True)
         content = response.content.decode()

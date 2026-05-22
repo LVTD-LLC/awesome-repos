@@ -67,17 +67,19 @@ class RepositoryAdmin(admin.ModelAdmin):
         "language",
         "generated_tags",
         "is_archived",
+        "uses_ai_for_development",
         "github_pushed_at",
         "awesome_count",
     )
     search_fields = ("full_name", "description", "language", "topics", "generated_tags")
-    list_filter = ("is_archived", "is_fork", "language")
+    list_filter = ("uses_ai_for_development", "is_archived", "is_fork", "language")
     readonly_fields = (
         "readme",
         "readme_path",
         "readme_url",
         "readme_synced_at",
         "readme_last_error",
+        "ai_development_signals",
         "generated_tags",
         "generated_tags_model",
         "generated_tags_source_hash",

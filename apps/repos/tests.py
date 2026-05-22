@@ -28,12 +28,14 @@ from apps.repos.services import (
     GitHubAPIError,
     add_repository_to_awesome_list,
     attach_awesome_list_commit_count,
+    detect_ai_development_signals,
     discover_missing_awesome_list_repositories,
     extract_github_repos,
     fetch_github_commit_count,
     fetch_json,
     fetch_repository_readme,
     fetch_repository_readme_data,
+    fetch_repository_tree_items,
     github_rate_limit_status,
     parse_github_repo_url,
     repository_performance_summary,
@@ -349,6 +351,10 @@ def stub_repository_readme(monkeypatch, content="# Django\n"):
             "readme_last_error": "",
         },
     )
+    monkeypatch.setattr(
+        "apps.repos.services.fetch_repository_ai_development_signals",
+        lambda full_name, default_branch: [],
+    )
 
 
 @pytest.mark.django_db
@@ -445,15 +451,62 @@ def test_fetch_repository_readme_data_decodes_github_contents_metadata(monkeypat
     }
 
 
+def test_detect_ai_development_signals_identifies_common_agent_files():
+    signals = detect_ai_development_signals(
+        [
+            {"path": "AGENTS.md", "type": "blob"},
+            {"path": "docs/CONTRIBUTING.md", "type": "blob"},
+            {"path": ".github/copilot-instructions.md", "type": "blob"},
+            {"path": ".github/instructions/python.instructions.md", "type": "blob"},
+            {"path": ".cursor", "type": "tree"},
+            {"path": ".cursor/rules/backend.mdc", "type": "blob"},
+            {"path": ".windsurf/rules/style.md", "type": "blob"},
+            {"path": ".gemini/settings.json", "type": "blob"},
+            {"path": ".devin/config.json", "type": "blob"},
+            {"path": ".clinerules/testing.md", "type": "blob"},
+            {"path": ".aider.conf.yml", "type": "blob"},
+            {"path": ".coderabbit.yml", "type": "tree"},
+        ]
+    )
+
+    signal_paths = {signal["path"] for signal in signals}
+    assert "AGENTS.md" in signal_paths
+    assert ".github/copilot-instructions.md" in signal_paths
+    assert ".github/instructions/python.instructions.md" in signal_paths
+    assert ".cursor" in signal_paths
+    assert ".cursor/rules/backend.mdc" in signal_paths
+    assert ".windsurf/rules/style.md" in signal_paths
+    assert ".gemini/settings.json" in signal_paths
+    assert ".devin/config.json" in signal_paths
+    assert ".clinerules/testing.md" in signal_paths
+    assert ".aider.conf.yml" in signal_paths
+    assert "docs/CONTRIBUTING.md" not in signal_paths
+    assert ".coderabbit.yml" not in signal_paths
+    assert len(signal_paths) == len(signals)
+
+
+def test_fetch_repository_tree_items_rejects_truncated_github_trees(monkeypatch):
+    monkeypatch.setattr(
+        "apps.repos.services.fetch_json",
+        lambda url: {
+            "truncated": True,
+            "tree": [{"path": "AGENTS.md", "type": "blob"}],
+        },
+    )
+
+    with pytest.raises(RuntimeError, match="GitHub tree for django/django is truncated"):
+        fetch_repository_tree_items("django/django", "main")
+
+
 def test_fetch_github_commit_count_uses_last_link_page(monkeypatch):
     captured = {}
 
     class DummyResponse:
         headers = {
             "Link": (
-                '<https://api.github.com/repositories/1/commits?sha=main&per_page=1&page=2>;'
+                "<https://api.github.com/repositories/1/commits?sha=main&per_page=1&page=2>;"
                 ' rel="next", '
-                '<https://api.github.com/repositories/1/commits?sha=main&per_page=1&page=456>;'
+                "<https://api.github.com/repositories/1/commits?sha=main&per_page=1&page=456>;"
                 ' rel="last"'
             )
         }
@@ -540,6 +593,38 @@ def test_upsert_repository_from_github_stores_readme(monkeypatch):
 
 
 @pytest.mark.django_db
+def test_upsert_repository_from_github_stores_ai_development_signals(monkeypatch):
+    readme = "# Django\nThe Web framework.\n"
+
+    def fake_fetch_json(url):
+        if url.endswith("/readme"):
+            return {
+                "encoding": "base64",
+                "content": base64.b64encode(readme.encode("utf-8")).decode("ascii"),
+                "path": "README.md",
+                "download_url": "https://raw.githubusercontent.com/django/django/main/README.md",
+            }
+        if "/git/trees/" in url:
+            return {
+                "tree": [
+                    {"path": "AGENTS.md", "type": "blob"},
+                    {"path": ".github/copilot-instructions.md", "type": "blob"},
+                ]
+            }
+        return github_repo_payload(stars=80000, forks=32000, watchers=1200)
+
+    monkeypatch.setattr("apps.repos.services.fetch_json", fake_fetch_json)
+
+    repo = upsert_repository_from_github("django/django")
+
+    assert repo.uses_ai_for_development is True
+    assert {signal["path"] for signal in repo.ai_development_signals} == {
+        "AGENTS.md",
+        ".github/copilot-instructions.md",
+    }
+
+
+@pytest.mark.django_db
 def test_upsert_repository_from_github_preserves_readme_when_refresh_fails(monkeypatch):
     previous_readme_synced_at = timezone.now() - timedelta(days=1)
     repo = Repository.objects.create(
@@ -575,6 +660,52 @@ def test_upsert_repository_from_github_preserves_readme_when_refresh_fails(monke
     assert repo.readme_url == ("https://raw.githubusercontent.com/django/django/main/README.md")
     assert repo.readme_last_error == "404 Not Found"
     assert repo.readme_synced_at == previous_readme_synced_at
+
+
+@pytest.mark.django_db
+def test_upsert_repository_from_github_preserves_ai_signals_when_tree_fetch_fails(monkeypatch):
+    repo = Repository.objects.create(
+        full_name="django/django",
+        owner="django",
+        name="django",
+        url="https://github.com/django/django",
+        uses_ai_for_development=True,
+        ai_development_signals=[
+            {
+                "path": "AGENTS.md",
+                "kind": "file",
+                "tool": "Agent instructions",
+                "signal": "agent_instructions",
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        "apps.repos.services.fetch_json",
+        lambda url: github_repo_payload(stars=15, forks=4, watchers=2),
+    )
+    monkeypatch.setattr(
+        "apps.repos.services.fetch_repository_readme_data",
+        lambda full_name: {
+            "ok": False,
+            "readme": "",
+            "readme_path": "",
+            "readme_url": "",
+            "readme_last_error": "404 Not Found",
+        },
+    )
+
+    def fail_ai_signals(full_name, default_branch):
+        raise RuntimeError("tree failed")
+
+    monkeypatch.setattr(
+        "apps.repos.services.fetch_repository_ai_development_signals",
+        fail_ai_signals,
+    )
+
+    repo = upsert_repository_from_github(repo.full_name)
+
+    assert repo.uses_ai_for_development is True
+    assert repo.ai_development_signals[0]["path"] == "AGENTS.md"
 
 
 @pytest.mark.django_db
@@ -614,6 +745,50 @@ def test_upsert_repository_from_github_can_refresh_metadata_without_readme(monke
     assert repo.readme_last_error == "old README error"
     assert repo.readme_synced_at == previous_readme_synced_at
     assert RepositorySnapshot.objects.filter(repository=repo).count() == 1
+
+
+@pytest.mark.django_db
+def test_upsert_repository_from_github_preserves_ai_signals_when_tree_is_truncated(
+    monkeypatch,
+):
+    repo = Repository.objects.create(
+        full_name="django/django",
+        owner="django",
+        name="django",
+        url="https://github.com/django/django",
+        uses_ai_for_development=True,
+        ai_development_signals=[
+            {
+                "path": "AGENTS.md",
+                "kind": "file",
+                "tool": "Agent instructions",
+                "signal": "agent_instructions",
+            }
+        ],
+    )
+
+    def fake_fetch_json(url):
+        if url.endswith("/readme"):
+            return {
+                "encoding": "base64",
+                "content": base64.b64encode(b"# Django\n").decode("ascii"),
+                "path": "README.md",
+                "download_url": "https://raw.githubusercontent.com/django/django/main/README.md",
+            }
+        if "/git/trees/" in url:
+            return {
+                "truncated": True,
+                "tree": [],
+            }
+        return github_repo_payload(stars=15, forks=4, watchers=2)
+
+    monkeypatch.setattr("apps.repos.services.fetch_json", fake_fetch_json)
+
+    repo = upsert_repository_from_github(repo.full_name)
+
+    assert repo.stars == 15
+    assert repo.uses_ai_for_development is True
+    assert repo.ai_development_signals[0]["path"] == "AGENTS.md"
 
 
 @pytest.mark.django_db
@@ -1560,6 +1735,15 @@ def test_repository_search_filters_and_sorts():
         language="Python",
         stars=50,
         github_pushed_at=timezone.now(),
+        uses_ai_for_development=True,
+        ai_development_signals=[
+            {
+                "path": "AGENTS.md",
+                "kind": "file",
+                "tool": "Agent instructions",
+                "signal": "agent_instructions",
+            }
+        ],
     )
     old = Repository.objects.create(
         full_name="owner/old",
@@ -1583,6 +1767,9 @@ def test_repository_search_filters_and_sorts():
 
     qs = repository_search_queryset({"min_stars": "80"})
     assert list(qs) == [old]
+
+    qs = repository_search_queryset({"ai_development": "yes"})
+    assert list(qs) == [recent]
 
 
 @pytest.mark.django_db
@@ -1896,9 +2083,7 @@ def test_search_page_renders(client):
     assert b"django (1)" in response.content
     assert b"web-framework (1)" in response.content
     assert response.context["total_lists"] == 1
-    assert list(response.context["awesome_lists"].values_list("id", flat=True)) == [
-        active_list.id
-    ]
+    assert list(response.context["awesome_lists"].values_list("id", flat=True)) == [active_list.id]
     assert b"Inactive List" not in response.content
 
 
@@ -1932,7 +2117,7 @@ def test_search_page_exposes_semantic_search_filter(client):
 
     sort_select = re.search(r'<select\b[^>]*\bname="sort"[^>]*>', content)
     assert sort_select is not None
-    assert 'x-bind:disabled="searchMode === \'semantic\'"' in sort_select.group(0)
+    assert "x-bind:disabled=\"searchMode === 'semantic'\"" in sort_select.group(0)
     assert re.search(r"\sdisabled(?=[\s>])", sort_select.group(0))
 
 
