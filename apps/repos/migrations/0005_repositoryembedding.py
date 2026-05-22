@@ -11,7 +11,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
     dependencies = [
         ("core", "0001_enable_extensions"),
-        ("repos", "0003_schedule_monthly_repository_refresh"),
+        ("repos", "0004_repositorysnapshot"),
     ]
 
     operations = [

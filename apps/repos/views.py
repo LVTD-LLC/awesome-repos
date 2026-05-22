@@ -4,7 +4,7 @@ from django.shortcuts import get_object_or_404
 from django.views.generic import DetailView, ListView
 
 from apps.repos.models import AwesomeList, Repository
-from apps.repos.services import repository_search_queryset
+from apps.repos.services import repository_performance_summary, repository_search_queryset
 
 
 class RepositorySearchView(ListView):
@@ -43,6 +43,11 @@ class RepositoryDetailView(DetailView):
         full_name = f"{self.kwargs['owner']}/{self.kwargs['name']}"
         queryset = Repository.objects.prefetch_related("awesome_items__awesome_list")
         return get_object_or_404(queryset, full_name=full_name)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["performance"] = repository_performance_summary(self.object)
+        return context
 
 
 class AwesomeListDetailView(DetailView):
