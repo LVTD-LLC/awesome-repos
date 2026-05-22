@@ -153,49 +153,79 @@ def extract_github_repos(markdown: str) -> list[str]:
     return sorted(repos, key=str.lower)
 
 
-def raw_readme_url(full_name: str, default_branch: str = "main") -> str:
+def raw_readme_url(
+    full_name: str,
+    default_branch: str = "main",
+    filename: str = "README.md",
+) -> str:
     owner, repo = full_name.split("/", 1)
-    return f"https://raw.githubusercontent.com/{owner}/{repo}/{default_branch}/README.md"
+    return f"https://raw.githubusercontent.com/{owner}/{repo}/{default_branch}/{filename}"
+
+
+def readme_candidate_urls(full_name: str, default_branch: str):
+    for filename in README_CANDIDATES:
+        yield filename, raw_readme_url(full_name, default_branch, filename)
 
 
 def fetch_awesome_readme(full_name: str) -> tuple[str, dict]:
     repo_meta = fetch_json(f"https://api.github.com/repos/{full_name}")
     branch = repo_meta.get("default_branch") or "main"
-    owner, repo = full_name.split("/", 1)
     last_error = None
-    for filename in README_CANDIDATES:
-        url = f"https://raw.githubusercontent.com/{owner}/{repo}/{branch}/{filename}"
+    for _filename, url in readme_candidate_urls(full_name, branch):
         try:
             return fetch_text(url), repo_meta
-        except (HTTPError, URLError, TimeoutError) as exc:
+        except (RuntimeError, URLError, TimeoutError) as exc:
             last_error = exc
     raise RuntimeError(f"Could not fetch README for {full_name}: {last_error}")
 
 
-def fetch_repository_readme(full_name: str) -> str:
+def fetch_repository_readme_data(full_name: str) -> dict:
     try:
         data = fetch_json(f"https://api.github.com/repos/{full_name}/readme")
     except RuntimeError as exc:
         if str(exc).startswith("404 "):
-            return ""
+            return {
+                "ok": False,
+                "readme": "",
+                "readme_path": "",
+                "readme_url": "",
+                "readme_last_error": str(exc),
+            }
         raise
 
+    readme = ""
     content = data.get("content") or ""
     if data.get("encoding") == "base64" and content:
         try:
-            return base64.b64decode(content).decode("utf-8", errors="replace")
-        except (binascii.Error, ValueError):
+            readme = base64.b64decode(content).decode("utf-8", errors="replace")
+        except binascii.Error, ValueError:
             logger.warning(
                 "repository_readme_decode_failed",
                 repo_full_name=full_name,
             )
-            return ""
+            return {
+                "ok": False,
+                "readme": "",
+                "readme_path": data.get("path") or "",
+                "readme_url": data.get("download_url") or "",
+                "readme_last_error": "Could not decode README content.",
+            }
 
-    download_url = data.get("download_url")
-    if download_url:
-        return fetch_text(download_url)
+    download_url = data.get("download_url") or ""
+    if not readme and download_url:
+        readme = fetch_text(download_url)
 
-    return ""
+    return {
+        "ok": bool(readme),
+        "readme": readme,
+        "readme_path": data.get("path") or "",
+        "readme_url": download_url,
+        "readme_last_error": "" if readme else "README content was empty.",
+    }
+
+
+def fetch_repository_readme(full_name: str) -> str:
+    return fetch_repository_readme_data(full_name)["readme"]
 
 
 def dt(value: str | None):
@@ -238,9 +268,34 @@ def record_repository_snapshot(
 
 
 @transaction.atomic
-def _upsert_repository_metadata(data: dict, *, synced_at) -> Repository:
+def _upsert_repository_metadata(data: dict, *, synced_at, readme_data: dict) -> Repository:
     full_name = data["full_name"]
     license_data = data.get("license") or {}
+    default_branch = data.get("default_branch") or ""
+    existing_repo = (
+        Repository.objects.filter(full_name=full_name)
+        .only(
+            "readme",
+            "readme_path",
+            "readme_url",
+        )
+        .first()
+    )
+    if readme_data["ok"]:
+        readme_defaults = {
+            "readme": readme_data["readme"],
+            "readme_path": readme_data["readme_path"],
+            "readme_url": readme_data["readme_url"],
+            "readme_last_error": "",
+        }
+    else:
+        readme_defaults = {
+            "readme": existing_repo.readme if existing_repo else "",
+            "readme_path": existing_repo.readme_path if existing_repo else "",
+            "readme_url": existing_repo.readme_url if existing_repo else "",
+            "readme_last_error": readme_data["readme_last_error"],
+        }
+
     repo, _ = Repository.objects.update_or_create(
         full_name=full_name,
         defaults={
@@ -257,7 +312,7 @@ def _upsert_repository_metadata(data: dict, *, synced_at) -> Repository:
             "forks": data.get("forks_count") or 0,
             "open_issues": data.get("open_issues_count") or 0,
             "watchers": data.get("subscribers_count") or data.get("watchers_count") or 0,
-            "default_branch": data.get("default_branch") or "",
+            "default_branch": default_branch,
             "is_archived": bool(data.get("archived")),
             "is_disabled": bool(data.get("disabled")),
             "is_fork": bool(data.get("fork")),
@@ -265,6 +320,8 @@ def _upsert_repository_metadata(data: dict, *, synced_at) -> Repository:
             "github_updated_at": dt(data.get("updated_at")),
             "github_pushed_at": dt(data.get("pushed_at")),
             "last_synced_at": synced_at,
+            "readme_synced_at": synced_at,
+            **readme_defaults,
             "raw": data,
         },
     )
@@ -274,19 +331,30 @@ def _upsert_repository_metadata(data: dict, *, synced_at) -> Repository:
 
 def upsert_repository_from_github(full_name: str) -> Repository:
     data = fetch_json(f"https://api.github.com/repos/{full_name}")
-    repo = _upsert_repository_metadata(data, synced_at=timezone.now())
+    try:
+        readme_data = fetch_repository_readme_data(data["full_name"])
+    except Exception as exc:  # noqa: BLE001 - README fetch should not block metadata sync
+        logger.warning(
+            "repository_readme_fetch_failed",
+            repo_full_name=data["full_name"],
+            error=str(exc),
+            exc_info=True,
+        )
+        readme_data = {
+            "ok": False,
+            "readme": "",
+            "readme_path": "",
+            "readme_url": "",
+            "readme_last_error": str(exc),
+        }
+
+    repo = _upsert_repository_metadata(
+        data,
+        synced_at=timezone.now(),
+        readme_data=readme_data,
+    )
     if repository_embeddings_configured():
-        try:
-            readme_text = fetch_repository_readme(repo.full_name)
-        except Exception as exc:  # noqa: BLE001 - README/embedding should not block metadata sync
-            logger.warning(
-                "repository_readme_fetch_failed",
-                repo_full_name=repo.full_name,
-                error=str(exc),
-                exc_info=True,
-            )
-        else:
-            sync_repository_embedding(repo, readme_text)
+        sync_repository_embedding(repo, repo.readme)
 
     return repo
 
@@ -583,9 +651,7 @@ def _apply_repository_semantic_search(qs, q: str):
             vector__isnull=False,
             vector__model=settings.REPOSITORY_EMBEDDING_MODEL,
             vector__dimensions=REPOSITORY_EMBEDDING_DIMENSIONS,
-        ).annotate(
-            vector_distance=CosineDistance("vector__embedding", response.vector)
-        ),
+        ).annotate(vector_distance=CosineDistance("vector__embedding", response.vector)),
         True,
     )
 

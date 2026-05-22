@@ -44,7 +44,14 @@ class RepositoryAdmin(admin.ModelAdmin):
     )
     search_fields = ("full_name", "description", "language")
     list_filter = ("is_archived", "is_fork", "language")
-    readonly_fields = ("raw",)
+    readonly_fields = (
+        "readme",
+        "readme_path",
+        "readme_url",
+        "readme_synced_at",
+        "readme_last_error",
+        "raw",
+    )
 
     def awesome_count(self, obj):
         return obj.awesome_items.count()

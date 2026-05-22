@@ -29,6 +29,7 @@ from apps.repos.services import (
     extract_github_repos,
     fetch_json,
     fetch_repository_readme,
+    fetch_repository_readme_data,
     github_rate_limit_status,
     parse_github_repo_url,
     repository_performance_summary,
@@ -205,12 +206,26 @@ def github_repo_payload(full_name="django/django", stars=80000, forks=32000, wat
     }
 
 
+def stub_repository_readme(monkeypatch, content="# Django\n"):
+    monkeypatch.setattr(
+        "apps.repos.services.fetch_repository_readme_data",
+        lambda full_name: {
+            "ok": True,
+            "readme": content,
+            "readme_path": "README.md",
+            "readme_url": f"https://raw.githubusercontent.com/{full_name}/main/README.md",
+            "readme_last_error": "",
+        },
+    )
+
+
 @pytest.mark.django_db
 def test_upsert_repository_from_github_records_snapshot(monkeypatch):
     monkeypatch.setattr(
         "apps.repos.services.fetch_json",
         lambda url: github_repo_payload(stars=80000, forks=32000, watchers=1200),
     )
+    stub_repository_readme(monkeypatch)
 
     repo = upsert_repository_from_github("django/django")
 
@@ -235,6 +250,7 @@ def test_upsert_repository_from_github_records_snapshot_for_each_refresh(monkeyp
         return payloads.pop(0)
 
     monkeypatch.setattr("apps.repos.services.fetch_json", fake_fetch_json)
+    stub_repository_readme(monkeypatch)
 
     repo = upsert_repository_from_github("django/django")
     repo = upsert_repository_from_github("django/django")
@@ -258,6 +274,7 @@ def test_upsert_repository_from_github_rolls_back_when_snapshot_fails(monkeypatc
         "apps.repos.services.fetch_json",
         lambda url: github_repo_payload(stars=15, forks=4, watchers=2),
     )
+    stub_repository_readme(monkeypatch, content="# Updated Django\n")
 
     def fail_snapshot(repository, *, captured_at=None, source="github_api"):
         raise RuntimeError("snapshot failed")
@@ -271,6 +288,93 @@ def test_upsert_repository_from_github_rolls_back_when_snapshot_fails(monkeypatc
     assert repo.stars == 10
     assert repo.last_synced_at is None
     assert RepositorySnapshot.objects.filter(repository=repo).count() == 0
+
+
+def test_fetch_repository_readme_data_decodes_github_contents_metadata(monkeypatch):
+    readme = "# Django\n\nThe Web framework."
+    monkeypatch.setattr(
+        "apps.repos.services.fetch_json",
+        lambda url: {
+            "encoding": "base64",
+            "content": base64.b64encode(readme.encode("utf-8")).decode("ascii"),
+            "path": "README.md",
+            "download_url": "https://raw.githubusercontent.com/django/django/main/README.md",
+        },
+    )
+
+    result = fetch_repository_readme_data("django/django")
+
+    assert result == {
+        "ok": True,
+        "readme": readme,
+        "readme_path": "README.md",
+        "readme_url": "https://raw.githubusercontent.com/django/django/main/README.md",
+        "readme_last_error": "",
+    }
+
+
+@pytest.mark.django_db
+def test_upsert_repository_from_github_stores_readme(monkeypatch):
+    readme = "# Django\nThe Web framework.\n"
+
+    def fake_fetch_json(url):
+        if url.endswith("/readme"):
+            return {
+                "encoding": "base64",
+                "content": base64.b64encode(readme.encode("utf-8")).decode("ascii"),
+                "path": "README.md",
+                "download_url": "https://raw.githubusercontent.com/django/django/main/README.md",
+            }
+        return github_repo_payload(stars=80000, forks=32000, watchers=1200)
+
+    monkeypatch.setattr(
+        "apps.repos.services.fetch_json",
+        fake_fetch_json,
+    )
+
+    repo = upsert_repository_from_github("django/django")
+
+    assert repo.readme == readme
+    assert repo.readme_path == "README.md"
+    assert repo.readme_url == ("https://raw.githubusercontent.com/django/django/main/README.md")
+    assert repo.readme_synced_at == repo.last_synced_at
+    assert repo.readme_last_error == ""
+
+
+@pytest.mark.django_db
+def test_upsert_repository_from_github_preserves_readme_when_refresh_fails(monkeypatch):
+    repo = Repository.objects.create(
+        full_name="django/django",
+        owner="django",
+        name="django",
+        url="https://github.com/django/django",
+        readme="# Existing README\n",
+        readme_path="README.md",
+        readme_url="https://raw.githubusercontent.com/django/django/main/README.md",
+    )
+    monkeypatch.setattr(
+        "apps.repos.services.fetch_json",
+        lambda url: github_repo_payload(stars=15, forks=4, watchers=2),
+    )
+    monkeypatch.setattr(
+        "apps.repos.services.fetch_repository_readme_data",
+        lambda full_name: {
+            "ok": False,
+            "readme": "",
+            "readme_path": "",
+            "readme_url": "",
+            "readme_last_error": "404 Not Found",
+        },
+    )
+
+    repo = upsert_repository_from_github(repo.full_name)
+
+    assert repo.stars == 15
+    assert repo.readme == "# Existing README\n"
+    assert repo.readme_path == "README.md"
+    assert repo.readme_url == ("https://raw.githubusercontent.com/django/django/main/README.md")
+    assert repo.readme_last_error == "404 Not Found"
+    assert repo.readme_synced_at == repo.last_synced_at
 
 
 @pytest.mark.django_db
@@ -572,28 +676,41 @@ def test_upsert_repository_from_github_syncs_embedding_from_readme(monkeypatch, 
 
 
 @pytest.mark.django_db
-def test_upsert_repository_from_github_skips_readme_when_embeddings_unconfigured(
+def test_upsert_repository_from_github_stores_readme_when_embeddings_unconfigured(
     monkeypatch,
     settings,
 ):
     settings.OPENROUTER_API_KEY = ""
     settings.REPOSITORY_EMBEDDINGS_ENABLED = True
+    readme = "# Django\n"
 
-    def fail_fetch_repository_readme(full_name):
-        raise AssertionError("README should not be fetched when embeddings are unconfigured")
+    def fake_fetch_json(url):
+        if url.endswith("/readme"):
+            return {
+                "encoding": "base64",
+                "content": base64.b64encode(readme.encode("utf-8")).decode("ascii"),
+                "path": "README.md",
+                "download_url": "https://raw.githubusercontent.com/django/django/main/README.md",
+            }
+        return github_repo_api_payload()
+
+    def fail_sync_repository_embedding(repository, readme_text):
+        raise AssertionError("embedding sync should not run when embeddings are unconfigured")
 
     monkeypatch.setattr(
         "apps.repos.services.fetch_json",
-        lambda url: github_repo_api_payload(),
+        fake_fetch_json,
     )
     monkeypatch.setattr(
-        "apps.repos.services.fetch_repository_readme",
-        fail_fetch_repository_readme,
+        "apps.repos.services.sync_repository_embedding",
+        fail_sync_repository_embedding,
     )
 
     repo = upsert_repository_from_github("django/django")
 
     assert repo.description == "The Web framework"
+    assert repo.readme == readme
+    assert repo.readme_path == "README.md"
 
 
 @pytest.mark.django_db
@@ -761,6 +878,43 @@ def test_refresh_repository_task_updates_single_repository(monkeypatch):
 
     assert refreshed == ["django/django"]
     assert result == {"repository_id": repository.id, "full_name": "django/django"}
+
+
+@pytest.mark.django_db
+def test_refresh_repository_task_updates_repository_readme(monkeypatch):
+    repository = Repository.objects.create(
+        full_name="django/django",
+        owner="django",
+        name="django",
+        url="https://github.com/django/django",
+        readme="# Old README\n",
+    )
+    readme = "# New README\nUpdated project docs.\n"
+
+    def fake_fetch_json(url):
+        if url.endswith("/readme"):
+            return {
+                "encoding": "base64",
+                "content": base64.b64encode(readme.encode("utf-8")).decode("ascii"),
+                "path": "README.md",
+                "download_url": "https://raw.githubusercontent.com/django/django/main/README.md",
+            }
+        return github_repo_payload(stars=81000, forks=33000, watchers=1300)
+
+    monkeypatch.setattr("apps.repos.services.fetch_json", fake_fetch_json)
+
+    result = refresh_repository_task(repository.id, repository.full_name)
+
+    repository.refresh_from_db()
+    assert result == {"repository_id": repository.id, "full_name": "django/django"}
+    assert repository.stars == 81000
+    assert repository.readme == readme
+    assert repository.readme_path == "README.md"
+    assert repository.readme_url == (
+        "https://raw.githubusercontent.com/django/django/main/README.md"
+    )
+    assert repository.readme_synced_at == repository.last_synced_at
+    assert repository.readme_last_error == ""
 
 
 @pytest.mark.django_db

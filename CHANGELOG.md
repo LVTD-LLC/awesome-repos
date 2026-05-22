@@ -24,6 +24,7 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Awesome Repos: added pgvector-backed repository embeddings from GitHub descriptions and READMEs via OpenRouter/PydanticAI.
 - Awesome Repos: record repository metadata snapshots on every GitHub refresh and show tracked star growth in repository search/detail pages.
 - Awesome Repos: added a monthly repository metadata refresh schedule that fans out one background task per saved repository.
+- Awesome Repos: store each ingested repository README alongside the GitHub API metadata.
 
 ### Changed
 - Awesome Repos admin-panel add flow now only asks for the GitHub URL; list names and slugs are derived automatically from the source repo.

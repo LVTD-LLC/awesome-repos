@@ -51,6 +51,11 @@ class Repository(BaseModel):
     github_updated_at = models.DateTimeField(null=True, blank=True)
     github_pushed_at = models.DateTimeField(null=True, blank=True)
     last_synced_at = models.DateTimeField(null=True, blank=True)
+    readme = models.TextField(blank=True, default="")
+    readme_path = models.CharField(max_length=255, blank=True, default="")
+    readme_url = models.URLField(max_length=500, blank=True, default="")
+    readme_synced_at = models.DateTimeField(null=True, blank=True)
+    readme_last_error = models.TextField(blank=True, default="")
     raw = models.JSONField(default=dict, blank=True)
 
     class Meta:
