@@ -31,6 +31,7 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Awesome Repos: added an awesome-list directory and detail pages with stored list activity metrics including stars, commits, README repository counts, forks, issues, and scan freshness.
 
 ### Changed
+- Awesome Repos: repository search is now the root landing page, with `/repos/` redirecting to `/` and a prominent link to the `/lists/` awesome-list directory.
 - Awesome Repos: moved repository search filters into a compact vertical modal opened from a single filter button.
 - Awesome Repos admin-panel add flow now only asks for the GitHub URL; list names and slugs are derived automatically from the source repo.
 - Awesome-list scans now log start/finish/failure details and surface empty scans or sync failures in the admin panel.
@@ -41,7 +42,7 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Awesome Repos: removed manifest-dependent logo static references so production template rendering works after `collectstatic`.
 
 ### Changed
-- Awesome Repos landing pages now use a minimal header and no longer show sign-in/sign-up navbar buttons.
+- Awesome Repos landing pages no longer render a public navbar.
 - Frontend assets now use Tailwind CLI plus Django staticfiles instead of a JavaScript bundler.
 - AI-assisted development guidance now uses tool-neutral `AGENTS.md` files
   instead of agent-vendor-specific instruction files.

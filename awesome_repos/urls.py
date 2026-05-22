@@ -20,6 +20,7 @@ from django.urls import include, path
 from django.views.generic import TemplateView
 
 from apps.pages.views import AccountSignupByPasskeyView, AccountSignupView
+from apps.repos.views import RepositorySearchView
 from awesome_repos.sitemaps import sitemaps
 
 urlpatterns = [
@@ -44,6 +45,7 @@ urlpatterns += [
     
     path("api/", include("apps.api.urls")),
     
+    path("", RepositorySearchView.as_view(), name="landing"),
     path("", include("apps.repos.urls")),
     path("", include("apps.pages.urls")),
     path("", include("apps.core.urls")),

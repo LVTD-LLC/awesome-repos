@@ -194,6 +194,8 @@ def test_landing_page_does_not_show_sign_in_or_sign_up_buttons(client):
     assert "brand/awesome-repos-mark.svg" in content
     assert "brand/apple-touch-icon.png" in content
     assert "brand/awesome-repos-social.png" in content
+    assert "Search every repository hiding inside awesome lists." in content
+    assert "Browse awesome lists" in content
     assert "Sign In" not in content
     assert "Start for Free" not in content
 

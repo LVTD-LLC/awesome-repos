@@ -1903,6 +1903,24 @@ def test_search_page_renders(client):
 
 
 @pytest.mark.django_db
+def test_repository_search_is_root_page(client):
+    response = client.get(reverse("repos:search"))
+
+    assert reverse("repos:search") == "/"
+    assert response.status_code == 200
+    assert b"Search every repository hiding inside awesome lists." in response.content
+    assert b"Browse awesome lists" in response.content
+
+
+@pytest.mark.django_db
+def test_legacy_repos_page_redirects_to_root(client):
+    response = client.get("/repos/")
+
+    assert response.status_code == 302
+    assert response["Location"] == "/"
+
+
+@pytest.mark.django_db
 def test_search_page_exposes_semantic_search_filter(client):
     response = client.get(reverse("repos:search"), {"q": "framework", "mode": "semantic"})
 
