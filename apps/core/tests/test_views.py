@@ -129,6 +129,38 @@ def test_admin_panel_can_retry_awesome_list_scan(
     assert "Queued a retry scan for Awesome Django." in response.content.decode()
 
 
+@pytest.mark.django_db
+def test_admin_panel_shows_github_rate_limit_card(client, monkeypatch, sync_state_transitions):
+    user = get_user_model().objects.create_superuser(
+        username="admin",
+        email="admin@example.com",
+        password="password123",
+    )
+    client.force_login(user)
+    monkeypatch.setattr(
+        "apps.core.views.github_rate_limit_status",
+        lambda: {
+            "ok": True,
+            "token_configured": True,
+            "core": {
+                "limit": 5000,
+                "used": 125,
+                "remaining": 4875,
+                "reset_at": None,
+            },
+            "error": "",
+        },
+    )
+
+    response = client.get(reverse("admin_panel"))
+    content = response.content.decode()
+
+    assert response.status_code == 200
+    assert "GitHub API status" in content
+    assert "4875" in content
+    assert "5000" in content
+
+
 @override_settings(SITE_URL="http://example.com")
 def test_build_absolute_public_url_upgrades_non_local_http():
     assert build_absolute_public_url("/api/user") == "https://example.com/api/user"

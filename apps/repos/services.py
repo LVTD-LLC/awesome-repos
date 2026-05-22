@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import re
+from datetime import UTC, datetime
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
@@ -75,6 +76,42 @@ def fetch_text(url: str) -> str:
             return response.read().decode("utf-8", errors="replace")
     except HTTPError as exc:
         raise RuntimeError(_github_error_message(url, exc)) from exc
+
+
+def github_rate_limit_status() -> dict:
+    token_configured = bool(github_token())
+    status = {
+        "token_configured": token_configured,
+        "ok": False,
+        "core": {},
+        "error": "",
+    }
+    if not token_configured:
+        status["error"] = "GITHUB_TOKEN is not configured."
+        return status
+
+    try:
+        data = fetch_json("https://api.github.com/rate_limit")
+    except Exception as exc:  # noqa: BLE001 - admin diagnostics should not break page render
+        status["error"] = str(exc)
+        return status
+
+    core = data.get("resources", {}).get("core", {})
+    reset = core.get("reset")
+    reset_at = None
+    if reset:
+        reset_at = datetime.fromtimestamp(int(reset), UTC)
+
+    status.update(
+        ok=True,
+        core={
+            "limit": core.get("limit", 0),
+            "used": core.get("used", 0),
+            "remaining": core.get("remaining", 0),
+            "reset_at": reset_at,
+        },
+    )
+    return status
 
 
 def parse_github_repo_url(url: str) -> str:
