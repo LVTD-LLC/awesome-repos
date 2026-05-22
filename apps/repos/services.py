@@ -5,9 +5,10 @@ import binascii
 import json
 import os
 import re
+import time
 from datetime import UTC, datetime
 from urllib.error import HTTPError, URLError
-from urllib.parse import parse_qs, urlencode, urlparse
+from urllib.parse import quote, urlencode, urlparse
 from urllib.request import Request, urlopen
 
 from django.conf import settings
@@ -37,6 +38,10 @@ from apps.repos.tags import (
 from awesome_repos.utils import get_awesome_repos_logger
 
 logger = get_awesome_repos_logger(__name__)
+# Process-local snapshot from the most recent GitHub response. Treat this as a
+# best-effort hint; callers must still handle actual 403/429 responses.
+_github_rate_limit_state: dict[str, str] = {}
+GITHUB_API_VERSION = "2026-03-10"
 
 GITHUB_REPO_RE = re.compile(
     r"https?://github\.com/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)(?:[/#?][^\s)\]>'\"]*)?",
@@ -44,6 +49,77 @@ GITHUB_REPO_RE = re.compile(
 )
 SKIP_REPO_NAMES = {"stargazers", "network", "issues", "pulls", "pull", "wiki", "releases"}
 README_CANDIDATES = ("README.md", "readme.md", "README.markdown", "README.rst")
+AI_DEVELOPMENT_ANYWHERE_FILE_SIGNALS = {
+    "agents.md": ("Agent instructions", "agent_instructions"),
+    "agents.override.md": ("Codex", "codex_override_instructions"),
+    "agent.md": ("Agent instructions", "agent_instructions"),
+    "claude.md": ("Claude Code", "claude_memory"),
+    "claude.local.md": ("Claude Code", "claude_local_memory"),
+    "gemini.md": ("Gemini CLI", "gemini_context"),
+    "codex.md": ("Codex", "codex_instructions"),
+}
+AI_DEVELOPMENT_EXACT_PATH_SIGNALS = {
+    ".aider.conf.yml": ("Aider", "aider_config"),
+    ".aider.conf.yaml": ("Aider", "aider_config"),
+    ".coderabbit.yaml": ("CodeRabbit", "coderabbit_config"),
+    ".coderabbit.yml": ("CodeRabbit", "coderabbit_config"),
+    ".continue/config.json": ("Continue", "continue_config"),
+    ".continue/config.ts": ("Continue", "continue_config"),
+    ".continue/config.yaml": ("Continue", "continue_config"),
+    ".continue/config.yml": ("Continue", "continue_config"),
+    ".cursorrules": ("Cursor", "cursor_legacy_rules"),
+    ".devin/config.json": ("Devin", "devin_config"),
+    ".devin/config.local.json": ("Devin", "devin_local_config"),
+    ".gemini/settings.json": ("Gemini CLI", "gemini_project_settings"),
+    ".github/copilot-instructions.md": ("GitHub Copilot", "copilot_repo_instructions"),
+    ".windsurfrules": ("Windsurf", "windsurf_legacy_rules"),
+    "greptile.json": ("Greptile", "greptile_config"),
+}
+AI_DEVELOPMENT_DIRECTORY_SIGNALS = {
+    ".agents": ("Agent workspace", "agent_directory"),
+    ".claude": ("Claude Code", "claude_project_config"),
+    ".claude/agents": ("Claude Code", "claude_subagents"),
+    ".claude/commands": ("Claude Code", "claude_commands"),
+    ".claude/skills": ("Claude Code", "claude_skills"),
+    ".clinerules": ("Cline", "cline_workspace_rules"),
+    ".continue": ("Continue", "continue_config"),
+    ".cursor": ("Cursor", "cursor_project_config"),
+    ".cursor/rules": ("Cursor", "cursor_project_rules"),
+    ".devin": ("Devin", "devin_project_config"),
+    ".gemini": ("Gemini CLI", "gemini_project_config"),
+    ".github/instructions": ("GitHub Copilot", "copilot_path_instructions"),
+    ".windsurf": ("Windsurf", "windsurf_project_config"),
+    ".windsurf/rules": ("Windsurf", "windsurf_workspace_rules"),
+}
+AI_DEVELOPMENT_PATH_PREFIX_SIGNALS = (
+    (".agents/", "Agent workspace", "agent_directory"),
+    (".claude/", "Claude Code", "claude_project_config"),
+    (".clinerules/", "Cline", "cline_workspace_rules"),
+    (".continue/", "Continue", "continue_config"),
+    (".cursor/rules/", "Cursor", "cursor_project_rules"),
+    (".devin/", "Devin", "devin_project_config"),
+    (".gemini/", "Gemini CLI", "gemini_project_config"),
+    (".github/instructions/", "GitHub Copilot", "copilot_path_instructions"),
+    (".windsurf/rules/", "Windsurf", "windsurf_workspace_rules"),
+)
+AWESOME_LIST_DERIVED_META_KEYS = {"commits_count"}
+
+
+class GitHubAPIError(RuntimeError):
+    def __init__(
+        self,
+        message: str,
+        *,
+        status_code: int,
+        retry_after: str | None = None,
+        rate_limit_remaining: str | None = None,
+        rate_limit_reset: str | None = None,
+    ):
+        super().__init__(message)
+        self.status_code = status_code
+        self.retry_after = retry_after
+        self.rate_limit_remaining = rate_limit_remaining
+        self.rate_limit_reset = rate_limit_reset
 
 
 def github_token() -> str:
@@ -58,6 +134,7 @@ def github_token() -> str:
 def github_headers():
     headers = {
         "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": GITHUB_API_VERSION,
         "User-Agent": "awesome-repos-bot",
     }
     token = github_token()
@@ -66,11 +143,75 @@ def github_headers():
     return headers
 
 
+def _capture_github_rate_limit_headers(headers) -> None:
+    if not headers:
+        return
+
+    limit = headers.get("X-RateLimit-Limit")
+    remaining = headers.get("X-RateLimit-Remaining")
+    used = headers.get("X-RateLimit-Used")
+    reset = headers.get("X-RateLimit-Reset")
+    resource = headers.get("X-RateLimit-Resource")
+    if remaining is None and limit is None:
+        return
+
+    _github_rate_limit_state.clear()
+    _github_rate_limit_state.update(
+        {
+            "limit": limit or "",
+            "remaining": remaining or "",
+            "used": used or "",
+            "reset": reset or "",
+            "resource": resource or "",
+        }
+    )
+
+
+def github_rate_limit_state() -> dict[str, str]:
+    return dict(_github_rate_limit_state)
+
+
+def github_rate_limit_remaining() -> int | None:
+    reset = _github_rate_limit_state.get("reset")
+    if reset:
+        try:
+            if int(reset) <= int(time.time()):
+                return None
+        except ValueError:
+            return None
+
+    remaining = _github_rate_limit_state.get("remaining")
+    if remaining in {None, ""}:
+        return None
+    try:
+        return int(remaining)
+    except ValueError:
+        return None
+
+
 def _github_error_message(url: str, exc: HTTPError) -> str:
     retry_after = exc.headers.get("Retry-After") if exc.headers else None
     remaining = exc.headers.get("X-RateLimit-Remaining") if exc.headers else None
     reset = exc.headers.get("X-RateLimit-Reset") if exc.headers else None
+    body_message = ""
+    try:
+        body = exc.read().decode("utf-8", errors="replace")
+    except Exception:  # noqa: BLE001 - error bodies are best-effort diagnostics only
+        body = ""
+    if body:
+        try:
+            body_message = json.loads(body).get("message", "")
+        except (
+            AttributeError,
+            TypeError,
+            ValueError,
+            json.JSONDecodeError,
+        ):
+            body_message = body.strip()
+
     parts = [f"{exc.code} {exc.reason}", url]
+    if body_message:
+        parts.append(f"message={body_message[:300]}")
     if remaining is not None:
         parts.append(f"rate_limit_remaining={remaining}")
     if reset is not None:
@@ -84,39 +225,81 @@ def fetch_json(url: str):
     request = Request(url, headers=github_headers())
     try:
         with urlopen(request, timeout=30) as response:
+            _capture_github_rate_limit_headers(getattr(response, "headers", None))
             return json.loads(response.read().decode("utf-8"))
     except HTTPError as exc:
-        raise RuntimeError(_github_error_message(url, exc)) from exc
+        _capture_github_rate_limit_headers(exc.headers)
+        raise GitHubAPIError(
+            _github_error_message(url, exc),
+            status_code=exc.code,
+            retry_after=exc.headers.get("Retry-After") if exc.headers else None,
+            rate_limit_remaining=(
+                exc.headers.get("X-RateLimit-Remaining") if exc.headers else None
+            ),
+            rate_limit_reset=exc.headers.get("X-RateLimit-Reset") if exc.headers else None,
+        ) from exc
 
 
-def _last_page_from_link_header(link_header: str) -> int | None:
-    for section in link_header.split(","):
-        if 'rel="last"' not in section:
-            continue
-        match = re.search(r"<([^>]+)>", section)
-        if not match:
-            return None
-        page_values = parse_qs(urlparse(match.group(1)).query).get("page")
-        if not page_values:
-            return None
-        try:
-            return int(page_values[0])
-        except ValueError:
-            return None
-    return None
-
-
-def fetch_repository_commit_count(full_name: str, default_branch: str = "") -> int:
-    params = {"per_page": "1"}
-    if default_branch:
-        params["sha"] = default_branch
-    url = f"https://api.github.com/repos/{full_name}/commits?{urlencode(params)}"
+def fetch_text(url: str) -> str:
     request = Request(url, headers=github_headers())
     try:
         with urlopen(request, timeout=30) as response:
-            data = json.loads(response.read().decode("utf-8"))
+            _capture_github_rate_limit_headers(getattr(response, "headers", None))
+            return response.read().decode("utf-8", errors="replace")
+    except HTTPError as exc:
+        _capture_github_rate_limit_headers(exc.headers)
+        raise GitHubAPIError(
+            _github_error_message(url, exc),
+            status_code=exc.code,
+            retry_after=exc.headers.get("Retry-After") if exc.headers else None,
+            rate_limit_remaining=(
+                exc.headers.get("X-RateLimit-Remaining") if exc.headers else None
+            ),
+            rate_limit_reset=exc.headers.get("X-RateLimit-Reset") if exc.headers else None,
+        ) from exc
+
+
+def is_github_rate_limit_error(exc: Exception) -> bool:
+    if not isinstance(exc, GitHubAPIError):
+        return False
+    message = str(exc).lower()
+    if exc.status_code == 429:
+        return True
+    return bool(
+        exc.status_code == 403
+        and (
+            exc.retry_after
+            or exc.rate_limit_remaining == "0"
+            or "rate limit" in message
+            or "secondary rate limit" in message
+        )
+    )
+
+
+def _last_page_from_link_header(link_header: str) -> int | None:
+    for link in link_header.split(","):
+        if 'rel="last"' not in link:
+            continue
+        match = re.search(r"[?&]page=(\d+)", link)
+        if match:
+            return int(match.group(1))
+    return None
+
+
+def fetch_github_commit_count(full_name: str, default_branch: str) -> int:
+    if not default_branch:
+        raise ValueError("Cannot fetch commit count without a default branch.")
+
+    query = urlencode({"sha": default_branch, "per_page": 1})
+    url = f"https://api.github.com/repos/{full_name}/commits?{query}"
+    request = Request(url, headers=github_headers())
+    try:
+        with urlopen(request, timeout=30) as response:
+            _capture_github_rate_limit_headers(getattr(response, "headers", None))
+            commits = json.loads(response.read().decode("utf-8"))
             link_header = response.headers.get("Link", "")
     except HTTPError as exc:
+        _capture_github_rate_limit_headers(exc.headers)
         if exc.code == 409:
             return 0
         raise RuntimeError(_github_error_message(url, exc)) from exc
@@ -124,18 +307,7 @@ def fetch_repository_commit_count(full_name: str, default_branch: str = "") -> i
     last_page = _last_page_from_link_header(link_header)
     if last_page is not None:
         return last_page
-    if isinstance(data, list):
-        return len(data)
-    return 0
-
-
-def fetch_text(url: str) -> str:
-    request = Request(url, headers=github_headers())
-    try:
-        with urlopen(request, timeout=30) as response:
-            return response.read().decode("utf-8", errors="replace")
-    except HTTPError as exc:
-        raise RuntimeError(_github_error_message(url, exc)) from exc
+    return len(commits) if isinstance(commits, list) else 0
 
 
 def github_rate_limit_status() -> dict:
@@ -224,6 +396,27 @@ def fetch_awesome_readme(full_name: str) -> tuple[str, dict]:
     raise RuntimeError(f"Could not fetch README for {full_name}: {last_error}")
 
 
+def attach_awesome_list_commit_count(full_name: str, meta: dict) -> None:
+    default_branch = meta.get("default_branch") or ""
+    if not default_branch:
+        logger.warning(
+            "awesome_list_commit_count_skipped",
+            repo_full_name=full_name,
+            reason="missing_default_branch",
+        )
+        return
+
+    try:
+        meta["commits_count"] = fetch_github_commit_count(full_name, default_branch)
+    except Exception as exc:  # noqa: BLE001 - commit count is useful but optional
+        logger.warning(
+            "awesome_list_commit_count_fetch_failed",
+            repo_full_name=full_name,
+            error=str(exc),
+            exc_info=True,
+        )
+
+
 def fetch_repository_readme_data(full_name: str) -> dict:
     try:
         data = fetch_json(f"https://api.github.com/repos/{full_name}/readme")
@@ -274,6 +467,113 @@ def fetch_repository_readme(full_name: str) -> str:
     return fetch_repository_readme_data(full_name)["readme"]
 
 
+def _append_ai_development_signal(
+    signals: list[dict],
+    seen: set[str],
+    *,
+    path: str,
+    kind: str,
+    tool: str,
+    signal: str,
+) -> None:
+    key = path.lower()
+    if key in seen:
+        return
+    seen.add(key)
+    signals.append(
+        {
+            "path": path,
+            "kind": "directory" if kind == "tree" else "file",
+            "tool": tool,
+            "signal": signal,
+        }
+    )
+
+
+def detect_ai_development_signals(tree_items: list[dict]) -> list[dict]:
+    signals = []
+    seen = set()
+
+    for item in tree_items:
+        path = (item.get("path") or "").strip("/")
+        kind = item.get("type") or ""
+        if not path or kind not in {"blob", "tree"}:
+            continue
+
+        normalized_path = path.lower()
+        basename = normalized_path.rsplit("/", 1)[-1]
+
+        exact_match = AI_DEVELOPMENT_EXACT_PATH_SIGNALS.get(normalized_path)
+        if kind == "blob" and exact_match:
+            tool, signal = exact_match
+            _append_ai_development_signal(
+                signals,
+                seen,
+                path=path,
+                kind=kind,
+                tool=tool,
+                signal=signal,
+            )
+
+        directory_match = AI_DEVELOPMENT_DIRECTORY_SIGNALS.get(normalized_path)
+        if kind == "tree" and directory_match:
+            tool, signal = directory_match
+            _append_ai_development_signal(
+                signals,
+                seen,
+                path=path,
+                kind=kind,
+                tool=tool,
+                signal=signal,
+            )
+
+        file_match = AI_DEVELOPMENT_ANYWHERE_FILE_SIGNALS.get(basename)
+        if kind == "blob" and file_match:
+            tool, signal = file_match
+            _append_ai_development_signal(
+                signals,
+                seen,
+                path=path,
+                kind=kind,
+                tool=tool,
+                signal=signal,
+            )
+
+        for prefix, tool, signal in AI_DEVELOPMENT_PATH_PREFIX_SIGNALS:
+            if normalized_path.startswith(prefix):
+                _append_ai_development_signal(
+                    signals,
+                    seen,
+                    path=path,
+                    kind=kind,
+                    tool=tool,
+                    signal=signal,
+                )
+
+    return sorted(signals, key=lambda signal: signal["path"].lower())
+
+
+def fetch_repository_tree_items(full_name: str, default_branch: str) -> list[dict]:
+    ref = quote(default_branch or "HEAD", safe="")
+    data = fetch_json(f"https://api.github.com/repos/{full_name}/git/trees/{ref}?recursive=1")
+    if data.get("truncated"):
+        logger.warning(
+            "repository_tree_truncated",
+            repo_full_name=full_name,
+            default_branch=default_branch,
+        )
+        raise RuntimeError(f"GitHub tree for {full_name} is truncated; skipping AI signal update")
+    return data.get("tree") or []
+
+
+def fetch_repository_ai_development_signals(
+    full_name: str,
+    default_branch: str,
+) -> list[dict]:
+    tree_items = fetch_repository_tree_items(full_name, default_branch)
+    return detect_ai_development_signals(tree_items)
+
+
 def dt(value: str | None):
     if not value:
         return None
@@ -281,6 +581,60 @@ def dt(value: str | None):
     if parsed and timezone.is_naive(parsed):
         return timezone.make_aware(parsed)
     return parsed
+
+
+def update_awesome_list_metadata(
+    awesome_list: AwesomeList,
+    meta: dict,
+    *,
+    repo_full_name: str,
+    readme_repository_count: int,
+    scanned_at,
+    last_error: str = "",
+) -> None:
+    awesome_list.repo_full_name = meta.get("full_name", repo_full_name)
+    awesome_list.description = meta.get("description") or awesome_list.description
+    awesome_list.topics = meta.get("topics") or []
+    awesome_list.stars = meta.get("stargazers_count") or 0
+    awesome_list.forks = meta.get("forks_count") or 0
+    awesome_list.open_issues = meta.get("open_issues_count") or 0
+    awesome_list.watchers = meta.get("subscribers_count") or meta.get("watchers_count") or 0
+    update_fields = [
+        "repo_full_name",
+        "description",
+        "topics",
+        "stars",
+        "forks",
+        "open_issues",
+        "watchers",
+        "readme_repository_count",
+        "default_branch",
+        "is_archived",
+        "is_disabled",
+        "github_created_at",
+        "github_updated_at",
+        "github_pushed_at",
+        "last_scanned_at",
+        "last_error",
+        "raw",
+        "updated_at",
+    ]
+    if meta.get("commits_count") is not None:
+        awesome_list.commits_count = meta["commits_count"]
+        update_fields.append("commits_count")
+    awesome_list.readme_repository_count = readme_repository_count
+    awesome_list.default_branch = meta.get("default_branch") or ""
+    awesome_list.is_archived = bool(meta.get("archived"))
+    awesome_list.is_disabled = bool(meta.get("disabled"))
+    awesome_list.github_created_at = dt(meta.get("created_at"))
+    awesome_list.github_updated_at = dt(meta.get("updated_at"))
+    awesome_list.github_pushed_at = dt(meta.get("pushed_at"))
+    awesome_list.last_scanned_at = scanned_at
+    awesome_list.last_error = last_error
+    awesome_list.raw = {
+        key: value for key, value in meta.items() if key not in AWESOME_LIST_DERIVED_META_KEYS
+    }
+    awesome_list.save(update_fields=update_fields)
 
 
 def record_repository_snapshot(
@@ -319,13 +673,15 @@ def _upsert_repository_metadata(
     data: dict,
     *,
     synced_at,
-    readme_data: dict,
-    commit_count: int | None,
+    readme_data: dict | None = None,
+    ai_development_signals: list[dict] | None = None,
+    commit_count: int | None = None,
 ) -> Repository:
     full_name = data["full_name"]
     license_data = data.get("license") or {}
     default_branch = data.get("default_branch") or ""
-    if readme_data["ok"]:
+    readme_defaults = {}
+    if readme_data and readme_data["ok"]:
         readme_defaults = {
             "readme": readme_data["readme"],
             "readme_path": readme_data["readme_path"],
@@ -333,11 +689,16 @@ def _upsert_repository_metadata(
             "readme_synced_at": synced_at,
             "readme_last_error": "",
         }
-    else:
+    elif readme_data and readme_data.get("readme_last_error"):
         readme_defaults = {
             "readme_last_error": readme_data["readme_last_error"],
         }
-
+    ai_development_defaults = {}
+    if ai_development_signals is not None:
+        ai_development_defaults = {
+            "uses_ai_for_development": bool(ai_development_signals),
+            "ai_development_signals": ai_development_signals,
+        }
     defaults = {
         "host": "github",
         "owner": data.get("owner", {}).get("login", full_name.split("/", 1)[0]),
@@ -361,6 +722,7 @@ def _upsert_repository_metadata(
         "github_pushed_at": dt(data.get("pushed_at")),
         "last_synced_at": synced_at,
         **readme_defaults,
+        **ai_development_defaults,
         "raw": data,
     }
     if commit_count is not None:
@@ -374,33 +736,48 @@ def _upsert_repository_metadata(
     return repo
 
 
-def upsert_repository_from_github(full_name: str) -> Repository:
+def upsert_repository_from_github(full_name: str, *, include_readme: bool = True) -> Repository:
     data = fetch_json(f"https://api.github.com/repos/{full_name}")
+    default_branch = data.get("default_branch") or ""
+    readme_data = None
+    if include_readme:
+        try:
+            readme_data = fetch_repository_readme_data(data["full_name"])
+        except Exception as exc:  # noqa: BLE001 - README fetch should not block metadata sync
+            logger.warning(
+                "repository_readme_fetch_failed",
+                repo_full_name=data["full_name"],
+                error=str(exc),
+                exc_info=True,
+            )
+            readme_data = {
+                "ok": False,
+                "readme": "",
+                "readme_path": "",
+                "readme_url": "",
+                "readme_last_error": str(exc),
+            }
     try:
-        readme_data = fetch_repository_readme_data(data["full_name"])
-    except Exception as exc:  # noqa: BLE001 - README fetch should not block metadata sync
+        ai_development_signals = fetch_repository_ai_development_signals(
+            data["full_name"],
+            default_branch,
+        )
+    except Exception as exc:  # noqa: BLE001 - tree fetch should not block metadata sync
         logger.warning(
-            "repository_readme_fetch_failed",
+            "repository_ai_development_signal_fetch_failed",
             repo_full_name=data["full_name"],
+            default_branch=default_branch,
             error=str(exc),
             exc_info=True,
         )
-        readme_data = {
-            "ok": False,
-            "readme": "",
-            "readme_path": "",
-            "readme_url": "",
-            "readme_last_error": str(exc),
-        }
+        ai_development_signals = None
     try:
-        commit_count = fetch_repository_commit_count(
-            data["full_name"],
-            data.get("default_branch") or "",
-        )
-    except Exception as exc:  # noqa: BLE001 - commit count should not block metadata sync
+        commit_count = fetch_github_commit_count(data["full_name"], default_branch)
+    except Exception as exc:  # noqa: BLE001 - commit counts are useful but optional
         logger.warning(
             "repository_commit_count_fetch_failed",
             repo_full_name=data["full_name"],
+            default_branch=default_branch,
             error=str(exc),
             exc_info=True,
         )
@@ -410,11 +787,12 @@ def upsert_repository_from_github(full_name: str) -> Repository:
         data,
         synced_at=timezone.now(),
         readme_data=readme_data,
+        ai_development_signals=ai_development_signals,
         commit_count=commit_count,
     )
-    if repository_tagging_configured():
+    if include_readme and repository_tagging_configured():
         sync_repository_tags(repo, repo.readme)
-    if repository_embeddings_configured():
+    if include_readme and repository_embeddings_configured():
         sync_repository_embedding(repo, repo.readme)
 
     return repo
@@ -466,10 +844,7 @@ def repository_performance_summary(repository: Repository, limit: int = 12) -> d
                 "forks_delta": forks_delta,
                 "forks_delta_label": _format_delta(forks_delta),
                 "commit_delta": commit_delta,
-                "commit_delta_label": _format_delta(
-                    commit_delta,
-                    none_label="n/a" if older_snapshot else "baseline",
-                ),
+                "commit_delta_label": _format_delta(commit_delta),
             }
         )
 
@@ -503,9 +878,12 @@ def repository_performance_summary(repository: Repository, limit: int = 12) -> d
         "stars_since_previous": stars_since_previous,
         "stars_since_previous_label": _format_delta(stars_since_previous),
         "commits_since_first": commits_since_first,
-        "commits_since_first_label": _format_delta(commits_since_first, none_label="n/a"),
+        "commits_since_first_label": _format_delta(commits_since_first, none_label="—"),
         "commits_since_previous": commits_since_previous,
-        "commits_since_previous_label": _format_delta(commits_since_previous, none_label="n/a"),
+        "commits_since_previous_label": _format_delta(
+            commits_since_previous,
+            none_label="—",
+        ),
         "history": history,
     }
 
@@ -521,14 +899,22 @@ def sync_awesome_list(awesome_list: AwesomeList, limit: int | None = None) -> di
         limit=limit,
     )
     markdown, meta = fetch_awesome_readme(full_name)
-    repo_names = extract_github_repos(markdown)
+    attach_awesome_list_commit_count(full_name, meta)
+    discovered_repo_names = extract_github_repos(markdown)
+    scanned_at = timezone.now()
+    repo_names = discovered_repo_names
     if limit:
         repo_names = repo_names[:limit]
 
     if not repo_names:
-        awesome_list.last_scanned_at = timezone.now()
-        awesome_list.last_error = "No GitHub repository links found in README."
-        awesome_list.save(update_fields=["last_scanned_at", "last_error", "updated_at"])
+        update_awesome_list_metadata(
+            awesome_list,
+            meta,
+            repo_full_name=full_name,
+            readme_repository_count=len(discovered_repo_names),
+            scanned_at=scanned_at,
+            last_error="No GitHub repository links found in README.",
+        )
         logger.warning(
             "awesome_list_scan_found_no_repos",
             awesome_list_id=awesome_list.id,
@@ -544,18 +930,13 @@ def sync_awesome_list(awesome_list: AwesomeList, limit: int | None = None) -> di
             "failure_count": 0,
         }
 
-    awesome_list.repo_full_name = meta.get("full_name", full_name)
-    awesome_list.description = meta.get("description") or awesome_list.description
-    awesome_list.last_scanned_at = timezone.now()
-    awesome_list.last_error = ""
-    awesome_list.save(
-        update_fields=[
-            "repo_full_name",
-            "description",
-            "last_scanned_at",
-            "last_error",
-            "updated_at",
-        ]
+    update_awesome_list_metadata(
+        awesome_list,
+        meta,
+        repo_full_name=full_name,
+        readme_repository_count=len(discovered_repo_names),
+        scanned_at=scanned_at,
+        last_error="",
     )
 
     created_links = 0
@@ -610,14 +991,21 @@ def discover_missing_awesome_list_repositories(
         limit=limit,
     )
     markdown, meta = fetch_awesome_readme(full_name)
-    repo_names = extract_github_repos(markdown)
+    discovered_repo_names = extract_github_repos(markdown)
+    scanned_at = timezone.now()
+    repo_names = discovered_repo_names
     if limit:
         repo_names = repo_names[:limit]
 
     if not repo_names:
-        awesome_list.last_scanned_at = timezone.now()
-        awesome_list.last_error = "No GitHub repository links found in README."
-        awesome_list.save(update_fields=["last_scanned_at", "last_error", "updated_at"])
+        update_awesome_list_metadata(
+            awesome_list,
+            meta,
+            repo_full_name=full_name,
+            readme_repository_count=len(discovered_repo_names),
+            scanned_at=scanned_at,
+            last_error="No GitHub repository links found in README.",
+        )
         logger.warning(
             "awesome_list_missing_repo_discovery_found_no_repos",
             awesome_list_id=awesome_list.id,
@@ -633,18 +1021,13 @@ def discover_missing_awesome_list_repositories(
             "skipped_existing": 0,
         }
 
-    awesome_list.repo_full_name = meta.get("full_name", full_name)
-    awesome_list.description = meta.get("description") or awesome_list.description
-    awesome_list.last_scanned_at = timezone.now()
-    awesome_list.last_error = ""
-    awesome_list.save(
-        update_fields=[
-            "repo_full_name",
-            "description",
-            "last_scanned_at",
-            "last_error",
-            "updated_at",
-        ]
+    update_awesome_list_metadata(
+        awesome_list,
+        meta,
+        repo_full_name=full_name,
+        readme_repository_count=len(discovered_repo_names),
+        scanned_at=scanned_at,
+        last_error="",
     )
 
     existing_repositories = {
@@ -707,7 +1090,12 @@ def add_repository_to_awesome_list(awesome_list: AwesomeList, repo_full_name: st
     }
 
 
-def refresh_repositories(queryset=None, limit: int | None = None) -> dict:
+def refresh_repositories(
+    queryset=None,
+    limit: int | None = None,
+    *,
+    include_readme: bool = False,
+) -> dict:
     queryset = queryset or Repository.objects.all()
     if limit:
         queryset = queryset[:limit]
@@ -715,7 +1103,7 @@ def refresh_repositories(queryset=None, limit: int | None = None) -> dict:
     failures = []
     for repo in queryset:
         try:
-            upsert_repository_from_github(repo.full_name)
+            upsert_repository_from_github(repo.full_name, include_readme=include_readme)
             synced += 1
         except Exception as exc:  # noqa: BLE001
             failures.append({"repo": repo.full_name, "error": str(exc)})
@@ -757,7 +1145,7 @@ def _apply_repository_keyword_search(qs, q: str):
     )
 
 
-def _apply_repository_filters(qs, params):
+def _apply_repository_taxonomy_filters(qs, params):
     language = (params.get("language") or "").strip()
     if language:
         qs = qs.filter(language__iexact=language)
@@ -770,6 +1158,10 @@ def _apply_repository_filters(qs, params):
     generated_tag = normalize_repository_tag(params.get("generated_tag") or "")
     if generated_tag:
         qs = qs.filter(generated_tags__contains=[generated_tag])
+    return qs
+
+
+def _apply_repository_state_filters(qs, params):
     min_stars = params.get("min_stars")
     if min_stars:
         qs = qs.filter(stars__gte=int(min_stars))
@@ -778,11 +1170,21 @@ def _apply_repository_filters(qs, params):
         qs = qs.filter(is_archived=True)
     elif archived == "no":
         qs = qs.filter(is_archived=False)
+    ai_development = params.get("ai_development")
+    if ai_development == "yes":
+        qs = qs.filter(uses_ai_for_development=True)
+    elif ai_development == "no":
+        qs = qs.filter(uses_ai_for_development=False)
     updated_days = params.get("updated_days")
     if updated_days:
         cutoff = timezone.now() - timezone.timedelta(days=int(updated_days))
         qs = qs.filter(github_pushed_at__gte=cutoff)
     return qs
+
+
+def _apply_repository_filters(qs, params):
+    qs = _apply_repository_taxonomy_filters(qs, params)
+    return _apply_repository_state_filters(qs, params)
 
 
 def repository_search_queryset(params):

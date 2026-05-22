@@ -15,12 +15,31 @@ class AwesomeList(BaseModel):
     source_url = models.URLField(unique=True, help_text="GitHub awesome-list repo URL")
     repo_full_name = models.CharField(max_length=255, blank=True, default="")
     description = models.TextField(blank=True, default="")
+    topics = models.JSONField(default=list, blank=True)
+    stars = models.PositiveIntegerField(default=0)
+    forks = models.PositiveIntegerField(default=0)
+    open_issues = models.PositiveIntegerField(default=0)
+    watchers = models.PositiveIntegerField(default=0)
+    commits_count = models.PositiveIntegerField(null=True, blank=True)
+    readme_repository_count = models.PositiveIntegerField(default=0)
+    default_branch = models.CharField(max_length=255, blank=True, default="")
+    is_archived = models.BooleanField(default=False)
+    is_disabled = models.BooleanField(default=False)
+    github_created_at = models.DateTimeField(null=True, blank=True)
+    github_updated_at = models.DateTimeField(null=True, blank=True)
+    github_pushed_at = models.DateTimeField(null=True, blank=True)
     is_active = models.BooleanField(default=True)
     last_scanned_at = models.DateTimeField(null=True, blank=True)
     last_error = models.TextField(blank=True, default="")
+    raw = models.JSONField(default=dict, blank=True)
 
     class Meta:
         ordering = ["name"]
+        indexes = [
+            models.Index(fields=["-stars"]),
+            models.Index(fields=["-github_pushed_at"]),
+            models.Index(fields=["-last_scanned_at"]),
+        ]
 
     def __str__(self):
         return self.name
@@ -58,6 +77,8 @@ class Repository(BaseModel):
     readme_url = models.URLField(max_length=500, blank=True, default="")
     readme_synced_at = models.DateTimeField(null=True, blank=True)
     readme_last_error = models.TextField(blank=True, default="")
+    uses_ai_for_development = models.BooleanField(default=False)
+    ai_development_signals = models.JSONField(default=list, blank=True)
     generated_tags = models.JSONField(default=list, blank=True)
     generated_tags_model = models.CharField(max_length=255, blank=True, default="")
     generated_tags_source_hash = models.CharField(max_length=64, blank=True, default="")
@@ -72,6 +93,7 @@ class Repository(BaseModel):
             models.Index(fields=["-github_pushed_at"]),
             models.Index(fields=["is_archived"]),
             models.Index(fields=["language"]),
+            models.Index(fields=["uses_ai_for_development"]),
             GinIndex(fields=["topics"], name="repo_topics_gin_idx"),
             GinIndex(fields=["generated_tags"], name="repo_gen_tags_gin_idx"),
         ]

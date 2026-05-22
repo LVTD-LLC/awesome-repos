@@ -16,19 +16,24 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 
 ## [Unreleased]
 ### Added
+- Awesome Repos: added local logo assets and wired the navbar, favicon, touch icon, README, and base social metadata to the new branding.
 - Awesome Repos: ingest GitHub awesome-list READMEs, index the linked repositories, and expose searchable repository/list detail pages with stars, freshness, archive-state, and cross-list counts.
 - Awesome Repos: added an admin-panel flow to create new awesome-list sources and queue their initial scan.
 - Awesome Repos admin panel now shows GitHub API rate-limit status for the configured scanner token.
 - Awesome Repos admin panel now lets superusers retry scans for existing awesome-list repos.
-- Awesome Repos: added a daily scheduled task that queues per-list missing repository discovery and only ingests newly discovered repositories.
+- Awesome Repos: added a daily scheduled task that queues a capped number of newly discovered repositories from awesome-list READMEs.
 - Awesome Repos: added pgvector-backed repository embeddings from GitHub descriptions and READMEs via OpenRouter/PydanticAI.
+- Awesome Repos search filters now expose semantic relevance mode for repository queries.
 - Awesome Repos: record repository metadata snapshots on every GitHub refresh and show tracked star growth in repository search/detail pages.
-- Awesome Repos: added a monthly repository metadata refresh schedule that fans out one background task per saved repository.
-- Awesome Repos: store each ingested repository README alongside the GitHub API metadata.
 - Awesome Repos: record default-branch commit counts during repository refreshes and show commit growth in repository history.
+- Awesome Repos: added a daily budgeted repository metadata refresh that walks the oldest-synced repositories first and skips README refreshes by default.
+- Awesome Repos: store each ingested repository README alongside the GitHub API metadata.
+- Awesome Repos: detect AI development config files during repository sync and add an AI dev signals filter to repository search.
 - Awesome Repos: generate repository discovery tags from descriptions and READMEs, and add filters for generated tags and GitHub topics.
+- Awesome Repos: added an awesome-list directory and detail pages with stored list activity metrics including stars, commits, README repository counts, forks, issues, and scan freshness.
 
 ### Changed
+- Awesome Repos: moved repository search filters into a compact vertical modal opened from a single filter button.
 - Awesome Repos admin-panel add flow now only asks for the GitHub URL; list names and slugs are derived automatically from the source repo.
 - Awesome-list scans now log start/finish/failure details and surface empty scans or sync failures in the admin panel.
 

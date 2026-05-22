@@ -5,7 +5,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("repos", "0007_repository_generated_tags_and_more"),
+        ("repos", "0009_merge_20260522_awesome_list_activity_and_daily_refresh"),
     ]
 
     operations = [
