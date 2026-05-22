@@ -25,6 +25,7 @@
 
           <form method="post" class="mt-6 space-y-4">
             {% csrf_token %}
+            <input type="hidden" name="action" value="add_awesome_list" />
 
             <div>
               <label for="id_source_url" class="block text-sm font-medium text-gray-700">GitHub URL</label>
@@ -62,15 +63,27 @@
             <ul class="space-y-4">
               {% for awesome_list in recent_awesome_lists %}
               <li class="pb-4 border-b border-gray-200 last:border-0 last:pb-0">
-                <p class="text-sm font-medium text-gray-900">{{ awesome_list.name }}</p>
-                <p class="mt-1 text-xs text-gray-500">
-                  {{ awesome_list.repo_full_name|default:awesome_list.source_url }} ·
-                  {{ awesome_list.item_count }} repo{{ awesome_list.item_count|pluralize }} ·
-                  {% if awesome_list.last_scanned_at %}{{ awesome_list.last_scanned_at|date:"M d, Y" }}{% else %}Not scanned yet{% endif %}
-                </p>
-                {% if awesome_list.last_error %}
-                <p class="mt-2 text-xs text-red-600">{{ awesome_list.last_error }}</p>
-                {% endif %}
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div class="min-w-0">
+                    <p class="text-sm font-medium text-gray-900">{{ awesome_list.name }}</p>
+                    <p class="mt-1 text-xs text-gray-500">
+                      {{ awesome_list.repo_full_name|default:awesome_list.source_url }} ·
+                      {{ awesome_list.item_count }} repo{{ awesome_list.item_count|pluralize }} ·
+                      {% if awesome_list.last_scanned_at %}{{ awesome_list.last_scanned_at|date:"M d, Y" }}{% else %}Not scanned yet{% endif %}
+                    </p>
+                    {% if awesome_list.last_error %}
+                    <p class="mt-2 text-xs text-red-600">{{ awesome_list.last_error }}</p>
+                    {% endif %}
+                  </div>
+                  <form method="post" class="shrink-0">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="retry_awesome_list" />
+                    <input type="hidden" name="awesome_list_id" value="{{ awesome_list.id }}" />
+                    <button type="submit" class="rounded-full border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50">
+                      Retry scan
+                    </button>
+                  </form>
+                </div>
               </li>
               {% empty %}
               <li class="text-sm text-center text-gray-500">No awesome lists yet</li>

@@ -195,6 +195,7 @@ def delete_account(request):
 class AdminPanelView(UserPassesTestMixin, TemplateView):
     template_name = "pages/admin-panel.html"
     login_url = "account_login"
+    scan_task_group = "Scan awesome list"
 
     def test_func(self):
         return self.request.user.is_superuser
@@ -252,23 +253,46 @@ class AdminPanelView(UserPassesTestMixin, TemplateView):
 
         return context
 
+    def queue_awesome_list_scan(self, awesome_list, *, is_retry=False):
+        transaction.on_commit(
+            lambda: async_task(
+                "apps.repos.tasks.sync_awesome_list_task",
+                awesome_list.id,
+                group=self.scan_task_group,
+            )
+        )
+        logger.info(
+            "Admin queued awesome-list scan",
+            awesome_list_id=awesome_list.id,
+            awesome_list_slug=awesome_list.slug,
+            source_url=awesome_list.source_url,
+            is_retry=is_retry,
+        )
+
+    def retry_awesome_list_scan(self, request):
+        try:
+            awesome_list_id = int(request.POST.get("awesome_list_id", ""))
+        except (TypeError, ValueError):
+            messages.error(request, "Choose an awesome list to retry.")
+            return redirect("admin_panel")
+
+        awesome_list = AwesomeList.objects.filter(id=awesome_list_id).first()
+        if awesome_list is None:
+            messages.error(request, "That awesome list could not be found.")
+            return redirect("admin_panel")
+
+        self.queue_awesome_list_scan(awesome_list, is_retry=True)
+        messages.success(request, f"Queued a retry scan for {awesome_list.name}.")
+        return redirect("admin_panel")
+
     def post(self, request, *args, **kwargs):
+        if request.POST.get("action") == "retry_awesome_list":
+            return self.retry_awesome_list_scan(request)
+
         form = AwesomeListCreateForm(request.POST)
         if form.is_valid():
             awesome_list = form.save()
-            transaction.on_commit(
-                lambda: async_task(
-                    "apps.repos.tasks.sync_awesome_list_task",
-                    awesome_list.id,
-                    group="Scan awesome list",
-                )
-            )
-            logger.info(
-                "Admin queued awesome-list scan",
-                awesome_list_id=awesome_list.id,
-                awesome_list_slug=awesome_list.slug,
-                source_url=awesome_list.source_url,
-            )
+            self.queue_awesome_list_scan(awesome_list)
             messages.success(
                 request,
                 f"Added {awesome_list.name} and queued a scan.",

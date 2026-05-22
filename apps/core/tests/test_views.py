@@ -82,6 +82,53 @@ def test_admin_panel_can_add_awesome_list_and_queue_scan(
     assert "Added Awesome Django and queued a scan." in response.content.decode()
 
 
+@pytest.mark.django_db
+def test_admin_panel_can_retry_awesome_list_scan(
+    client,
+    monkeypatch,
+    sync_state_transitions,
+):
+    user = get_user_model().objects.create_superuser(
+        username="admin",
+        email="admin@example.com",
+        password="password123",
+    )
+    client.force_login(user)
+    awesome_list = AwesomeList.objects.create(
+        name="Awesome Django",
+        slug="awesome-django",
+        source_url="https://github.com/wsvincent/awesome-django",
+        repo_full_name="wsvincent/awesome-django",
+        last_error="Previous scan failed.",
+    )
+    queued = []
+
+    def fake_async_task(func_path, awesome_list_id, **kwargs):
+        queued.append((func_path, awesome_list_id, kwargs))
+
+    monkeypatch.setattr("apps.core.views.async_task", fake_async_task)
+    monkeypatch.setattr("apps.core.views.transaction.on_commit", lambda callback: callback())
+
+    response = client.post(
+        reverse("admin_panel"),
+        data={
+            "action": "retry_awesome_list",
+            "awesome_list_id": awesome_list.id,
+        },
+        follow=True,
+    )
+
+    assert response.status_code == 200
+    assert queued == [
+        (
+            "apps.repos.tasks.sync_awesome_list_task",
+            awesome_list.id,
+            {"group": "Scan awesome list"},
+        )
+    ]
+    assert "Queued a retry scan for Awesome Django." in response.content.decode()
+
+
 @override_settings(SITE_URL="http://example.com")
 def test_build_absolute_public_url_upgrades_non_local_http():
     assert build_absolute_public_url("/api/user") == "https://example.com/api/user"
