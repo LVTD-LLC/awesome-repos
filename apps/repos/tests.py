@@ -16,6 +16,7 @@ from apps.repos.services import (
     repository_search_queryset,
     sync_awesome_list,
 )
+from apps.repos.tasks import refresh_repositories_task, refresh_repository_task
 
 
 @pytest.mark.parametrize(
@@ -374,6 +375,137 @@ def test_github_rate_limit_status_formats_core_limit(monkeypatch):
     assert status["core"]["used"] == 123
     assert status["core"]["remaining"] == 4877
     assert status["core"]["reset_at"] is not None
+
+
+@pytest.mark.django_db
+def test_refresh_repository_task_updates_single_repository(monkeypatch):
+    repository = Repository.objects.create(
+        full_name="django/django",
+        owner="django",
+        name="django",
+        url="https://github.com/django/django",
+    )
+    refreshed = []
+
+    def fake_upsert_repository_from_github(full_name):
+        refreshed.append(full_name)
+        return repository
+
+    monkeypatch.setattr(
+        "apps.repos.tasks.upsert_repository_from_github",
+        fake_upsert_repository_from_github,
+    )
+
+    result = refresh_repository_task(repository.id, repository.full_name)
+
+    assert refreshed == ["django/django"]
+    assert result == {"repository_id": repository.id, "full_name": "django/django"}
+
+
+@pytest.mark.django_db
+def test_refresh_repository_task_logs_and_reraises_failures(monkeypatch):
+    repository = Repository.objects.create(
+        full_name="django/django",
+        owner="django",
+        name="django",
+        url="https://github.com/django/django",
+    )
+
+    class DummyLogger:
+        def __init__(self):
+            self.errors = []
+
+        def info(self, event, **kwargs):
+            pass
+
+        def error(self, event, **kwargs):
+            self.errors.append((event, kwargs))
+
+    dummy_logger = DummyLogger()
+
+    def fake_upsert_repository_from_github(full_name):
+        raise RuntimeError(f"could not refresh {full_name}")
+
+    monkeypatch.setattr("apps.repos.tasks.logger", dummy_logger)
+    monkeypatch.setattr(
+        "apps.repos.tasks.upsert_repository_from_github",
+        fake_upsert_repository_from_github,
+    )
+
+    with pytest.raises(RuntimeError, match="could not refresh django/django"):
+        refresh_repository_task(repository.id, repository.full_name)
+
+    assert dummy_logger.errors == [
+        (
+            "repository_refresh_task_failed",
+            {
+                "repository_id": repository.id,
+                "repository_full_name": "django/django",
+                "error": "could not refresh django/django",
+                "exc_info": True,
+            },
+        )
+    ]
+
+
+@pytest.mark.django_db
+def test_refresh_repositories_task_queues_one_task_per_repository(monkeypatch):
+    stale = Repository.objects.create(
+        full_name="owner/stale",
+        owner="owner",
+        name="stale",
+        url="https://github.com/owner/stale",
+        last_synced_at=timezone.now() - timedelta(days=7),
+    )
+    fresh = Repository.objects.create(
+        full_name="owner/fresh",
+        owner="owner",
+        name="fresh",
+        url="https://github.com/owner/fresh",
+        last_synced_at=timezone.now(),
+    )
+    queued = []
+
+    def fake_async_task(func_path, repository_id, full_name, **kwargs):
+        task_id = f"task-{repository_id}"
+        queued.append((func_path, repository_id, full_name, kwargs, task_id))
+        return task_id
+
+    monkeypatch.setattr("apps.repos.tasks.async_task", fake_async_task)
+
+    result = refresh_repositories_task()
+
+    assert queued == [
+        (
+            "apps.repos.tasks.refresh_repository_task",
+            stale.id,
+            "owner/stale",
+            {"group": "Refresh repositories"},
+            f"task-{stale.id}",
+        ),
+        (
+            "apps.repos.tasks.refresh_repository_task",
+            fresh.id,
+            "owner/fresh",
+            {"group": "Refresh repositories"},
+            f"task-{fresh.id}",
+        ),
+    ]
+    assert result == {
+        "queued": 2,
+        "repositories": [
+            {
+                "repository_id": stale.id,
+                "full_name": "owner/stale",
+                "task_id": f"task-{stale.id}",
+            },
+            {
+                "repository_id": fresh.id,
+                "full_name": "owner/fresh",
+                "task_id": f"task-{fresh.id}",
+            },
+        ],
+    }
 
 
 @pytest.mark.django_db
