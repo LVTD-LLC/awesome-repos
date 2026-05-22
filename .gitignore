@@ -26,6 +26,7 @@ develop-eggs/
 static/
 !frontend/static/
 !frontend/static/brand/
+!frontend/static/brand/*.png
 !frontend/static/brand/*.svg
 assets/css/main.css
 dist/

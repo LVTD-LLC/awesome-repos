@@ -16,7 +16,7 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 
 ## [Unreleased]
 ### Added
-- Awesome Repos: added local SVG logo assets and wired the navbar, favicon, README, and base social metadata to the new branding.
+- Awesome Repos: added local logo assets and wired the navbar, favicon, touch icon, README, and base social metadata to the new branding.
 - Awesome Repos: ingest GitHub awesome-list READMEs, index the linked repositories, and expose searchable repository/list detail pages with stars, freshness, archive-state, and cross-list counts.
 - Awesome Repos: added an admin-panel flow to create new awesome-list sources and queue their initial scan.
 - Awesome Repos admin panel now shows GitHub API rate-limit status for the configured scanner token.
