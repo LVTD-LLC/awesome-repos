@@ -40,15 +40,19 @@ def awesome_list_directory_totals() -> dict:
     item_table = connection.ops.quote_name(AwesomeListItem._meta.db_table)
     list_pk = connection.ops.quote_name(AwesomeList._meta.pk.column)
     list_active = connection.ops.quote_name("is_active")
+    list_last_scanned_at = connection.ops.quote_name("last_scanned_at")
+    list_readme_repository_count = connection.ops.quote_name("readme_repository_count")
+    list_stars = connection.ops.quote_name("stars")
     item_list_id = connection.ops.quote_name(
         AwesomeListItem._meta.get_field("awesome_list").column
     )
     query = f"""
         SELECT
             COUNT(*) AS total_lists,
-            COALESCE(SUM(readme_repository_count), 0) AS total_readme_repositories,
-            COALESCE(SUM(stars), 0) AS total_list_stars,
-            MAX(last_scanned_at) AS latest_scan,
+            COALESCE(SUM(awesome_list.{list_readme_repository_count}), 0)
+                AS total_readme_repositories,
+            COALESCE(SUM(awesome_list.{list_stars}), 0) AS total_list_stars,
+            MAX(awesome_list.{list_last_scanned_at}) AS latest_scan,
             (
                 SELECT COUNT(*)
                 FROM {item_table} AS item
@@ -90,8 +94,10 @@ class RepositorySearchView(ListView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["awesome_lists"] = AwesomeList.objects.annotate(repo_count=Count("items")).order_by(
-            "name"
+        context["awesome_lists"] = (
+            AwesomeList.objects.filter(is_active=True).annotate(repo_count=Count("items")).order_by(
+                "name"
+            )
         )
         context["languages"] = (
             Repository.objects.exclude(language="")
@@ -103,7 +109,7 @@ class RepositorySearchView(ListView):
         context["generated_tag_options"] = repository_json_value_counts("generated_tags")
         context["params"] = self.request.GET.copy()
         context["total_repositories"] = Repository.objects.count()
-        context["total_lists"] = AwesomeList.objects.count()
+        context["total_lists"] = AwesomeList.objects.filter(is_active=True).count()
         return context
 
 

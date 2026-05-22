@@ -44,6 +44,7 @@ GITHUB_REPO_RE = re.compile(
 )
 SKIP_REPO_NAMES = {"stargazers", "network", "issues", "pulls", "pull", "wiki", "releases"}
 README_CANDIDATES = ("README.md", "readme.md", "README.markdown", "README.rst")
+AWESOME_LIST_DERIVED_META_KEYS = {"commits_count"}
 
 
 def github_token() -> str:
@@ -342,7 +343,9 @@ def update_awesome_list_metadata(
     awesome_list.github_pushed_at = dt(meta.get("pushed_at"))
     awesome_list.last_scanned_at = scanned_at
     awesome_list.last_error = last_error
-    awesome_list.raw = meta
+    awesome_list.raw = {
+        key: value for key, value in meta.items() if key not in AWESOME_LIST_DERIVED_META_KEYS
+    }
     awesome_list.save(update_fields=update_fields)
 
 

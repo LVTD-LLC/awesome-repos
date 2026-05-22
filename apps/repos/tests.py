@@ -24,8 +24,8 @@ from apps.repos.models import (
     RepositorySnapshot,
 )
 from apps.repos.services import (
-    attach_awesome_list_commit_count,
     add_repository_to_awesome_list,
+    attach_awesome_list_commit_count,
     discover_missing_awesome_list_repositories,
     extract_github_repos,
     fetch_github_commit_count,
@@ -194,6 +194,7 @@ def test_sync_awesome_list_stores_list_activity_metadata(monkeypatch):
     assert awesome_list.default_branch == "main"
     assert awesome_list.github_pushed_at is not None
     assert awesome_list.last_error == ""
+    assert "commits_count" not in awesome_list.raw
     assert awesome_list.items.count() == 1
 
 
@@ -1685,6 +1686,17 @@ def test_repository_performance_summary_reuses_recent_snapshots_for_short_histor
 
 @pytest.mark.django_db
 def test_search_page_renders(client):
+    active_list = AwesomeList.objects.create(
+        name="Awesome Django",
+        slug="awesome-django",
+        source_url="https://github.com/wsvincent/awesome-django",
+    )
+    AwesomeList.objects.create(
+        name="Inactive List",
+        slug="inactive-list",
+        source_url="https://github.com/example/inactive-list",
+        is_active=False,
+    )
     Repository.objects.create(
         full_name="django/django",
         owner="django",
@@ -1702,6 +1714,11 @@ def test_search_page_renders(client):
     assert b"Any GitHub topic" in response.content
     assert b"django (1)" in response.content
     assert b"web-framework (1)" in response.content
+    assert response.context["total_lists"] == 1
+    assert list(response.context["awesome_lists"].values_list("id", flat=True)) == [
+        active_list.id
+    ]
+    assert b"Inactive List" not in response.content
 
 
 @pytest.mark.django_db
