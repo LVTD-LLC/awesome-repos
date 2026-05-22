@@ -1,6 +1,8 @@
 from math import ceil
 
 from django.conf import settings
+from django.core.cache import cache
+from django.utils import timezone
 from django_q.tasks import async_task
 
 from apps.repos.models import AwesomeList, Repository
@@ -8,6 +10,7 @@ from apps.repos.services import (
     add_repository_to_awesome_list,
     discover_missing_awesome_list_repositories,
     github_rate_limit_remaining,
+    github_rate_limit_status,
     is_github_rate_limit_error,
     sync_awesome_list,
     upsert_repository_from_github,
@@ -33,10 +36,44 @@ def _daily_missing_repository_limit(limit: int | None) -> int:
     return max(0, settings.GITHUB_DAILY_DISCOVERY_REPOSITORY_LIMIT)
 
 
+def _daily_missing_repository_budget_key() -> str:
+    return f"github-missing-repo-budget:{timezone.now():%Y%m%d}"
+
+
+def _try_reserve_daily_missing_repository_slot(daily_limit: int) -> bool:
+    if daily_limit <= 0:
+        return False
+
+    key = _daily_missing_repository_budget_key()
+    cache.add(key, 0, timeout=60 * 60 * 36)
+    try:
+        used = cache.incr(key)
+    except ValueError:
+        cache.add(key, 0, timeout=60 * 60 * 36)
+        used = cache.incr(key)
+    return used <= daily_limit
+
+
+def _available_repository_refresh_limit(refresh_limit: int, min_remaining: int | None) -> int:
+    if min_remaining is None or refresh_limit <= 0:
+        return refresh_limit
+
+    if github_rate_limit_remaining() is None:
+        github_rate_limit_status()
+
+    remaining = github_rate_limit_remaining()
+    if remaining is None:
+        return refresh_limit
+    return min(refresh_limit, max(0, remaining - min_remaining))
+
+
 def _github_refresh_budget_exhausted(min_remaining: int | None) -> bool:
     if min_remaining is None:
         return False
 
+    # Rate-limit state is process-local and only populated after a GitHub response.
+    # This guard is proactive best effort; individual refresh tasks still handle
+    # actual 403/429 rate-limit responses without retrying.
     remaining = github_rate_limit_remaining()
     return remaining is not None and remaining <= min_remaining
 
@@ -87,85 +124,52 @@ def enqueue_missing_repositories_from_awesome_lists_task(
     daily_limit: int | None = None,
 ):
     task_ids = []
-    failures = []
-    checked_lists = 0
-    remaining_budget = _daily_missing_repository_limit(daily_limit)
+    resolved_daily_limit = _daily_missing_repository_limit(daily_limit)
     awesome_lists = AwesomeList.objects.filter(is_active=True).order_by("name")
     for awesome_list in awesome_lists:
-        if remaining_budget <= 0:
-            break
-
-        try:
-            result = discover_missing_awesome_list_repositories(
-                awesome_list,
+        task_ids.append(
+            async_task(
+                "apps.repos.tasks.enqueue_missing_repositories_for_awesome_list_task",
+                awesome_list.id,
                 limit=limit_per_list,
+                daily_limit=resolved_daily_limit,
+                group="Daily awesome-list missing repo discovery",
             )
-        except Exception as exc:  # noqa: BLE001 - one bad list should not block discovery
-            failures.append({"awesome_list": awesome_list.slug, "error": str(exc)})
-            awesome_list.last_error = str(exc)
-            awesome_list.save(update_fields=["last_error", "updated_at"])
-            if is_github_rate_limit_error(exc):
-                logger.warning(
-                    "awesome_list_missing_repo_syncs_stopped_for_rate_limit",
-                    awesome_list_id=awesome_list.id,
-                    awesome_list_slug=awesome_list.slug,
-                    error=str(exc),
-                )
-                break
-            logger.error(
-                "awesome_list_missing_repo_discovery_failed",
-                awesome_list_id=awesome_list.id,
-                awesome_list_slug=awesome_list.slug,
-                error=str(exc),
-                exc_info=True,
-            )
-            continue
-
-        checked_lists += 1
-        for repo_full_name in result["missing"]:
-            if remaining_budget <= 0:
-                break
-            task_ids.append(
-                async_task(
-                    "apps.repos.tasks.add_missing_repository_to_awesome_list_task",
-                    awesome_list.id,
-                    repo_full_name,
-                    group="Add missing awesome-list repos",
-                )
-            )
-            remaining_budget -= 1
+        )
 
     logger.info(
         "awesome_list_missing_repo_syncs_queued",
         queued_count=len(task_ids),
         limit_per_list=limit_per_list,
-        daily_limit=_daily_missing_repository_limit(daily_limit),
-        checked_lists=checked_lists,
-        failure_count=len(failures),
+        daily_limit=resolved_daily_limit,
     )
     return {
         "queued": len(task_ids),
         "task_ids": task_ids,
-        "checked_lists": checked_lists,
-        "failure_count": len(failures),
-        "failures": failures[:25],
+        "daily_limit": resolved_daily_limit,
     }
 
 
 def enqueue_missing_repositories_for_awesome_list_task(
-    awesome_list_id: int, limit: int | None = None
+    awesome_list_id: int, limit: int | None = None, daily_limit: int | None = None
 ):
     awesome_list = AwesomeList.objects.get(id=awesome_list_id)
+    resolved_daily_limit = _daily_missing_repository_limit(daily_limit)
     try:
         logger.info(
             "awesome_list_missing_repo_discovery_task_started",
             awesome_list_id=awesome_list_id,
             awesome_list_slug=awesome_list.slug,
             limit=limit,
+            daily_limit=resolved_daily_limit,
         )
         result = discover_missing_awesome_list_repositories(awesome_list, limit=limit)
         task_ids = []
+        budget_exhausted = False
         for repo_full_name in result["missing"]:
+            if not _try_reserve_daily_missing_repository_slot(resolved_daily_limit):
+                budget_exhausted = True
+                break
             task_ids.append(
                 async_task(
                     "apps.repos.tasks.add_missing_repository_to_awesome_list_task",
@@ -177,6 +181,8 @@ def enqueue_missing_repositories_for_awesome_list_task(
 
         result["queued"] = len(task_ids)
         result["task_ids"] = task_ids
+        result["daily_limit"] = resolved_daily_limit
+        result["budget_exhausted"] = budget_exhausted
         logged_result = {
             **result,
             "missing": result["missing"][:25],
@@ -258,6 +264,18 @@ def refresh_repository_task(
             "full_name": refreshed.full_name,
         }
     except Exception as exc:
+        if is_github_rate_limit_error(exc):
+            logger.warning(
+                "repository_refresh_task_stopped_for_rate_limit",
+                repository_id=repository_id,
+                repository_full_name=full_name,
+                error=str(exc),
+            )
+            return {
+                "repository_id": repository_id,
+                "full_name": full_name,
+                "stopped_for_rate_limit": True,
+            }
         logger.error(
             "repository_refresh_task_failed",
             repository_id=repository_id,
@@ -287,76 +305,49 @@ def refresh_repositories_task(
         "id",
         "full_name",
     )
+    refresh_limit = _available_repository_refresh_limit(refresh_limit, min_remaining)
     queryset = queryset[:refresh_limit]
 
-    synced = 0
-    refreshed_repositories = []
-    failures = []
-    stopped_for_rate_limit = False
+    queued = []
     for repository_id, full_name in queryset.iterator():
         if _github_refresh_budget_exhausted(min_remaining):
-            stopped_for_rate_limit = True
             logger.warning(
                 "repository_refresh_stopped_for_rate_limit_budget",
                 remaining=github_rate_limit_remaining(),
                 min_remaining=min_remaining,
-                synced=synced,
+                queued=len(queued),
                 limit=refresh_limit,
             )
             break
 
-        try:
-            refreshed = upsert_repository_from_github(full_name, include_readme=include_readme)
-        except Exception as exc:  # noqa: BLE001 - keep one bad repo from killing a batch
-            failures.append(
-                {"repository_id": repository_id, "full_name": full_name, "error": str(exc)}
-            )
-            if is_github_rate_limit_error(exc):
-                stopped_for_rate_limit = True
-                logger.warning(
-                    "repository_refresh_stopped_for_rate_limit_error",
-                    repository_id=repository_id,
-                    repository_full_name=full_name,
-                    error=str(exc),
-                    synced=synced,
-                    limit=refresh_limit,
-                )
-                break
-            logger.error(
-                "repository_refresh_failed",
-                repository_id=repository_id,
-                repository_full_name=full_name,
-                error=str(exc),
-                exc_info=True,
-            )
-            continue
-
-        synced += 1
-        refreshed_repositories.append(
+        task_id = async_task(
+            "apps.repos.tasks.refresh_repository_task",
+            repository_id,
+            full_name,
+            include_readme=include_readme,
+            group="Refresh repositories",
+        )
+        queued.append(
             {
-                "repository_id": refreshed.id,
-                "full_name": refreshed.full_name,
+                "repository_id": repository_id,
+                "full_name": full_name,
+                "task_id": task_id,
             }
         )
 
     logger.info(
-        "repository_refresh_batch_finished",
-        synced=synced,
-        failure_count=len(failures),
+        "repository_refresh_fanout_finished",
+        queued=len(queued),
         limit=refresh_limit,
         total_repositories=total_repositories,
         include_readme=include_readme,
-        stopped_for_rate_limit=stopped_for_rate_limit,
         rate_limit_remaining=github_rate_limit_remaining(),
     )
     return {
-        "synced": synced,
-        "failure_count": len(failures),
-        "failures": failures[:25],
+        "queued": len(queued),
         "limit": refresh_limit,
         "total_repositories": total_repositories,
         "include_readme": include_readme,
-        "stopped_for_rate_limit": stopped_for_rate_limit,
         "rate_limit_remaining": github_rate_limit_remaining(),
-        "repositories": refreshed_repositories[:25],
+        "repositories": queued[:25],
     }

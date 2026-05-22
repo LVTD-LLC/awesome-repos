@@ -454,26 +454,10 @@ def test_enqueue_awesome_list_missing_repo_syncs_task_queues_daily_budget(
     )
     queued = []
 
-    def fake_discover(awesome_list, limit=None):
-        assert awesome_list == active
-        assert limit == 5
-        return {
-            "awesome_list": awesome_list.slug,
-            "discovered": 2,
-            "missing": ["django/django", "encode/httpx"],
-            "missing_count": 2,
-            "linked_existing": 0,
-            "skipped_existing": 0,
-        }
-
     def fake_async_task(func_path, *args, **kwargs):
         queued.append((func_path, args, kwargs))
         return f"task-{len(queued)}"
 
-    monkeypatch.setattr(
-        "apps.repos.tasks.discover_missing_awesome_list_repositories",
-        fake_discover,
-    )
     monkeypatch.setattr("apps.repos.tasks.async_task", fake_async_task)
 
     from apps.repos.tasks import enqueue_awesome_list_missing_repo_syncs_task
@@ -483,16 +467,16 @@ def test_enqueue_awesome_list_missing_repo_syncs_task_queues_daily_budget(
     assert result == {
         "queued": 1,
         "task_ids": ["task-1"],
-        "checked_lists": 1,
-        "failure_count": 0,
-        "failures": [],
+        "daily_limit": 1,
     }
     assert queued == [
         (
-            "apps.repos.tasks.add_missing_repository_to_awesome_list_task",
-            (active.id, "django/django"),
+            "apps.repos.tasks.enqueue_missing_repositories_for_awesome_list_task",
+            (active.id,),
             {
-                "group": "Add missing awesome-list repos",
+                "limit": 5,
+                "daily_limit": 1,
+                "group": "Daily awesome-list missing repo discovery",
             },
         )
     ]
@@ -526,6 +510,10 @@ def test_enqueue_missing_repositories_for_awesome_list_task_queues_missing_repos
         "apps.repos.tasks.discover_missing_awesome_list_repositories",
         fake_discover,
     )
+    monkeypatch.setattr(
+        "apps.repos.tasks._try_reserve_daily_missing_repository_slot",
+        lambda daily_limit: True,
+    )
     monkeypatch.setattr("apps.repos.tasks.async_task", fake_async_task)
 
     from apps.repos.tasks import enqueue_missing_repositories_for_awesome_list_task
@@ -534,6 +522,8 @@ def test_enqueue_missing_repositories_for_awesome_list_task_queues_missing_repos
 
     assert result["queued"] == 2
     assert result["task_ids"] == ["task-1", "task-2"]
+    assert result["daily_limit"] == 250
+    assert result["budget_exhausted"] is False
     assert queued == [
         (
             "apps.repos.tasks.add_missing_repository_to_awesome_list_task",
@@ -584,6 +574,10 @@ def test_enqueue_missing_repositories_for_awesome_list_task_truncates_logged_ids
         "apps.repos.tasks.discover_missing_awesome_list_repositories",
         fake_discover,
     )
+    monkeypatch.setattr(
+        "apps.repos.tasks._try_reserve_daily_missing_repository_slot",
+        lambda daily_limit: True,
+    )
     monkeypatch.setattr("apps.repos.tasks.async_task", fake_async_task)
     monkeypatch.setattr("apps.repos.tasks.logger", FakeLogger())
 
@@ -602,6 +596,60 @@ def test_enqueue_missing_repositories_for_awesome_list_task_truncates_logged_ids
     assert finished_event["result"]["queued"] == 30
     assert len(finished_event["result"]["task_ids"]) == 25
     assert len(finished_event["result"]["missing"]) == 25
+
+
+@pytest.mark.django_db
+def test_enqueue_missing_repositories_for_awesome_list_task_stops_at_daily_budget(
+    monkeypatch,
+):
+    awesome_list = AwesomeList.objects.create(
+        name="Awesome Python",
+        slug="awesome-python-budget",
+        source_url="https://github.com/vinta/awesome-python",
+    )
+    queued = []
+    budget_results = iter([True, False])
+
+    monkeypatch.setattr(
+        "apps.repos.tasks.discover_missing_awesome_list_repositories",
+        lambda awesome_list, limit=None: {
+            "awesome_list": awesome_list.slug,
+            "discovered": 2,
+            "missing": ["django/django", "encode/httpx"],
+            "missing_count": 2,
+            "linked_existing": 0,
+            "skipped_existing": 0,
+        },
+    )
+    monkeypatch.setattr(
+        "apps.repos.tasks._try_reserve_daily_missing_repository_slot",
+        lambda daily_limit: next(budget_results),
+    )
+
+    def fake_async_task(func_path, *args, **kwargs):
+        queued.append((func_path, args, kwargs))
+        return f"task-{len(queued)}"
+
+    monkeypatch.setattr("apps.repos.tasks.async_task", fake_async_task)
+
+    from apps.repos.tasks import enqueue_missing_repositories_for_awesome_list_task
+
+    result = enqueue_missing_repositories_for_awesome_list_task(
+        awesome_list.id,
+        daily_limit=1,
+    )
+
+    assert result["queued"] == 1
+    assert result["task_ids"] == ["task-1"]
+    assert result["daily_limit"] == 1
+    assert result["budget_exhausted"] is True
+    assert queued == [
+        (
+            "apps.repos.tasks.add_missing_repository_to_awesome_list_task",
+            (awesome_list.id, "django/django"),
+            {"group": "Add missing awesome-list repos"},
+        )
+    ]
 
 
 @pytest.mark.django_db
@@ -1234,34 +1282,39 @@ def test_refresh_repositories_task_refreshes_oldest_metadata_only(monkeypatch):
         url="https://github.com/owner/fresh",
         last_synced_at=timezone.now(),
     )
-    refreshed = []
+    queued = []
 
-    def fake_upsert_repository_from_github(full_name, *, include_readme=True):
-        refreshed.append((full_name, include_readme))
-        return Repository.objects.get(full_name=full_name)
+    def fake_async_task(func_path, repository_id, full_name, **kwargs):
+        task_id = f"task-{repository_id}"
+        queued.append((func_path, repository_id, full_name, kwargs, task_id))
+        return task_id
 
-    monkeypatch.setattr(
-        "apps.repos.tasks.upsert_repository_from_github",
-        fake_upsert_repository_from_github,
-    )
+    monkeypatch.setattr("apps.repos.tasks.async_task", fake_async_task)
     monkeypatch.setattr("apps.repos.tasks.github_rate_limit_remaining", lambda: None)
+    monkeypatch.setattr("apps.repos.tasks.github_rate_limit_status", lambda: {"ok": False})
 
     result = refresh_repositories_task(limit=1)
 
-    assert refreshed == [("owner/stale", False)]
+    assert queued == [
+        (
+            "apps.repos.tasks.refresh_repository_task",
+            stale.id,
+            "owner/stale",
+            {"include_readme": False, "group": "Refresh repositories"},
+            f"task-{stale.id}",
+        )
+    ]
     assert result == {
-        "synced": 1,
-        "failure_count": 0,
-        "failures": [],
+        "queued": 1,
         "limit": 1,
         "total_repositories": 2,
         "include_readme": False,
-        "stopped_for_rate_limit": False,
         "rate_limit_remaining": None,
         "repositories": [
             {
                 "repository_id": stale.id,
                 "full_name": "owner/stale",
+                "task_id": f"task-{stale.id}",
             },
         ],
     }
@@ -1277,23 +1330,22 @@ def test_refresh_repositories_task_stops_before_reserved_rate_limit(monkeypatch,
         url="https://github.com/owner/stale",
     )
 
-    def fail_upsert(full_name, *, include_readme=True):
-        raise AssertionError(f"should not refresh {full_name}")
+    def fail_async_task(*args, **kwargs):
+        raise AssertionError("should not queue repository refresh")
 
-    monkeypatch.setattr("apps.repos.tasks.upsert_repository_from_github", fail_upsert)
+    monkeypatch.setattr("apps.repos.tasks.async_task", fail_async_task)
     monkeypatch.setattr("apps.repos.tasks.github_rate_limit_remaining", lambda: 999)
 
     result = refresh_repositories_task(limit=1)
 
-    assert result["synced"] == 0
-    assert result["failure_count"] == 0
-    assert result["stopped_for_rate_limit"] is True
+    assert result["queued"] == 0
+    assert result["limit"] == 0
     assert result["rate_limit_remaining"] == 999
 
 
 @pytest.mark.django_db
-def test_refresh_repositories_task_stops_on_rate_limit_error(monkeypatch):
-    Repository.objects.create(
+def test_refresh_repository_task_stops_on_rate_limit_error(monkeypatch):
+    repository = Repository.objects.create(
         full_name="owner/stale",
         owner="owner",
         name="stale",
@@ -1308,18 +1360,12 @@ def test_refresh_repositories_task_stops_on_rate_limit_error(monkeypatch):
         )
 
     monkeypatch.setattr("apps.repos.tasks.upsert_repository_from_github", fail_upsert)
-    remaining_values = iter([None, 0])
-    monkeypatch.setattr(
-        "apps.repos.tasks.github_rate_limit_remaining",
-        lambda: next(remaining_values, 0),
-    )
 
-    result = refresh_repositories_task(limit=1)
+    result = refresh_repository_task(repository.id, repository.full_name)
 
-    assert result["synced"] == 0
-    assert result["failure_count"] == 1
     assert result["stopped_for_rate_limit"] is True
-    assert result["rate_limit_remaining"] == 0
+    assert result["repository_id"] == repository.id
+    assert result["full_name"] == "owner/stale"
 
 
 @pytest.mark.django_db
