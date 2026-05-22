@@ -39,6 +39,7 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Awesome-list scans now log start/finish/failure details and surface empty scans or sync failures in the admin panel.
 
 ### Fixed
+- Awesome Repos: repair repository migration graph ordering so production can migrate past the AI-development and activity merge branches.
 - Awesome Repos admin panel now bounds the Recent awesome lists card height so long list histories do not stretch the dashboard row.
 - Awesome Repos: include `django.contrib.postgres` so pgvector HNSW indexes pass Django production checks.
 - Awesome Repos: removed manifest-dependent logo static references so production template rendering works after `collectstatic`.
