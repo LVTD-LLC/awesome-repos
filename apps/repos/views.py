@@ -12,6 +12,7 @@ from apps.repos.services import repository_performance_summary, repository_searc
 from apps.repos.tags import normalize_repository_tag
 
 REPOSITORY_JSON_FILTER_FIELDS = {"topics", "generated_tags"}
+MAX_UPDATED_DAYS_FILTER = 36500
 
 
 def repository_json_value_counts(
@@ -153,7 +154,7 @@ def _apply_list_repository_state_filters(qs, params):
         qs = qs.filter(stars__gte=min_stars)
 
     updated_days = _positive_int_param(params, "updated_days")
-    if updated_days:
+    if updated_days and updated_days <= MAX_UPDATED_DAYS_FILTER:
         cutoff = timezone.now() - timedelta(days=updated_days)
         qs = qs.filter(github_pushed_at__gte=cutoff)
 

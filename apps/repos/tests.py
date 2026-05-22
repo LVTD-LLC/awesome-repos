@@ -2492,6 +2492,32 @@ def test_awesome_list_detail_page_sorts_by_cross_list_mentions(client):
 
 
 @pytest.mark.django_db
+def test_awesome_list_detail_page_ignores_extreme_updated_days_filter(client):
+    awesome_list = AwesomeList.objects.create(
+        name="Awesome Django",
+        slug="awesome-django",
+        source_url="https://github.com/wsvincent/awesome-django",
+    )
+    repo = Repository.objects.create(
+        full_name="django/django",
+        owner="django",
+        name="django",
+        url="https://github.com/django/django",
+        github_pushed_at=timezone.now(),
+    )
+    AwesomeListItem.objects.create(awesome_list=awesome_list, repository=repo)
+
+    response = client.get(
+        reverse("repos:list_detail", kwargs={"slug": "awesome-django"}),
+        {"updated_days": "1000000000"},
+    )
+
+    assert response.status_code == 200
+    assert response.context["page_obj"].paginator.count == 1
+    assert b"django/django" in response.content
+
+
+@pytest.mark.django_db
 def test_awesome_list_detail_page_preserves_filters_in_pagination_links(client):
     awesome_list = AwesomeList.objects.create(
         name="Awesome Django",
