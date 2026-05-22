@@ -1,8 +1,11 @@
 from django.db import models
 from django.urls import reverse
 from django.utils import timezone
+from pgvector.django import HnswIndex, VectorField
 
 from apps.core.base_models import BaseModel
+
+REPOSITORY_EMBEDDING_DIMENSIONS = 1536
 
 
 class AwesomeList(BaseModel):
@@ -115,3 +118,33 @@ class AwesomeListItem(BaseModel):
 
     def __str__(self):
         return f"{self.repository.full_name} in {self.awesome_list.name}"
+
+
+class RepositoryEmbedding(BaseModel):
+    repository = models.OneToOneField(
+        Repository,
+        on_delete=models.CASCADE,
+        related_name="vector",
+    )
+    model = models.CharField(max_length=255)
+    dimensions = models.PositiveSmallIntegerField(default=REPOSITORY_EMBEDDING_DIMENSIONS)
+    source_text_hash = models.CharField(max_length=64)
+    source_text_chars = models.PositiveIntegerField(default=0)
+    embedding = VectorField(dimensions=REPOSITORY_EMBEDDING_DIMENSIONS)
+    embedded_at = models.DateTimeField()
+
+    class Meta:
+        ordering = ["repository__full_name"]
+        indexes = [
+            models.Index(fields=["model", "source_text_hash"], name="repo_emb_model_hash_idx"),
+            HnswIndex(
+                name="repo_emb_vec_hnsw_idx",
+                fields=["embedding"],
+                m=16,
+                ef_construction=64,
+                opclasses=["vector_cosine_ops"],
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.repository.full_name} embedding"

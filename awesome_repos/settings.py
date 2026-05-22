@@ -10,23 +10,21 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
+import logging
 import os
 from pathlib import Path
 from urllib.parse import quote
 
 import environ
-import structlog
-import logging
+import logfire
 import sentry_sdk
+import structlog
 from sentry_sdk.integrations.django import DjangoIntegration
 from sentry_sdk.integrations.redis import RedisIntegration
 from structlog_sentry import SentryProcessor
-from awesome_repos.sentry_utils import CustomLoggingIntegration, before_send
 
-import logfire
 from awesome_repos.logging_utils import scrubbing_callback
-
-
+from awesome_repos.sentry_utils import CustomLoggingIntegration, before_send
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -109,18 +107,14 @@ THIRD_PARTY_APPS = [
     "allauth.mfa",
     "django_q",
     "django_extensions",
-    
     "django_structlog",
 ]
 
 CUSTOM_APPS = [
     "apps.core.CoreConfig",
     "apps.api.ApiConfig",
-    
     "apps.pages.PagesConfig",
     "apps.repos.apps.ReposConfig",
-    
-    
 ]
 
 INSTALLED_APPS = DEFAULT_APPS + THIRD_PARTY_APPS + CUSTOM_APPS
@@ -155,9 +149,6 @@ TEMPLATES = [
                 "apps.core.context_processors.current_state",
                 "apps.core.context_processors.mfa_recovery_codes_settings",
                 "apps.core.context_processors.posthog_api_key",
-                
-                
-                
                 "apps.core.context_processors.available_social_providers",
                 "apps.pages.context_processors.referrer_banner",
             ],
@@ -243,7 +234,7 @@ aws_s3_endpoint_url = env("AWS_S3_ENDPOINT_URL", default="")
 MEDIA_ROOT = os.path.join(BASE_DIR, "media/")
 
 if not aws_s3_endpoint_url:
-    MEDIA_URL = f"/media/"
+    MEDIA_URL = "/media/"
     STORAGES = {
         "default": {
             "BACKEND": "django.core.files.storage.FileSystemStorage",
@@ -399,6 +390,7 @@ Q_CLUSTER = {
     "error_reporter": {},
 }
 
+
 def extract_from_record(logger, name, event_dict):
     """
     Extract thread name and add them to the event dict.
@@ -406,6 +398,7 @@ def extract_from_record(logger, name, event_dict):
     record = event_dict["_record"]
     event_dict["thread_id"] = record.thread
     return event_dict
+
 
 LOGGING = {
     "version": 1,
@@ -565,18 +558,20 @@ if SENTRY_DSN and ENVIRONMENT == "prod":
 POSTHOG_API_KEY = env("POSTHOG_API_KEY", default="")
 
 
-
-
-
-
-
-
-
-
 SHELL_PLUS_IMPORTS = [
     "from django_q.tasks import async_task",
     "from apps.core.tasks import *",
 ]
+
+OPENROUTER_API_KEY = env("OPENROUTER_API_KEY", default="")
+OPENROUTER_BASE_URL = env("OPENROUTER_BASE_URL", default="https://openrouter.ai/api/v1")
+REPOSITORY_EMBEDDINGS_ENABLED = env.bool("REPOSITORY_EMBEDDINGS_ENABLED", default=True)
+REPOSITORY_EMBEDDING_MODEL = env(
+    "REPOSITORY_EMBEDDING_MODEL",
+    default="openai/text-embedding-3-small",
+)
+REPOSITORY_EMBEDDING_DIMENSIONS = env.int("REPOSITORY_EMBEDDING_DIMENSIONS", default=1536)
+REPOSITORY_EMBEDDING_MAX_CHARS = env.int("REPOSITORY_EMBEDDING_MAX_CHARS", default=24000)
 
 
 SUPPORTED_AI_MODELS = {

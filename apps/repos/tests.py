@@ -1,18 +1,34 @@
+import base64
 from datetime import timedelta
+from io import StringIO
 
 import pytest
+from django.core.management import call_command
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
 
+from apps.repos.embeddings import (
+    build_repository_embedding_payload,
+    build_repository_embedding_text,
+    save_repository_embedding,
+)
 from apps.repos.forms import AwesomeListCreateForm
-from apps.repos.models import AwesomeList, AwesomeListItem, Repository, RepositorySnapshot
+from apps.repos.models import (
+    REPOSITORY_EMBEDDING_DIMENSIONS,
+    AwesomeList,
+    AwesomeListItem,
+    Repository,
+    RepositoryEmbedding,
+    RepositorySnapshot,
+)
 from apps.repos.services import (
     add_repository_to_awesome_list,
     discover_missing_awesome_list_repositories,
     extract_github_repos,
     fetch_json,
+    fetch_repository_readme,
     github_rate_limit_status,
     parse_github_repo_url,
     repository_performance_summary,
@@ -476,6 +492,252 @@ def test_github_rate_limit_status_formats_core_limit(monkeypatch):
     assert status["core"]["reset_at"] is not None
 
 
+def test_fetch_repository_readme_decodes_github_contents_payload(monkeypatch):
+    readme = "# Django\n\nThe Web framework."
+    monkeypatch.setattr(
+        "apps.repos.services.fetch_json",
+        lambda url: {
+            "encoding": "base64",
+            "content": base64.b64encode(readme.encode("utf-8")).decode("ascii"),
+        },
+    )
+
+    assert fetch_repository_readme("django/django") == readme
+
+
+def github_repo_api_payload():
+    return {
+        "full_name": "django/django",
+        "owner": {"login": "django"},
+        "name": "django",
+        "html_url": "https://github.com/django/django",
+        "description": "The Web framework",
+        "homepage": "https://www.djangoproject.com/",
+        "language": "Python",
+        "license": {"spdx_id": "BSD-3-Clause"},
+        "topics": ["django", "web"],
+        "stargazers_count": 80000,
+        "forks_count": 32000,
+        "open_issues_count": 100,
+        "subscribers_count": 2000,
+        "default_branch": "main",
+        "archived": False,
+        "disabled": False,
+        "fork": False,
+        "created_at": "2005-07-21T00:00:00Z",
+        "updated_at": "2026-05-22T00:00:00Z",
+        "pushed_at": "2026-05-22T00:00:00Z",
+    }
+
+
+@pytest.mark.django_db(transaction=True)
+def test_upsert_repository_from_github_syncs_embedding_from_readme(monkeypatch, settings):
+    settings.OPENROUTER_API_KEY = "or-test"
+    settings.REPOSITORY_EMBEDDINGS_ENABLED = True
+    captured = {}
+
+    def fake_fetch_json(url):
+        if url.endswith("/readme"):
+            captured["readme_fetch_in_atomic"] = connection.in_atomic_block
+            return {
+                "encoding": "base64",
+                "content": base64.b64encode(b"# Django\n").decode("ascii"),
+            }
+        captured["metadata_fetch_in_atomic"] = connection.in_atomic_block
+        return github_repo_api_payload()
+
+    def fake_sync_repository_embedding(repository, readme_text):
+        captured["repo"] = repository.full_name
+        captured["description"] = repository.description
+        captured["readme_text"] = readme_text
+        captured["embedding_sync_in_atomic"] = connection.in_atomic_block
+
+    monkeypatch.setattr("apps.repos.services.fetch_json", fake_fetch_json)
+    monkeypatch.setattr(
+        "apps.repos.services.sync_repository_embedding",
+        fake_sync_repository_embedding,
+    )
+
+    repo = upsert_repository_from_github("django/django")
+
+    assert repo.description == "The Web framework"
+    assert captured == {
+        "metadata_fetch_in_atomic": False,
+        "readme_fetch_in_atomic": False,
+        "repo": "django/django",
+        "description": "The Web framework",
+        "readme_text": "# Django\n",
+        "embedding_sync_in_atomic": False,
+    }
+
+
+@pytest.mark.django_db
+def test_upsert_repository_from_github_skips_readme_when_embeddings_unconfigured(
+    monkeypatch,
+    settings,
+):
+    settings.OPENROUTER_API_KEY = ""
+    settings.REPOSITORY_EMBEDDINGS_ENABLED = True
+
+    def fail_fetch_repository_readme(full_name):
+        raise AssertionError("README should not be fetched when embeddings are unconfigured")
+
+    monkeypatch.setattr(
+        "apps.repos.services.fetch_json",
+        lambda url: github_repo_api_payload(),
+    )
+    monkeypatch.setattr(
+        "apps.repos.services.fetch_repository_readme",
+        fail_fetch_repository_readme,
+    )
+
+    repo = upsert_repository_from_github("django/django")
+
+    assert repo.description == "The Web framework"
+
+
+@pytest.mark.django_db
+def test_save_repository_embedding_persists_pgvector(monkeypatch, settings):
+    settings.OPENROUTER_API_KEY = "or-test"
+    settings.REPOSITORY_EMBEDDINGS_ENABLED = True
+    settings.REPOSITORY_EMBEDDING_MODEL = "openai/text-embedding-3-small"
+    settings.REPOSITORY_EMBEDDING_DIMENSIONS = REPOSITORY_EMBEDDING_DIMENSIONS
+    repo = Repository.objects.create(
+        full_name="django/django",
+        owner="django",
+        name="django",
+        url="https://github.com/django/django",
+        description="The Web framework",
+    )
+
+    def fake_generate_embedding(text, input_type="document"):
+        from apps.repos.embeddings import EmbeddingResponse
+
+        assert input_type == "document"
+        assert "The Web framework" in text
+        assert "# Django" in text
+        return EmbeddingResponse(
+            vector=[0.1] * REPOSITORY_EMBEDDING_DIMENSIONS,
+            model="openai/text-embedding-3-small",
+        )
+
+    monkeypatch.setattr("apps.repos.embeddings.generate_embedding", fake_generate_embedding)
+
+    embedding = save_repository_embedding(repo, "# Django")
+
+    assert embedding is not None
+    assert embedding.repository == repo
+    assert embedding.source_text_chars > 0
+    assert RepositoryEmbedding.objects.filter(repository=repo).exists()
+
+
+@pytest.mark.django_db
+def test_save_repository_embedding_skips_unchanged_source(monkeypatch, settings):
+    settings.OPENROUTER_API_KEY = "or-test"
+    settings.REPOSITORY_EMBEDDINGS_ENABLED = True
+    settings.REPOSITORY_EMBEDDING_MODEL = "openai/text-embedding-3-small"
+    settings.REPOSITORY_EMBEDDING_DIMENSIONS = REPOSITORY_EMBEDDING_DIMENSIONS
+    repo = Repository.objects.create(
+        full_name="django/django",
+        owner="django",
+        name="django",
+        url="https://github.com/django/django",
+        description="The Web framework",
+    )
+    calls = 0
+
+    def fake_generate_embedding(text, input_type="document"):
+        nonlocal calls
+        from apps.repos.embeddings import EmbeddingResponse
+
+        calls += 1
+        return EmbeddingResponse(
+            vector=[0.1] * REPOSITORY_EMBEDDING_DIMENSIONS,
+            model="openai/text-embedding-3-small",
+        )
+
+    monkeypatch.setattr("apps.repos.embeddings.generate_embedding", fake_generate_embedding)
+
+    first = save_repository_embedding(repo, "# Django")
+    second = save_repository_embedding(repo, "# Django")
+
+    assert calls == 1
+    assert first == second
+
+
+@pytest.mark.django_db
+def test_repository_embedding_text_uses_description_and_readme(settings):
+    settings.REPOSITORY_EMBEDDING_MAX_CHARS = 80
+    repo = Repository.objects.create(
+        full_name="django/django",
+        owner="django",
+        name="django",
+        url="https://github.com/django/django",
+        description="The Web framework",
+    )
+
+    text = build_repository_embedding_text(repo, "# Django\n" + ("docs " * 40))
+
+    assert text.startswith("Repository: django/django")
+    assert "Description:" in text
+    assert "README:" in text
+    assert len(text) == 80
+
+
+def test_repository_embedding_text_handles_null_description(settings):
+    settings.REPOSITORY_EMBEDDING_MAX_CHARS = 24000
+    repo = Repository(full_name="owner/repo", description=None)
+
+    text = build_repository_embedding_text(repo, "# README")
+
+    assert text == "Repository: owner/repo\n\nREADME:\n# README"
+
+
+@pytest.mark.django_db
+def test_embed_repositories_command_reports_unchanged_embeddings(monkeypatch, settings):
+    settings.OPENROUTER_API_KEY = "or-test"
+    settings.REPOSITORY_EMBEDDINGS_ENABLED = True
+    settings.REPOSITORY_EMBEDDING_MODEL = "openai/text-embedding-3-small"
+    settings.REPOSITORY_EMBEDDING_DIMENSIONS = REPOSITORY_EMBEDDING_DIMENSIONS
+    settings.REPOSITORY_EMBEDDING_MAX_CHARS = 24000
+    repo = Repository.objects.create(
+        full_name="django/django",
+        owner="django",
+        name="django",
+        url="https://github.com/django/django",
+        description="The Web framework",
+    )
+    readme_text = "# Django"
+    payload = build_repository_embedding_payload(repo, readme_text)
+    assert payload is not None
+    RepositoryEmbedding.objects.create(
+        repository=repo,
+        model="openai/text-embedding-3-small",
+        dimensions=REPOSITORY_EMBEDDING_DIMENSIONS,
+        source_text_hash=payload.text_hash,
+        source_text_chars=len(payload.text),
+        embedding=[0.1] * REPOSITORY_EMBEDDING_DIMENSIONS,
+        embedded_at=timezone.now(),
+    )
+
+    def fail_generate_embedding(text, input_type="document"):
+        raise AssertionError("unchanged embeddings should not be regenerated")
+
+    monkeypatch.setattr("apps.repos.embeddings.generate_embedding", fail_generate_embedding)
+    monkeypatch.setattr(
+        "apps.repos.management.commands.embed_repositories.fetch_repository_readme",
+        lambda full_name: readme_text,
+    )
+
+    stdout = StringIO()
+    call_command("embed_repositories", stdout=stdout)
+
+    output = stdout.getvalue()
+    assert "'embedded': 0" in output
+    assert "'skipped': 0" in output
+    assert "'unchanged': 1" in output
+
+
 @pytest.mark.django_db
 def test_refresh_repository_task_updates_single_repository(monkeypatch):
     repository = Repository.objects.create(
@@ -641,6 +903,80 @@ def test_repository_search_filters_and_sorts():
 
     qs = repository_search_queryset({"min_stars": "80"})
     assert list(qs) == [old]
+
+
+@pytest.mark.django_db
+def test_repository_search_semantic_mode_orders_by_vector(monkeypatch, settings):
+    settings.OPENROUTER_API_KEY = "or-test"
+    settings.REPOSITORY_EMBEDDINGS_ENABLED = True
+    settings.REPOSITORY_EMBEDDING_DIMENSIONS = REPOSITORY_EMBEDDING_DIMENSIONS
+    near = Repository.objects.create(
+        full_name="owner/near",
+        owner="owner",
+        name="near",
+        url="https://github.com/owner/near",
+        description="Python web framework",
+        stars=10,
+    )
+    far = Repository.objects.create(
+        full_name="owner/far",
+        owner="owner",
+        name="far",
+        url="https://github.com/owner/far",
+        description="Terminal theme",
+        stars=100,
+    )
+    stale_model = Repository.objects.create(
+        full_name="owner/stale-model",
+        owner="owner",
+        name="stale-model",
+        url="https://github.com/owner/stale-model",
+        description="Old embedding model",
+        stars=1000,
+    )
+    RepositoryEmbedding.objects.create(
+        repository=near,
+        model="openai/text-embedding-3-small",
+        dimensions=REPOSITORY_EMBEDDING_DIMENSIONS,
+        source_text_hash="a" * 64,
+        source_text_chars=10,
+        embedding=[1.0] + [0.0] * (REPOSITORY_EMBEDDING_DIMENSIONS - 1),
+        embedded_at=timezone.now(),
+    )
+    RepositoryEmbedding.objects.create(
+        repository=far,
+        model="openai/text-embedding-3-small",
+        dimensions=REPOSITORY_EMBEDDING_DIMENSIONS,
+        source_text_hash="b" * 64,
+        source_text_chars=10,
+        embedding=[0.0, 1.0] + [0.0] * (REPOSITORY_EMBEDDING_DIMENSIONS - 2),
+        embedded_at=timezone.now(),
+    )
+    RepositoryEmbedding.objects.create(
+        repository=stale_model,
+        model="older-embedding-model",
+        dimensions=REPOSITORY_EMBEDDING_DIMENSIONS,
+        source_text_hash="c" * 64,
+        source_text_chars=10,
+        embedding=[1.0] + [0.0] * (REPOSITORY_EMBEDDING_DIMENSIONS - 1),
+        embedded_at=timezone.now(),
+    )
+
+    def fake_generate_embedding(text, input_type="query"):
+        from apps.repos.embeddings import EmbeddingResponse
+
+        assert text == "web framework"
+        assert input_type == "query"
+        return EmbeddingResponse(
+            vector=[1.0] + [0.0] * (REPOSITORY_EMBEDDING_DIMENSIONS - 1),
+            model="openai/text-embedding-3-small",
+        )
+
+    monkeypatch.setattr("apps.repos.services.generate_embedding", fake_generate_embedding)
+
+    qs = repository_search_queryset({"q": "web framework", "mode": "semantic"})
+
+    assert list(qs) == [near, far]
 
 
 @pytest.mark.django_db

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+import binascii
 import json
 import os
 import re
@@ -8,12 +10,25 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
+from django.conf import settings
 from django.db import models, transaction
 from django.db.models import Count
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
+from pgvector.django import CosineDistance
 
-from apps.repos.models import AwesomeList, AwesomeListItem, Repository, RepositorySnapshot
+from apps.repos.embeddings import (
+    generate_embedding,
+    repository_embeddings_configured,
+    sync_repository_embedding,
+)
+from apps.repos.models import (
+    REPOSITORY_EMBEDDING_DIMENSIONS,
+    AwesomeList,
+    AwesomeListItem,
+    Repository,
+    RepositorySnapshot,
+)
 from awesome_repos.utils import get_awesome_repos_logger
 
 logger = get_awesome_repos_logger(__name__)
@@ -157,6 +172,32 @@ def fetch_awesome_readme(full_name: str) -> tuple[str, dict]:
     raise RuntimeError(f"Could not fetch README for {full_name}: {last_error}")
 
 
+def fetch_repository_readme(full_name: str) -> str:
+    try:
+        data = fetch_json(f"https://api.github.com/repos/{full_name}/readme")
+    except RuntimeError as exc:
+        if str(exc).startswith("404 "):
+            return ""
+        raise
+
+    content = data.get("content") or ""
+    if data.get("encoding") == "base64" and content:
+        try:
+            return base64.b64decode(content).decode("utf-8", errors="replace")
+        except (binascii.Error, ValueError):
+            logger.warning(
+                "repository_readme_decode_failed",
+                repo_full_name=full_name,
+            )
+            return ""
+
+    download_url = data.get("download_url")
+    if download_url:
+        return fetch_text(download_url)
+
+    return ""
+
+
 def dt(value: str | None):
     if not value:
         return None
@@ -197,11 +238,9 @@ def record_repository_snapshot(
 
 
 @transaction.atomic
-def upsert_repository_from_github(full_name: str) -> Repository:
-    data = fetch_json(f"https://api.github.com/repos/{full_name}")
+def _upsert_repository_metadata(data: dict, *, synced_at) -> Repository:
     full_name = data["full_name"]
     license_data = data.get("license") or {}
-    synced_at = timezone.now()
     repo, _ = Repository.objects.update_or_create(
         full_name=full_name,
         defaults={
@@ -230,6 +269,25 @@ def upsert_repository_from_github(full_name: str) -> Repository:
         },
     )
     record_repository_snapshot(repo, captured_at=synced_at)
+    return repo
+
+
+def upsert_repository_from_github(full_name: str) -> Repository:
+    data = fetch_json(f"https://api.github.com/repos/{full_name}")
+    repo = _upsert_repository_metadata(data, synced_at=timezone.now())
+    if repository_embeddings_configured():
+        try:
+            readme_text = fetch_repository_readme(repo.full_name)
+        except Exception as exc:  # noqa: BLE001 - README/embedding should not block metadata sync
+            logger.warning(
+                "repository_readme_fetch_failed",
+                repo_full_name=repo.full_name,
+                error=str(exc),
+                exc_info=True,
+            )
+        else:
+            sync_repository_embedding(repo, readme_text)
+
     return repo
 
 
@@ -293,7 +351,6 @@ def repository_performance_summary(repository: Repository, limit: int = 12) -> d
     }
 
 
-@transaction.atomic
 def sync_awesome_list(awesome_list: AwesomeList, limit: int | None = None) -> dict:
     full_name = awesome_list.repo_full_name or parse_github_repo_url(awesome_list.source_url)
     logger.info(
@@ -506,6 +563,42 @@ def refresh_repositories(queryset=None, limit: int | None = None) -> dict:
     return {"synced": synced, "failure_count": len(failures), "failures": failures[:25]}
 
 
+def _apply_repository_semantic_search(qs, q: str):
+    try:
+        response = generate_embedding(q, input_type="query")
+    except Exception as exc:  # noqa: BLE001 - fall back to keyword search
+        logger.warning("repository_semantic_search_failed", error=str(exc), exc_info=True)
+        return qs, False
+
+    if len(response.vector) != REPOSITORY_EMBEDDING_DIMENSIONS:
+        logger.warning(
+            "repository_semantic_search_dimension_mismatch",
+            expected=REPOSITORY_EMBEDDING_DIMENSIONS,
+            received=len(response.vector),
+        )
+        return qs, False
+
+    return (
+        qs.filter(
+            vector__isnull=False,
+            vector__model=settings.REPOSITORY_EMBEDDING_MODEL,
+            vector__dimensions=REPOSITORY_EMBEDDING_DIMENSIONS,
+        ).annotate(
+            vector_distance=CosineDistance("vector__embedding", response.vector)
+        ),
+        True,
+    )
+
+
+def _apply_repository_keyword_search(qs, q: str):
+    return qs.filter(
+        models.Q(full_name__icontains=q)
+        | models.Q(description__icontains=q)
+        | models.Q(language__icontains=q)
+        | models.Q(topics__icontains=q)
+    )
+
+
 def repository_search_queryset(params):
     first_snapshot = RepositorySnapshot.objects.filter(repository=models.OuterRef("pk")).order_by(
         "captured_at", "id"
@@ -528,13 +621,12 @@ def repository_search_queryset(params):
         )
     )
     q = (params.get("q") or "").strip()
-    if q:
-        qs = qs.filter(
-            models.Q(full_name__icontains=q)
-            | models.Q(description__icontains=q)
-            | models.Q(language__icontains=q)
-            | models.Q(topics__icontains=q)
-        )
+    semantic_search = False
+    if q and (params.get("mode") or "").strip() == "semantic":
+        qs, semantic_search = _apply_repository_semantic_search(qs, q)
+
+    if q and not semantic_search:
+        qs = _apply_repository_keyword_search(qs, q)
     language = (params.get("language") or "").strip()
     if language:
         qs = qs.filter(language__iexact=language)
@@ -562,4 +654,6 @@ def repository_search_queryset(params):
         "awesome": "-awesome_count",
         "name": "full_name",
     }
+    if semantic_search:
+        return qs.order_by("vector_distance", "-stars", "full_name")
     return qs.order_by(sort_map.get(sort, "-stars"), "full_name")

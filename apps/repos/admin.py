@@ -1,7 +1,13 @@
 from django.contrib import admin, messages
 from django_q.tasks import async_task
 
-from apps.repos.models import AwesomeList, AwesomeListItem, Repository, RepositorySnapshot
+from apps.repos.models import (
+    AwesomeList,
+    AwesomeListItem,
+    Repository,
+    RepositoryEmbedding,
+    RepositorySnapshot,
+)
 
 
 @admin.action(description="Queue scan for selected awesome lists")
@@ -91,3 +97,10 @@ class RepositorySnapshotAdmin(admin.ModelAdmin):
 class AwesomeListItemAdmin(admin.ModelAdmin):
     list_display = ("awesome_list", "repository", "created_at")
     search_fields = ("awesome_list__name", "repository__full_name")
+
+
+@admin.register(RepositoryEmbedding)
+class RepositoryEmbeddingAdmin(admin.ModelAdmin):
+    list_display = ("repository", "model", "dimensions", "source_text_chars", "embedded_at")
+    search_fields = ("repository__full_name", "model", "source_text_hash")
+    readonly_fields = ("embedding", "source_text_hash", "source_text_chars", "embedded_at")
