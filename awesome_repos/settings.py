@@ -95,6 +95,7 @@ DEFAULT_APPS = [
     "django.contrib.sites",
     "django.contrib.sitemaps",
     "django.contrib.humanize",
+    "django.contrib.postgres",
 ]
 
 THIRD_PARTY_APPS = [
