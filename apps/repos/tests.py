@@ -8,6 +8,7 @@ from apps.repos.forms import AwesomeListCreateForm
 from apps.repos.models import AwesomeList, AwesomeListItem, Repository
 from apps.repos.services import (
     extract_github_repos,
+    fetch_json,
     parse_github_repo_url,
     repository_search_queryset,
     sync_awesome_list,
@@ -77,6 +78,33 @@ def test_sync_awesome_list_marks_empty_scan_as_error(monkeypatch):
     assert result["discovered"] == 0
     assert result["synced"] == 0
     assert awesome_list.last_error == "No GitHub repository links found in README."
+
+
+@pytest.mark.django_db
+def test_fetch_json_uses_github_token(monkeypatch):
+    captured = {}
+
+    class DummyResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self):
+            return b'{"ok":true}'
+
+    def fake_urlopen(request, timeout=30):
+        captured["headers"] = dict(request.header_items())
+        return DummyResponse()
+
+    monkeypatch.setenv("GITHUB_TOKEN", "ghp_test_token")
+    monkeypatch.setattr("apps.repos.services.urlopen", fake_urlopen)
+
+    assert captured == {}
+    assert fetch_json("https://api.github.com/repos/example/example") == {"ok": True}
+    headers = {k.lower(): v for k, v in captured["headers"].items()}
+    assert headers["authorization"] == "Bearer ghp_test_token"
 
 
 @pytest.mark.django_db
