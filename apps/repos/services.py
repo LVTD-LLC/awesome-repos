@@ -196,6 +196,7 @@ def record_repository_snapshot(
     )
 
 
+@transaction.atomic
 def upsert_repository_from_github(full_name: str) -> Repository:
     data = fetch_json(f"https://api.github.com/repos/{full_name}")
     full_name = data["full_name"]

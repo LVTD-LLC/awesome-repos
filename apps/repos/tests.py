@@ -230,6 +230,34 @@ def test_upsert_repository_from_github_records_snapshot_for_each_refresh(monkeyp
 
 
 @pytest.mark.django_db
+def test_upsert_repository_from_github_rolls_back_when_snapshot_fails(monkeypatch):
+    repo = Repository.objects.create(
+        full_name="django/django",
+        owner="django",
+        name="django",
+        url="https://github.com/django/django",
+        stars=10,
+    )
+    monkeypatch.setattr(
+        "apps.repos.services.fetch_json",
+        lambda url: github_repo_payload(stars=15, forks=4, watchers=2),
+    )
+
+    def fail_snapshot(repository, *, captured_at=None, source="github_api"):
+        raise RuntimeError("snapshot failed")
+
+    monkeypatch.setattr("apps.repos.services.record_repository_snapshot", fail_snapshot)
+
+    with pytest.raises(RuntimeError, match="snapshot failed"):
+        upsert_repository_from_github("django/django")
+
+    repo.refresh_from_db()
+    assert repo.stars == 10
+    assert repo.last_synced_at is None
+    assert RepositorySnapshot.objects.filter(repository=repo).count() == 0
+
+
+@pytest.mark.django_db
 def test_enqueue_awesome_list_missing_repo_syncs_task_queues_active_lists(monkeypatch):
     active = AwesomeList.objects.create(
         name="Awesome Django",
