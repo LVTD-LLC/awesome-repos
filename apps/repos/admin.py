@@ -64,6 +64,7 @@ class RepositoryAdmin(admin.ModelAdmin):
     list_display = (
         "full_name",
         "stars",
+        "commit_count",
         "language",
         "generated_tags",
         "is_archived",
@@ -99,6 +100,7 @@ class RepositorySnapshotAdmin(admin.ModelAdmin):
         "captured_at",
         "stars",
         "forks",
+        "commit_count",
         "watchers",
         "open_issues",
         "source",
@@ -116,6 +118,7 @@ class RepositorySnapshotAdmin(admin.ModelAdmin):
         "topics",
         "stars",
         "forks",
+        "commit_count",
         "open_issues",
         "watchers",
         "default_branch",

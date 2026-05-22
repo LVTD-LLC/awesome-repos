@@ -259,6 +259,7 @@
               <option value="stars" {% if request.GET.sort == "stars" or not request.GET.sort %}selected{% endif %}>Sort by stars</option>
               <option value="recent" {% if request.GET.sort == "recent" %}selected{% endif %}>Recently updated</option>
               <option value="created" {% if request.GET.sort == "created" %}selected{% endif %}>Recently created</option>
+              <option value="commits" {% if request.GET.sort == "commits" %}selected{% endif %}>Most commits</option>
               <option value="awesome" {% if request.GET.sort == "awesome" %}selected{% endif %}>Most awesome-list mentions</option>
               <option value="name" {% if request.GET.sort == "name" %}selected{% endif %}>Name</option>
             </select>
@@ -298,6 +299,7 @@
               {% if repo.is_archived %}<span class="rounded-full bg-yellow-100 px-3 py-1 text-yellow-800">archived</span>{% endif %}
               {% if repo.uses_ai_for_development %}<span class="rounded-full bg-green-100 px-3 py-1 text-green-800 dark:bg-green-900/40 dark:text-green-200">AI dev signals</span>{% endif %}
               <span class="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-800">{{ repo.awesome_count }} awesome list{{ repo.awesome_count|pluralize }}</span>
+              {% if repo.commit_count != None %}<span class="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-800">{{ repo.commit_count }} commits</span>{% endif %}
               {% if repo.snapshot_count %}<span class="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-800">{{ repo.snapshot_count }} history point{{ repo.snapshot_count|pluralize }}</span>{% endif %}
               {% if repo.github_pushed_at %}<span class="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-800">updated {{ repo.github_pushed_at|date:"Y-m-d" }}</span>{% endif %}
             </div>
@@ -310,6 +312,15 @@
               <div class="text-sm font-semibold text-red-600 dark:text-red-400">{{ repo.stars_since_first }} tracked</div>
             {% elif repo.snapshot_count > 1 %}
               <div class="text-sm text-gray-500 dark:text-gray-400">0 tracked</div>
+            {% endif %}
+            {% if repo.commits_since_first != None and repo.snapshot_count > 1 %}
+              {% if repo.commits_since_first > 0 %}
+                <div class="text-sm font-semibold text-green-700 dark:text-green-400">+{{ repo.commits_since_first }} commits tracked</div>
+              {% elif repo.commits_since_first < 0 %}
+                <div class="text-sm font-semibold text-red-600 dark:text-red-400">{{ repo.commits_since_first }} commits tracked</div>
+              {% else %}
+                <div class="text-sm text-gray-500 dark:text-gray-400">0 commits tracked</div>
+              {% endif %}
             {% endif %}
             <a href="{{ repo.url }}" target="_blank" rel="noopener" class="text-sm font-semibold text-green-700 hover:underline">GitHub ↗</a>
           </div>

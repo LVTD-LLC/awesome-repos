@@ -17,9 +17,10 @@
       </div>
       <a href="{{ repository.url }}" target="_blank" rel="noopener" class="rounded-full bg-green-600 px-5 py-3 font-semibold text-white hover:bg-green-700">Open GitHub</a>
     </div>
-    <dl class="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <dl class="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
       <div class="rounded-2xl bg-gray-50 p-4 dark:bg-gray-900"><dt class="text-sm text-gray-500">Stars</dt><dd class="text-2xl font-bold">{{ repository.stars }}</dd></div>
       <div class="rounded-2xl bg-gray-50 p-4 dark:bg-gray-900"><dt class="text-sm text-gray-500">Forks</dt><dd class="text-2xl font-bold">{{ repository.forks }}</dd></div>
+      <div class="rounded-2xl bg-gray-50 p-4 dark:bg-gray-900"><dt class="text-sm text-gray-500">Commits</dt><dd class="text-2xl font-bold">{{ repository.commit_count|default_if_none:"—" }}</dd></div>
       <div class="rounded-2xl bg-gray-50 p-4 dark:bg-gray-900"><dt class="text-sm text-gray-500">Language</dt><dd class="text-2xl font-bold">{{ repository.language|default:"—" }}</dd></div>
       <div class="rounded-2xl bg-gray-50 p-4 dark:bg-gray-900"><dt class="text-sm text-gray-500">Awesome lists</dt><dd class="text-2xl font-bold">{{ repository.awesome_list_count }}</dd></div>
     </dl>
@@ -32,11 +33,13 @@
           </div>
           <div class="text-sm text-gray-500 dark:text-gray-400">Latest capture {{ performance.latest_snapshot.captured_at|date:"Y-m-d H:i" }}</div>
         </div>
-        <dl class="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <dl class="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
           <div class="rounded-2xl bg-gray-50 p-4 dark:bg-gray-900"><dt class="text-sm text-gray-500">Stars since first</dt><dd class="text-2xl font-bold {% if performance.stars_since_first > 0 %}text-green-700 dark:text-green-400{% elif performance.stars_since_first < 0 %}text-red-600 dark:text-red-400{% endif %}">{{ performance.stars_since_first_label }}</dd></div>
           <div class="rounded-2xl bg-gray-50 p-4 dark:bg-gray-900"><dt class="text-sm text-gray-500">Forks since first</dt><dd class="text-2xl font-bold">{{ performance.forks_since_first_label }}</dd></div>
           <div class="rounded-2xl bg-gray-50 p-4 dark:bg-gray-900"><dt class="text-sm text-gray-500">Watchers since first</dt><dd class="text-2xl font-bold">{{ performance.watchers_since_first_label }}</dd></div>
+          <div class="rounded-2xl bg-gray-50 p-4 dark:bg-gray-900"><dt class="text-sm text-gray-500">Commits since first</dt><dd class="text-2xl font-bold">{{ performance.commits_since_first_label }}</dd></div>
           <div class="rounded-2xl bg-gray-50 p-4 dark:bg-gray-900"><dt class="text-sm text-gray-500">Stars since last</dt><dd class="text-2xl font-bold">{{ performance.stars_since_previous_label }}</dd></div>
+          <div class="rounded-2xl bg-gray-50 p-4 dark:bg-gray-900"><dt class="text-sm text-gray-500">Commits since last</dt><dd class="text-2xl font-bold">{{ performance.commits_since_previous_label }}</dd></div>
         </dl>
         <div class="mt-6 overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-800">
           <table class="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
@@ -45,6 +48,7 @@
                 <th class="px-4 py-3">Captured</th>
                 <th class="px-4 py-3">Stars</th>
                 <th class="px-4 py-3">Forks</th>
+                <th class="px-4 py-3">Commits</th>
                 <th class="px-4 py-3">Open issues</th>
               </tr>
             </thead>
@@ -54,6 +58,7 @@
                   <td class="px-4 py-3 text-gray-600 dark:text-gray-300">{{ row.snapshot.captured_at|date:"Y-m-d H:i" }}</td>
                   <td class="px-4 py-3 font-semibold">{{ row.snapshot.stars }} <span class="text-xs text-gray-500 dark:text-gray-400">{{ row.stars_delta_label }}</span></td>
                   <td class="px-4 py-3">{{ row.snapshot.forks }} <span class="text-xs text-gray-500 dark:text-gray-400">{{ row.forks_delta_label }}</span></td>
+                  <td class="px-4 py-3">{{ row.snapshot.commit_count|default_if_none:"—" }} <span class="text-xs text-gray-500 dark:text-gray-400">{{ row.commit_delta_label }}</span></td>
                   <td class="px-4 py-3">{{ row.snapshot.open_issues }}</td>
                 </tr>
               {% endfor %}

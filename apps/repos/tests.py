@@ -59,8 +59,9 @@ from apps.repos.views import awesome_list_directory_totals, repository_json_valu
 
 
 @pytest.fixture(autouse=True)
-def disable_repository_tagging(settings):
+def disable_repository_tagging(settings, monkeypatch):
     settings.REPOSITORY_TAGGING_ENABLED = False
+    monkeypatch.setattr("apps.repos.services.fetch_github_commit_count", lambda *args: 123)
 
 
 @pytest.mark.parametrize(
@@ -371,9 +372,11 @@ def test_upsert_repository_from_github_records_snapshot(monkeypatch):
     assert repo.stars == 80000
     assert repo.forks == 32000
     assert repo.watchers == 1200
+    assert repo.commit_count == 123
     assert snapshot.stars == repo.stars
     assert snapshot.forks == repo.forks
     assert snapshot.watchers == repo.watchers
+    assert snapshot.commit_count == repo.commit_count
     assert snapshot.captured_at == repo.last_synced_at
 
 
@@ -529,6 +532,24 @@ def test_fetch_github_commit_count_uses_last_link_page(monkeypatch):
     assert fetch_github_commit_count("owner/repo", "main") == 456
     assert captured["url"].startswith("https://api.github.com/repos/owner/repo/commits?")
     assert "per_page=1" in captured["url"]
+
+
+def test_fetch_github_commit_count_counts_single_unpaginated_page(monkeypatch):
+    class DummyResponse:
+        headers = {}
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self):
+            return b'[{"sha": "abc"}]'
+
+    monkeypatch.setattr("apps.repos.services.urlopen", lambda request, timeout=30: DummyResponse())
+
+    assert fetch_github_commit_count("owner/repo", "main") == 1
 
 
 def test_fetch_github_commit_count_requires_default_branch():
@@ -706,6 +727,36 @@ def test_upsert_repository_from_github_preserves_ai_signals_when_tree_fetch_fail
 
     assert repo.uses_ai_for_development is True
     assert repo.ai_development_signals[0]["path"] == "AGENTS.md"
+
+
+@pytest.mark.django_db
+def test_upsert_repository_from_github_preserves_commit_count_when_fetch_fails(
+    monkeypatch,
+):
+    repo = Repository.objects.create(
+        full_name="django/django",
+        owner="django",
+        name="django",
+        url="https://github.com/django/django",
+        commit_count=42,
+    )
+    monkeypatch.setattr(
+        "apps.repos.services.fetch_json",
+        lambda url: github_repo_payload(stars=15, forks=4, watchers=2),
+    )
+    stub_repository_readme(monkeypatch)
+
+    def fail_commit_count(full_name, default_branch):
+        raise RuntimeError("commit count failed")
+
+    monkeypatch.setattr("apps.repos.services.fetch_github_commit_count", fail_commit_count)
+
+    repo = upsert_repository_from_github(repo.full_name)
+    snapshot = RepositorySnapshot.objects.get(repository=repo)
+
+    assert repo.stars == 15
+    assert repo.commit_count == 42
+    assert snapshot.commit_count == 42
 
 
 @pytest.mark.django_db
@@ -1734,6 +1785,7 @@ def test_repository_search_filters_and_sorts():
         description="Django tool",
         language="Python",
         stars=50,
+        commit_count=20,
         github_pushed_at=timezone.now(),
         uses_ai_for_development=True,
         ai_development_signals=[
@@ -1753,7 +1805,16 @@ def test_repository_search_filters_and_sorts():
         description="Node app",
         language="JavaScript",
         stars=100,
+        commit_count=40,
         github_pushed_at=timezone.now() - timedelta(days=500),
+    )
+    unsynced = Repository.objects.create(
+        full_name="owner/unsynced",
+        owner="owner",
+        name="unsynced",
+        url="https://github.com/owner/unsynced",
+        description="No commit count yet",
+        stars=75,
     )
     awesome = AwesomeList.objects.create(
         name="Awesome Django",
@@ -1770,6 +1831,9 @@ def test_repository_search_filters_and_sorts():
 
     qs = repository_search_queryset({"ai_development": "yes"})
     assert list(qs) == [recent]
+
+    qs = repository_search_queryset({"sort": "commits"})
+    assert list(qs) == [old, recent, unsynced]
 
 
 @pytest.mark.django_db
@@ -1971,23 +2035,28 @@ def test_repository_search_queryset_annotates_tracked_growth():
         description="Django tool",
         language="Python",
         stars=75,
+        commit_count=80,
     )
     RepositorySnapshot.objects.create(
         repository=repo,
         captured_at=timezone.now() - timedelta(days=2),
         stars=50,
+        commit_count=50,
     )
     RepositorySnapshot.objects.create(
         repository=repo,
         captured_at=timezone.now() - timedelta(days=1),
         stars=75,
+        commit_count=80,
     )
 
     result = repository_search_queryset({"q": "django"}).get()
 
     assert result.snapshot_count == 2
     assert result.first_snapshot_stars == 50
+    assert result.first_snapshot_commit_count == 50
     assert result.stars_since_first == 25
+    assert result.commits_since_first == 30
 
 
 @pytest.mark.django_db
@@ -2000,6 +2069,7 @@ def test_repository_performance_summary_returns_recent_growth():
         stars=75,
         forks=12,
         watchers=5,
+        commit_count=90,
     )
     RepositorySnapshot.objects.create(
         repository=repo,
@@ -2007,6 +2077,7 @@ def test_repository_performance_summary_returns_recent_growth():
         stars=50,
         forks=10,
         watchers=4,
+        commit_count=70,
     )
     RepositorySnapshot.objects.create(
         repository=repo,
@@ -2014,6 +2085,7 @@ def test_repository_performance_summary_returns_recent_growth():
         stars=75,
         forks=12,
         watchers=5,
+        commit_count=90,
     )
 
     summary = repository_performance_summary(repo)
@@ -2023,8 +2095,12 @@ def test_repository_performance_summary_returns_recent_growth():
     assert summary["stars_since_first_label"] == "+25"
     assert summary["forks_since_first"] == 2
     assert summary["watchers_since_first"] == 1
+    assert summary["commits_since_first"] == 20
+    assert summary["commits_since_first_label"] == "+20"
     assert summary["history"][0]["stars_delta"] == 25
+    assert summary["history"][0]["commit_delta"] == 20
     assert summary["history"][1]["stars_delta_label"] == "baseline"
+    assert summary["history"][1]["commit_delta_label"] == "baseline"
 
 
 @pytest.mark.django_db
@@ -2130,6 +2206,37 @@ def test_search_page_renders_negative_tracked_growth(client):
     assert response.status_code == 200
     assert b"-20 tracked" in response.content
     assert b">0 tracked<" not in response.content
+
+
+@pytest.mark.django_db
+def test_search_page_renders_tracked_commit_growth(client):
+    repo = Repository.objects.create(
+        full_name="django/django",
+        owner="django",
+        name="django",
+        url="https://github.com/django/django",
+        description="The Web framework",
+        language="Python",
+        stars=80,
+        commit_count=90,
+    )
+    RepositorySnapshot.objects.create(
+        repository=repo,
+        captured_at=timezone.now() - timedelta(days=2),
+        stars=70,
+        commit_count=70,
+    )
+    RepositorySnapshot.objects.create(
+        repository=repo,
+        captured_at=timezone.now() - timedelta(days=1),
+        stars=80,
+        commit_count=90,
+    )
+
+    response = client.get(reverse("repos:search"), {"q": "framework"})
+
+    assert response.status_code == 200
+    assert b"+20 commits tracked" in response.content
 
 
 @pytest.mark.django_db
@@ -2247,6 +2354,7 @@ def test_repository_detail_page_renders_performance_history(client):
         stars=75,
         forks=12,
         watchers=5,
+        commit_count=90,
     )
     RepositorySnapshot.objects.create(
         repository=repo,
@@ -2254,6 +2362,7 @@ def test_repository_detail_page_renders_performance_history(client):
         stars=50,
         forks=10,
         watchers=4,
+        commit_count=70,
     )
     RepositorySnapshot.objects.create(
         repository=repo,
@@ -2261,6 +2370,7 @@ def test_repository_detail_page_renders_performance_history(client):
         stars=75,
         forks=12,
         watchers=5,
+        commit_count=90,
     )
 
     response = client.get(
@@ -2270,3 +2380,6 @@ def test_repository_detail_page_renders_performance_history(client):
     assert response.status_code == 200
     assert b"Tracked growth" in response.content
     assert b"+25" in response.content
+    assert b"Commits since first" in response.content
+    assert b"Commits since last" in response.content
+    assert b"+20" in response.content
