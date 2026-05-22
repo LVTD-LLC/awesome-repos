@@ -500,7 +500,7 @@ def detect_ai_development_signals(tree_items: list[dict]) -> list[dict]:
         basename = normalized_path.rsplit("/", 1)[-1]
 
         exact_match = AI_DEVELOPMENT_EXACT_PATH_SIGNALS.get(normalized_path)
-        if exact_match:
+        if kind == "blob" and exact_match:
             tool, signal = exact_match
             _append_ai_development_signal(
                 signals,

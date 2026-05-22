@@ -465,6 +465,7 @@ def test_detect_ai_development_signals_identifies_common_agent_files():
             {"path": ".devin/config.json", "type": "blob"},
             {"path": ".clinerules/testing.md", "type": "blob"},
             {"path": ".aider.conf.yml", "type": "blob"},
+            {"path": ".coderabbit.yml", "type": "tree"},
         ]
     )
 
@@ -480,6 +481,7 @@ def test_detect_ai_development_signals_identifies_common_agent_files():
     assert ".clinerules/testing.md" in signal_paths
     assert ".aider.conf.yml" in signal_paths
     assert "docs/CONTRIBUTING.md" not in signal_paths
+    assert ".coderabbit.yml" not in signal_paths
     assert len(signal_paths) == len(signals)
 
 
