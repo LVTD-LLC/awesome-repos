@@ -2445,6 +2445,8 @@ def test_awesome_list_detail_page_filters_repositories(client):
     assert "web-framework (1)" in content
     assert response.context["filters_applied"] is True
     assert response.context["page_obj"].paginator.count == 1
+    assert response.context["repo_stats"]["active_count"] == 1
+    assert response.context["repo_stats"]["archived_count"] == 1
 
 
 @pytest.mark.django_db
@@ -2515,7 +2517,7 @@ def test_awesome_list_detail_page_preserves_filters_in_pagination_links(client):
 
     assert response.status_code == 200
     assert response.context["page_obj"].paginator.count == 51
-    assert "?page=1&q=owner&amp;sort=name" in response.content.decode()
+    assert "?page=1&amp;q=owner&amp;sort=name" in response.content.decode()
 
 
 @pytest.mark.django_db

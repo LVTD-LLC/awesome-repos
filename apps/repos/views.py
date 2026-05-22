@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from django.core.paginator import Paginator
 from django.db import connection
 from django.db.models import Count, F, Max, OuterRef, PositiveIntegerField, Q, Subquery, Sum
@@ -152,7 +154,7 @@ def _apply_list_repository_state_filters(qs, params):
 
     updated_days = _positive_int_param(params, "updated_days")
     if updated_days:
-        cutoff = timezone.now() - timezone.timedelta(days=updated_days)
+        cutoff = timezone.now() - timedelta(days=updated_days)
         qs = qs.filter(github_pushed_at__gte=cutoff)
 
     archived = params.get("archived")
@@ -333,7 +335,7 @@ class AwesomeListDetailView(DetailView):
         context["generated_tag_options"] = repository_json_value_counts(
             "generated_tags", awesome_list=self.object
         )
-        context["repo_stats"] = repos.aggregate(
+        context["repo_stats"] = all_list_repos.aggregate(
             total_stars=Sum("stars"),
             total_forks=Sum("forks"),
             active_count=Count("id", filter=Q(is_archived=False)),
@@ -341,7 +343,7 @@ class AwesomeListDetailView(DetailView):
             latest_repo_push=Max("github_pushed_at"),
         )
         context["language_counts"] = (
-            repos.exclude(language="")
+            all_list_repos.exclude(language="")
             .values("language")
             .annotate(count=Count("id"))
             .order_by("-count", "language")[:12]
