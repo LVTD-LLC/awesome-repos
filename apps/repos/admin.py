@@ -1,7 +1,7 @@
 from django.contrib import admin, messages
 from django_q.tasks import async_task
 
-from apps.repos.models import AwesomeList, AwesomeListItem, Repository
+from apps.repos.models import AwesomeList, AwesomeListItem, Repository, RepositorySnapshot
 
 
 @admin.action(description="Queue scan for selected awesome lists")
@@ -42,6 +42,49 @@ class RepositoryAdmin(admin.ModelAdmin):
 
     def awesome_count(self, obj):
         return obj.awesome_items.count()
+
+
+@admin.register(RepositorySnapshot)
+class RepositorySnapshotAdmin(admin.ModelAdmin):
+    list_display = (
+        "repository",
+        "captured_at",
+        "stars",
+        "forks",
+        "watchers",
+        "open_issues",
+        "source",
+    )
+    search_fields = ("repository__full_name", "language")
+    list_filter = ("source", "is_archived", "language")
+    readonly_fields = (
+        "repository",
+        "captured_at",
+        "source",
+        "description",
+        "homepage_url",
+        "language",
+        "license_name",
+        "topics",
+        "stars",
+        "forks",
+        "open_issues",
+        "watchers",
+        "default_branch",
+        "is_archived",
+        "is_disabled",
+        "is_fork",
+        "github_created_at",
+        "github_updated_at",
+        "github_pushed_at",
+    )
+    date_hierarchy = "captured_at"
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(AwesomeListItem)
