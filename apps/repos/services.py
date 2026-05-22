@@ -289,14 +289,14 @@ def fetch_repository_readme(full_name: str) -> str:
 
 def _append_ai_development_signal(
     signals: list[dict],
-    seen: set[tuple[str, str]],
+    seen: set[str],
     *,
     path: str,
     kind: str,
     tool: str,
     signal: str,
 ) -> None:
-    key = (path.lower(), signal)
+    key = path.lower()
     if key in seen:
         return
     seen.add(key)
@@ -382,6 +382,7 @@ def fetch_repository_tree_items(full_name: str, default_branch: str) -> list[dic
             repo_full_name=full_name,
             default_branch=default_branch,
         )
+        raise RuntimeError(f"GitHub tree for {full_name} is truncated; skipping AI signal update")
     return data.get("tree") or []
 
 

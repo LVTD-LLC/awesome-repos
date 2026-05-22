@@ -31,6 +31,7 @@ from apps.repos.services import (
     fetch_json,
     fetch_repository_readme,
     fetch_repository_readme_data,
+    fetch_repository_tree_items,
     github_rate_limit_status,
     parse_github_repo_url,
     repository_performance_summary,
@@ -359,6 +360,20 @@ def test_detect_ai_development_signals_identifies_common_agent_files():
     assert ".clinerules/testing.md" in signal_paths
     assert ".aider.conf.yml" in signal_paths
     assert "docs/CONTRIBUTING.md" not in signal_paths
+    assert len(signal_paths) == len(signals)
+
+
+def test_fetch_repository_tree_items_rejects_truncated_github_trees(monkeypatch):
+    monkeypatch.setattr(
+        "apps.repos.services.fetch_json",
+        lambda url: {
+            "truncated": True,
+            "tree": [{"path": "AGENTS.md", "type": "blob"}],
+        },
+    )
+
+    with pytest.raises(RuntimeError, match="GitHub tree for django/django is truncated"):
+        fetch_repository_tree_items("django/django", "main")
 
 
 @pytest.mark.django_db
@@ -501,6 +516,50 @@ def test_upsert_repository_from_github_preserves_ai_signals_when_tree_fetch_fail
 
     repo = upsert_repository_from_github(repo.full_name)
 
+    assert repo.uses_ai_for_development is True
+    assert repo.ai_development_signals[0]["path"] == "AGENTS.md"
+
+
+@pytest.mark.django_db
+def test_upsert_repository_from_github_preserves_ai_signals_when_tree_is_truncated(
+    monkeypatch,
+):
+    repo = Repository.objects.create(
+        full_name="django/django",
+        owner="django",
+        name="django",
+        url="https://github.com/django/django",
+        uses_ai_for_development=True,
+        ai_development_signals=[
+            {
+                "path": "AGENTS.md",
+                "kind": "file",
+                "tool": "Agent instructions",
+                "signal": "agent_instructions",
+            }
+        ],
+    )
+
+    def fake_fetch_json(url):
+        if url.endswith("/readme"):
+            return {
+                "encoding": "base64",
+                "content": base64.b64encode(b"# Django\n").decode("ascii"),
+                "path": "README.md",
+                "download_url": "https://raw.githubusercontent.com/django/django/main/README.md",
+            }
+        if "/git/trees/" in url:
+            return {
+                "truncated": True,
+                "tree": [],
+            }
+        return github_repo_payload(stars=15, forks=4, watchers=2)
+
+    monkeypatch.setattr("apps.repos.services.fetch_json", fake_fetch_json)
+
+    repo = upsert_repository_from_github(repo.full_name)
+
+    assert repo.stars == 15
     assert repo.uses_ai_for_development is True
     assert repo.ai_development_signals[0]["path"] == "AGENTS.md"
 
