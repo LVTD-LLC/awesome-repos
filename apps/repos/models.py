@@ -56,6 +56,8 @@ class Repository(BaseModel):
     readme_url = models.URLField(max_length=500, blank=True, default="")
     readme_synced_at = models.DateTimeField(null=True, blank=True)
     readme_last_error = models.TextField(blank=True, default="")
+    uses_ai_for_development = models.BooleanField(default=False)
+    ai_development_signals = models.JSONField(default=list, blank=True)
     raw = models.JSONField(default=dict, blank=True)
 
     class Meta:
@@ -65,6 +67,7 @@ class Repository(BaseModel):
             models.Index(fields=["-github_pushed_at"]),
             models.Index(fields=["is_archived"]),
             models.Index(fields=["language"]),
+            models.Index(fields=["uses_ai_for_development"]),
         ]
 
     def __str__(self):

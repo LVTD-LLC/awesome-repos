@@ -7,7 +7,7 @@ import os
 import re
 from datetime import UTC, datetime
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 from urllib.request import Request, urlopen
 
 from django.conf import settings
@@ -39,6 +39,59 @@ GITHUB_REPO_RE = re.compile(
 )
 SKIP_REPO_NAMES = {"stargazers", "network", "issues", "pulls", "pull", "wiki", "releases"}
 README_CANDIDATES = ("README.md", "readme.md", "README.markdown", "README.rst")
+AI_DEVELOPMENT_ANYWHERE_FILE_SIGNALS = {
+    "agents.md": ("Agent instructions", "agent_instructions"),
+    "agents.override.md": ("Codex", "codex_override_instructions"),
+    "agent.md": ("Agent instructions", "agent_instructions"),
+    "claude.md": ("Claude Code", "claude_memory"),
+    "claude.local.md": ("Claude Code", "claude_local_memory"),
+    "gemini.md": ("Gemini CLI", "gemini_context"),
+    "codex.md": ("Codex", "codex_instructions"),
+}
+AI_DEVELOPMENT_EXACT_PATH_SIGNALS = {
+    ".aider.conf.yml": ("Aider", "aider_config"),
+    ".aider.conf.yaml": ("Aider", "aider_config"),
+    ".coderabbit.yaml": ("CodeRabbit", "coderabbit_config"),
+    ".coderabbit.yml": ("CodeRabbit", "coderabbit_config"),
+    ".continue/config.json": ("Continue", "continue_config"),
+    ".continue/config.ts": ("Continue", "continue_config"),
+    ".continue/config.yaml": ("Continue", "continue_config"),
+    ".continue/config.yml": ("Continue", "continue_config"),
+    ".cursorrules": ("Cursor", "cursor_legacy_rules"),
+    ".devin/config.json": ("Devin", "devin_config"),
+    ".devin/config.local.json": ("Devin", "devin_local_config"),
+    ".gemini/settings.json": ("Gemini CLI", "gemini_project_settings"),
+    ".github/copilot-instructions.md": ("GitHub Copilot", "copilot_repo_instructions"),
+    ".windsurfrules": ("Windsurf", "windsurf_legacy_rules"),
+    "greptile.json": ("Greptile", "greptile_config"),
+}
+AI_DEVELOPMENT_DIRECTORY_SIGNALS = {
+    ".agents": ("Agent workspace", "agent_directory"),
+    ".claude": ("Claude Code", "claude_project_config"),
+    ".claude/agents": ("Claude Code", "claude_subagents"),
+    ".claude/commands": ("Claude Code", "claude_commands"),
+    ".claude/skills": ("Claude Code", "claude_skills"),
+    ".clinerules": ("Cline", "cline_workspace_rules"),
+    ".continue": ("Continue", "continue_config"),
+    ".cursor": ("Cursor", "cursor_project_config"),
+    ".cursor/rules": ("Cursor", "cursor_project_rules"),
+    ".devin": ("Devin", "devin_project_config"),
+    ".gemini": ("Gemini CLI", "gemini_project_config"),
+    ".github/instructions": ("GitHub Copilot", "copilot_path_instructions"),
+    ".windsurf": ("Windsurf", "windsurf_project_config"),
+    ".windsurf/rules": ("Windsurf", "windsurf_workspace_rules"),
+}
+AI_DEVELOPMENT_PATH_PREFIX_SIGNALS = (
+    (".agents/", "Agent workspace", "agent_directory"),
+    (".claude/", "Claude Code", "claude_project_config"),
+    (".clinerules/", "Cline", "cline_workspace_rules"),
+    (".continue/", "Continue", "continue_config"),
+    (".cursor/rules/", "Cursor", "cursor_project_rules"),
+    (".devin/", "Devin", "devin_project_config"),
+    (".gemini/", "Gemini CLI", "gemini_project_config"),
+    (".github/instructions/", "GitHub Copilot", "copilot_path_instructions"),
+    (".windsurf/rules/", "Windsurf", "windsurf_workspace_rules"),
+)
 
 
 def github_token() -> str:
@@ -198,7 +251,7 @@ def fetch_repository_readme_data(full_name: str) -> dict:
     if data.get("encoding") == "base64" and content:
         try:
             readme = base64.b64decode(content).decode("utf-8", errors="replace")
-        except (binascii.Error, ValueError):
+        except binascii.Error, ValueError:
             logger.warning(
                 "repository_readme_decode_failed",
                 repo_full_name=full_name,
@@ -226,6 +279,112 @@ def fetch_repository_readme_data(full_name: str) -> dict:
 
 def fetch_repository_readme(full_name: str) -> str:
     return fetch_repository_readme_data(full_name)["readme"]
+
+
+def _append_ai_development_signal(
+    signals: list[dict],
+    seen: set[tuple[str, str]],
+    *,
+    path: str,
+    kind: str,
+    tool: str,
+    signal: str,
+) -> None:
+    key = (path.lower(), signal)
+    if key in seen:
+        return
+    seen.add(key)
+    signals.append(
+        {
+            "path": path,
+            "kind": "directory" if kind == "tree" else "file",
+            "tool": tool,
+            "signal": signal,
+        }
+    )
+
+
+def detect_ai_development_signals(tree_items: list[dict]) -> list[dict]:
+    signals = []
+    seen = set()
+
+    for item in tree_items:
+        path = (item.get("path") or "").strip("/")
+        kind = item.get("type") or ""
+        if not path or kind not in {"blob", "tree"}:
+            continue
+
+        normalized_path = path.lower()
+        basename = normalized_path.rsplit("/", 1)[-1]
+
+        exact_match = AI_DEVELOPMENT_EXACT_PATH_SIGNALS.get(normalized_path)
+        if exact_match:
+            tool, signal = exact_match
+            _append_ai_development_signal(
+                signals,
+                seen,
+                path=path,
+                kind=kind,
+                tool=tool,
+                signal=signal,
+            )
+
+        directory_match = AI_DEVELOPMENT_DIRECTORY_SIGNALS.get(normalized_path)
+        if kind == "tree" and directory_match:
+            tool, signal = directory_match
+            _append_ai_development_signal(
+                signals,
+                seen,
+                path=path,
+                kind=kind,
+                tool=tool,
+                signal=signal,
+            )
+
+        file_match = AI_DEVELOPMENT_ANYWHERE_FILE_SIGNALS.get(basename)
+        if kind == "blob" and file_match:
+            tool, signal = file_match
+            _append_ai_development_signal(
+                signals,
+                seen,
+                path=path,
+                kind=kind,
+                tool=tool,
+                signal=signal,
+            )
+
+        for prefix, tool, signal in AI_DEVELOPMENT_PATH_PREFIX_SIGNALS:
+            if normalized_path.startswith(prefix):
+                _append_ai_development_signal(
+                    signals,
+                    seen,
+                    path=path,
+                    kind=kind,
+                    tool=tool,
+                    signal=signal,
+                )
+
+    return sorted(signals, key=lambda signal: signal["path"].lower())
+
+
+def fetch_repository_tree_items(full_name: str, default_branch: str) -> list[dict]:
+    ref = quote(default_branch or "HEAD", safe="")
+    data = fetch_json(f"https://api.github.com/repos/{full_name}/git/trees/{ref}?recursive=1")
+    if data.get("truncated"):
+        logger.warning(
+            "repository_tree_truncated",
+            repo_full_name=full_name,
+            default_branch=default_branch,
+        )
+    return data.get("tree") or []
+
+
+def fetch_repository_ai_development_signals(
+    full_name: str,
+    default_branch: str,
+) -> list[dict]:
+    tree_items = fetch_repository_tree_items(full_name, default_branch)
+    return detect_ai_development_signals(tree_items)
 
 
 def dt(value: str | None):
@@ -268,7 +427,13 @@ def record_repository_snapshot(
 
 
 @transaction.atomic
-def _upsert_repository_metadata(data: dict, *, synced_at, readme_data: dict) -> Repository:
+def _upsert_repository_metadata(
+    data: dict,
+    *,
+    synced_at,
+    readme_data: dict,
+    ai_development_signals: list[dict] | None,
+) -> Repository:
     full_name = data["full_name"]
     license_data = data.get("license") or {}
     default_branch = data.get("default_branch") or ""
@@ -283,6 +448,12 @@ def _upsert_repository_metadata(data: dict, *, synced_at, readme_data: dict) -> 
     else:
         readme_defaults = {
             "readme_last_error": readme_data["readme_last_error"],
+        }
+    ai_development_defaults = {}
+    if ai_development_signals is not None:
+        ai_development_defaults = {
+            "uses_ai_for_development": bool(ai_development_signals),
+            "ai_development_signals": ai_development_signals,
         }
 
     repo, _ = Repository.objects.update_or_create(
@@ -310,6 +481,7 @@ def _upsert_repository_metadata(data: dict, *, synced_at, readme_data: dict) -> 
             "github_pushed_at": dt(data.get("pushed_at")),
             "last_synced_at": synced_at,
             **readme_defaults,
+            **ai_development_defaults,
             "raw": data,
         },
     )
@@ -319,6 +491,7 @@ def _upsert_repository_metadata(data: dict, *, synced_at, readme_data: dict) -> 
 
 def upsert_repository_from_github(full_name: str) -> Repository:
     data = fetch_json(f"https://api.github.com/repos/{full_name}")
+    default_branch = data.get("default_branch") or ""
     try:
         readme_data = fetch_repository_readme_data(data["full_name"])
     except Exception as exc:  # noqa: BLE001 - README fetch should not block metadata sync
@@ -335,11 +508,26 @@ def upsert_repository_from_github(full_name: str) -> Repository:
             "readme_url": "",
             "readme_last_error": str(exc),
         }
+    try:
+        ai_development_signals = fetch_repository_ai_development_signals(
+            data["full_name"],
+            default_branch,
+        )
+    except Exception as exc:  # noqa: BLE001 - tree fetch should not block metadata sync
+        logger.warning(
+            "repository_ai_development_signal_fetch_failed",
+            repo_full_name=data["full_name"],
+            default_branch=default_branch,
+            error=str(exc),
+            exc_info=True,
+        )
+        ai_development_signals = None
 
     repo = _upsert_repository_metadata(
         data,
         synced_at=timezone.now(),
         readme_data=readme_data,
+        ai_development_signals=ai_development_signals,
     )
     if repository_embeddings_configured():
         sync_repository_embedding(repo, repo.readme)
@@ -653,6 +841,33 @@ def _apply_repository_keyword_search(qs, q: str):
     )
 
 
+def _apply_repository_search_filters(qs, params):
+    language = (params.get("language") or "").strip()
+    if language:
+        qs = qs.filter(language__iexact=language)
+    list_slug = (params.get("list") or "").strip()
+    if list_slug:
+        qs = qs.filter(awesome_items__awesome_list__slug=list_slug)
+    min_stars = params.get("min_stars")
+    if min_stars:
+        qs = qs.filter(stars__gte=int(min_stars))
+    archived = params.get("archived")
+    if archived == "yes":
+        qs = qs.filter(is_archived=True)
+    elif archived == "no":
+        qs = qs.filter(is_archived=False)
+    ai_development = params.get("ai_development")
+    if ai_development == "yes":
+        qs = qs.filter(uses_ai_for_development=True)
+    elif ai_development == "no":
+        qs = qs.filter(uses_ai_for_development=False)
+    updated_days = params.get("updated_days")
+    if updated_days:
+        cutoff = timezone.now() - timezone.timedelta(days=int(updated_days))
+        qs = qs.filter(github_pushed_at__gte=cutoff)
+    return qs
+
+
 def repository_search_queryset(params):
     first_snapshot = RepositorySnapshot.objects.filter(repository=models.OuterRef("pk")).order_by(
         "captured_at", "id"
@@ -681,24 +896,7 @@ def repository_search_queryset(params):
 
     if q and not semantic_search:
         qs = _apply_repository_keyword_search(qs, q)
-    language = (params.get("language") or "").strip()
-    if language:
-        qs = qs.filter(language__iexact=language)
-    list_slug = (params.get("list") or "").strip()
-    if list_slug:
-        qs = qs.filter(awesome_items__awesome_list__slug=list_slug)
-    min_stars = params.get("min_stars")
-    if min_stars:
-        qs = qs.filter(stars__gte=int(min_stars))
-    archived = params.get("archived")
-    if archived == "yes":
-        qs = qs.filter(is_archived=True)
-    elif archived == "no":
-        qs = qs.filter(is_archived=False)
-    updated_days = params.get("updated_days")
-    if updated_days:
-        cutoff = timezone.now() - timezone.timedelta(days=int(updated_days))
-        qs = qs.filter(github_pushed_at__gte=cutoff)
+    qs = _apply_repository_search_filters(qs, params)
 
     sort = params.get("sort") or "stars"
     sort_map = {

@@ -39,17 +39,19 @@ class RepositoryAdmin(admin.ModelAdmin):
         "stars",
         "language",
         "is_archived",
+        "uses_ai_for_development",
         "github_pushed_at",
         "awesome_count",
     )
     search_fields = ("full_name", "description", "language")
-    list_filter = ("is_archived", "is_fork", "language")
+    list_filter = ("uses_ai_for_development", "is_archived", "is_fork", "language")
     readonly_fields = (
         "readme",
         "readme_path",
         "readme_url",
         "readme_synced_at",
         "readme_last_error",
+        "ai_development_signals",
         "raw",
     )
 
