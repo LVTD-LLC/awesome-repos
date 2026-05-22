@@ -29,6 +29,11 @@ from apps.repos.models import (
     Repository,
     RepositorySnapshot,
 )
+from apps.repos.tags import (
+    normalize_repository_tag,
+    repository_tagging_configured,
+    sync_repository_tags,
+)
 from awesome_repos.utils import get_awesome_repos_logger
 
 logger = get_awesome_repos_logger(__name__)
@@ -238,10 +243,11 @@ def fetch_repository_readme_data(full_name: str) -> dict:
     if data.get("encoding") == "base64" and content:
         try:
             readme = base64.b64decode(content).decode("utf-8", errors="replace")
-        except binascii.Error, ValueError:
+        except (binascii.Error, ValueError) as exc:
             logger.warning(
                 "repository_readme_decode_failed",
                 repo_full_name=full_name,
+                error=str(exc),
             )
             return {
                 "ok": False,
@@ -406,6 +412,8 @@ def upsert_repository_from_github(full_name: str) -> Repository:
         readme_data=readme_data,
         commit_count=commit_count,
     )
+    if repository_tagging_configured():
+        sync_repository_tags(repo, repo.readme)
     if repository_embeddings_configured():
         sync_repository_embedding(repo, repo.readme)
 
@@ -745,7 +753,36 @@ def _apply_repository_keyword_search(qs, q: str):
         | models.Q(description__icontains=q)
         | models.Q(language__icontains=q)
         | models.Q(topics__icontains=q)
+        | models.Q(generated_tags__icontains=q)
     )
+
+
+def _apply_repository_filters(qs, params):
+    language = (params.get("language") or "").strip()
+    if language:
+        qs = qs.filter(language__iexact=language)
+    list_slug = (params.get("list") or "").strip()
+    if list_slug:
+        qs = qs.filter(awesome_items__awesome_list__slug=list_slug)
+    topic = normalize_repository_tag(params.get("topic") or "")
+    if topic:
+        qs = qs.filter(topics__contains=[topic])
+    generated_tag = normalize_repository_tag(params.get("generated_tag") or "")
+    if generated_tag:
+        qs = qs.filter(generated_tags__contains=[generated_tag])
+    min_stars = params.get("min_stars")
+    if min_stars:
+        qs = qs.filter(stars__gte=int(min_stars))
+    archived = params.get("archived")
+    if archived == "yes":
+        qs = qs.filter(is_archived=True)
+    elif archived == "no":
+        qs = qs.filter(is_archived=False)
+    updated_days = params.get("updated_days")
+    if updated_days:
+        cutoff = timezone.now() - timezone.timedelta(days=int(updated_days))
+        qs = qs.filter(github_pushed_at__gte=cutoff)
+    return qs
 
 
 def repository_search_queryset(params):
@@ -789,24 +826,7 @@ def repository_search_queryset(params):
 
     if q and not semantic_search:
         qs = _apply_repository_keyword_search(qs, q)
-    language = (params.get("language") or "").strip()
-    if language:
-        qs = qs.filter(language__iexact=language)
-    list_slug = (params.get("list") or "").strip()
-    if list_slug:
-        qs = qs.filter(awesome_items__awesome_list__slug=list_slug)
-    min_stars = params.get("min_stars")
-    if min_stars:
-        qs = qs.filter(stars__gte=int(min_stars))
-    archived = params.get("archived")
-    if archived == "yes":
-        qs = qs.filter(is_archived=True)
-    elif archived == "no":
-        qs = qs.filter(is_archived=False)
-    updated_days = params.get("updated_days")
-    if updated_days:
-        cutoff = timezone.now() - timezone.timedelta(days=int(updated_days))
-        qs = qs.filter(github_pushed_at__gte=cutoff)
+    qs = _apply_repository_filters(qs, params)
 
     sort = params.get("sort") or "stars"
     sort_map = {

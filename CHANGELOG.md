@@ -26,12 +26,14 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Awesome Repos: added a monthly repository metadata refresh schedule that fans out one background task per saved repository.
 - Awesome Repos: store each ingested repository README alongside the GitHub API metadata.
 - Awesome Repos: record default-branch commit counts during repository refreshes and show commit growth in repository history.
+- Awesome Repos: generate repository discovery tags from descriptions and READMEs, and add filters for generated tags and GitHub topics.
 
 ### Changed
 - Awesome Repos admin-panel add flow now only asks for the GitHub URL; list names and slugs are derived automatically from the source repo.
 - Awesome-list scans now log start/finish/failure details and surface empty scans or sync failures in the admin panel.
 
 ### Fixed
+- Awesome Repos admin panel now bounds the Recent awesome lists card height so long list histories do not stretch the dashboard row.
 - Awesome Repos: include `django.contrib.postgres` so pgvector HNSW indexes pass Django production checks.
 - Awesome Repos: removed manifest-dependent logo static references so production template rendering works after `collectstatic`.
 
