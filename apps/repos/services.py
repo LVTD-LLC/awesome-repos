@@ -5,6 +5,7 @@ import binascii
 import json
 import os
 import re
+import time
 from datetime import UTC, datetime
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode, urlparse
@@ -37,6 +38,10 @@ from apps.repos.tags import (
 from awesome_repos.utils import get_awesome_repos_logger
 
 logger = get_awesome_repos_logger(__name__)
+# Process-local snapshot from the most recent GitHub response. Treat this as a
+# best-effort hint; callers must still handle actual 403/429 responses.
+_github_rate_limit_state: dict[str, str] = {}
+GITHUB_API_VERSION = "2026-03-10"
 
 GITHUB_REPO_RE = re.compile(
     r"https?://github\.com/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)(?:[/#?][^\s)\]>'\"]*)?",
@@ -45,6 +50,23 @@ GITHUB_REPO_RE = re.compile(
 SKIP_REPO_NAMES = {"stargazers", "network", "issues", "pulls", "pull", "wiki", "releases"}
 README_CANDIDATES = ("README.md", "readme.md", "README.markdown", "README.rst")
 AWESOME_LIST_DERIVED_META_KEYS = {"commits_count"}
+
+
+class GitHubAPIError(RuntimeError):
+    def __init__(
+        self,
+        message: str,
+        *,
+        status_code: int,
+        retry_after: str | None = None,
+        rate_limit_remaining: str | None = None,
+        rate_limit_reset: str | None = None,
+    ):
+        super().__init__(message)
+        self.status_code = status_code
+        self.retry_after = retry_after
+        self.rate_limit_remaining = rate_limit_remaining
+        self.rate_limit_reset = rate_limit_reset
 
 
 def github_token() -> str:
@@ -59,6 +81,7 @@ def github_token() -> str:
 def github_headers():
     headers = {
         "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": GITHUB_API_VERSION,
         "User-Agent": "awesome-repos-bot",
     }
     token = github_token()
@@ -67,11 +90,75 @@ def github_headers():
     return headers
 
 
+def _capture_github_rate_limit_headers(headers) -> None:
+    if not headers:
+        return
+
+    limit = headers.get("X-RateLimit-Limit")
+    remaining = headers.get("X-RateLimit-Remaining")
+    used = headers.get("X-RateLimit-Used")
+    reset = headers.get("X-RateLimit-Reset")
+    resource = headers.get("X-RateLimit-Resource")
+    if remaining is None and limit is None:
+        return
+
+    _github_rate_limit_state.clear()
+    _github_rate_limit_state.update(
+        {
+            "limit": limit or "",
+            "remaining": remaining or "",
+            "used": used or "",
+            "reset": reset or "",
+            "resource": resource or "",
+        }
+    )
+
+
+def github_rate_limit_state() -> dict[str, str]:
+    return dict(_github_rate_limit_state)
+
+
+def github_rate_limit_remaining() -> int | None:
+    reset = _github_rate_limit_state.get("reset")
+    if reset:
+        try:
+            if int(reset) <= int(time.time()):
+                return None
+        except ValueError:
+            return None
+
+    remaining = _github_rate_limit_state.get("remaining")
+    if remaining in {None, ""}:
+        return None
+    try:
+        return int(remaining)
+    except ValueError:
+        return None
+
+
 def _github_error_message(url: str, exc: HTTPError) -> str:
     retry_after = exc.headers.get("Retry-After") if exc.headers else None
     remaining = exc.headers.get("X-RateLimit-Remaining") if exc.headers else None
     reset = exc.headers.get("X-RateLimit-Reset") if exc.headers else None
+    body_message = ""
+    try:
+        body = exc.read().decode("utf-8", errors="replace")
+    except Exception:  # noqa: BLE001 - error bodies are best-effort diagnostics only
+        body = ""
+    if body:
+        try:
+            body_message = json.loads(body).get("message", "")
+        except (
+            AttributeError,
+            TypeError,
+            ValueError,
+            json.JSONDecodeError,
+        ):
+            body_message = body.strip()
+
     parts = [f"{exc.code} {exc.reason}", url]
+    if body_message:
+        parts.append(f"message={body_message[:300]}")
     if remaining is not None:
         parts.append(f"rate_limit_remaining={remaining}")
     if reset is not None:
@@ -85,18 +172,55 @@ def fetch_json(url: str):
     request = Request(url, headers=github_headers())
     try:
         with urlopen(request, timeout=30) as response:
+            _capture_github_rate_limit_headers(getattr(response, "headers", None))
             return json.loads(response.read().decode("utf-8"))
     except HTTPError as exc:
-        raise RuntimeError(_github_error_message(url, exc)) from exc
+        _capture_github_rate_limit_headers(exc.headers)
+        raise GitHubAPIError(
+            _github_error_message(url, exc),
+            status_code=exc.code,
+            retry_after=exc.headers.get("Retry-After") if exc.headers else None,
+            rate_limit_remaining=(
+                exc.headers.get("X-RateLimit-Remaining") if exc.headers else None
+            ),
+            rate_limit_reset=exc.headers.get("X-RateLimit-Reset") if exc.headers else None,
+        ) from exc
 
 
 def fetch_text(url: str) -> str:
     request = Request(url, headers=github_headers())
     try:
         with urlopen(request, timeout=30) as response:
+            _capture_github_rate_limit_headers(getattr(response, "headers", None))
             return response.read().decode("utf-8", errors="replace")
     except HTTPError as exc:
-        raise RuntimeError(_github_error_message(url, exc)) from exc
+        _capture_github_rate_limit_headers(exc.headers)
+        raise GitHubAPIError(
+            _github_error_message(url, exc),
+            status_code=exc.code,
+            retry_after=exc.headers.get("Retry-After") if exc.headers else None,
+            rate_limit_remaining=(
+                exc.headers.get("X-RateLimit-Remaining") if exc.headers else None
+            ),
+            rate_limit_reset=exc.headers.get("X-RateLimit-Reset") if exc.headers else None,
+        ) from exc
+
+
+def is_github_rate_limit_error(exc: Exception) -> bool:
+    if not isinstance(exc, GitHubAPIError):
+        return False
+    message = str(exc).lower()
+    if exc.status_code == 429:
+        return True
+    return bool(
+        exc.status_code == 403
+        and (
+            exc.retry_after
+            or exc.rate_limit_remaining == "0"
+            or "rate limit" in message
+            or "secondary rate limit" in message
+        )
+    )
 
 
 def _last_page_from_link_header(link_header: str) -> int | None:
@@ -380,11 +504,17 @@ def record_repository_snapshot(
 
 
 @transaction.atomic
-def _upsert_repository_metadata(data: dict, *, synced_at, readme_data: dict) -> Repository:
+def _upsert_repository_metadata(
+    data: dict,
+    *,
+    synced_at,
+    readme_data: dict | None = None,
+) -> Repository:
     full_name = data["full_name"]
     license_data = data.get("license") or {}
     default_branch = data.get("default_branch") or ""
-    if readme_data["ok"]:
+    readme_defaults = {}
+    if readme_data and readme_data["ok"]:
         readme_defaults = {
             "readme": readme_data["readme"],
             "readme_path": readme_data["readme_path"],
@@ -392,7 +522,7 @@ def _upsert_repository_metadata(data: dict, *, synced_at, readme_data: dict) -> 
             "readme_synced_at": synced_at,
             "readme_last_error": "",
         }
-    else:
+    elif readme_data and readme_data.get("readme_last_error"):
         readme_defaults = {
             "readme_last_error": readme_data["readme_last_error"],
         }
@@ -429,33 +559,35 @@ def _upsert_repository_metadata(data: dict, *, synced_at, readme_data: dict) -> 
     return repo
 
 
-def upsert_repository_from_github(full_name: str) -> Repository:
+def upsert_repository_from_github(full_name: str, *, include_readme: bool = True) -> Repository:
     data = fetch_json(f"https://api.github.com/repos/{full_name}")
-    try:
-        readme_data = fetch_repository_readme_data(data["full_name"])
-    except Exception as exc:  # noqa: BLE001 - README fetch should not block metadata sync
-        logger.warning(
-            "repository_readme_fetch_failed",
-            repo_full_name=data["full_name"],
-            error=str(exc),
-            exc_info=True,
-        )
-        readme_data = {
-            "ok": False,
-            "readme": "",
-            "readme_path": "",
-            "readme_url": "",
-            "readme_last_error": str(exc),
-        }
+    readme_data = None
+    if include_readme:
+        try:
+            readme_data = fetch_repository_readme_data(data["full_name"])
+        except Exception as exc:  # noqa: BLE001 - README fetch should not block metadata sync
+            logger.warning(
+                "repository_readme_fetch_failed",
+                repo_full_name=data["full_name"],
+                error=str(exc),
+                exc_info=True,
+            )
+            readme_data = {
+                "ok": False,
+                "readme": "",
+                "readme_path": "",
+                "readme_url": "",
+                "readme_last_error": str(exc),
+            }
 
     repo = _upsert_repository_metadata(
         data,
         synced_at=timezone.now(),
         readme_data=readme_data,
     )
-    if repository_tagging_configured():
+    if include_readme and repository_tagging_configured():
         sync_repository_tags(repo, repo.readme)
-    if repository_embeddings_configured():
+    if include_readme and repository_embeddings_configured():
         sync_repository_embedding(repo, repo.readme)
 
     return repo
@@ -723,7 +855,12 @@ def add_repository_to_awesome_list(awesome_list: AwesomeList, repo_full_name: st
     }
 
 
-def refresh_repositories(queryset=None, limit: int | None = None) -> dict:
+def refresh_repositories(
+    queryset=None,
+    limit: int | None = None,
+    *,
+    include_readme: bool = False,
+) -> dict:
     queryset = queryset or Repository.objects.all()
     if limit:
         queryset = queryset[:limit]
@@ -731,7 +868,7 @@ def refresh_repositories(queryset=None, limit: int | None = None) -> dict:
     failures = []
     for repo in queryset:
         try:
-            upsert_repository_from_github(repo.full_name)
+            upsert_repository_from_github(repo.full_name, include_readme=include_readme)
             synced += 1
         except Exception as exc:  # noqa: BLE001
             failures.append({"repo": repo.full_name, "error": str(exc)})

@@ -14,7 +14,7 @@
     </div>
 
     <div class="px-6 py-8">
-      <div class="grid grid-cols-1 gap-6 mb-8 lg:grid-cols-3">
+      <div class="grid grid-cols-1 items-start gap-6 mb-8 lg:grid-cols-3">
         <div class="p-6 bg-white rounded-lg border border-gray-200 shadow-sm">
           <div class="flex justify-between items-start">
             <div>
@@ -95,7 +95,7 @@
             <h2 class="text-lg font-semibold text-gray-900">Recent awesome lists</h2>
           </div>
           <div class="p-6">
-            <ul class="space-y-4">
+            <ul class="max-h-96 space-y-4 overflow-y-auto pr-2">
               {% for awesome_list in recent_awesome_lists %}
               <li class="pb-4 border-b border-gray-200 last:border-0 last:pb-0">
                 <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">

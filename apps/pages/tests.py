@@ -191,6 +191,9 @@ def test_landing_page_does_not_show_sign_in_or_sign_up_buttons(client):
 
     assert response.status_code == 200
     content = response.content.decode()
+    assert "brand/awesome-repos-mark.svg" in content
+    assert "brand/apple-touch-icon.png" in content
+    assert "brand/awesome-repos-social.png" in content
     assert "Sign In" not in content
     assert "Start for Free" not in content
 
