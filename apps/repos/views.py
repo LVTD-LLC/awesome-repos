@@ -38,14 +38,26 @@ def repository_json_value_counts(
 def awesome_list_directory_totals() -> dict:
     list_table = connection.ops.quote_name(AwesomeList._meta.db_table)
     item_table = connection.ops.quote_name(AwesomeListItem._meta.db_table)
+    list_pk = connection.ops.quote_name(AwesomeList._meta.pk.column)
+    list_active = connection.ops.quote_name("is_active")
+    item_list_id = connection.ops.quote_name(
+        AwesomeListItem._meta.get_field("awesome_list").column
+    )
     query = f"""
         SELECT
             COUNT(*) AS total_lists,
             COALESCE(SUM(readme_repository_count), 0) AS total_readme_repositories,
             COALESCE(SUM(stars), 0) AS total_list_stars,
             MAX(last_scanned_at) AS latest_scan,
-            (SELECT COUNT(*) FROM {item_table}) AS total_indexed_links
-        FROM {list_table}
+            (
+                SELECT COUNT(*)
+                FROM {item_table} AS item
+                INNER JOIN {list_table} AS item_list
+                    ON item.{item_list_id} = item_list.{list_pk}
+                WHERE item_list.{list_active}
+            ) AS total_indexed_links
+        FROM {list_table} AS awesome_list
+        WHERE awesome_list.{list_active}
     """
     with connection.cursor() as cursor:
         cursor.execute(query)
@@ -102,7 +114,9 @@ class AwesomeListListView(ListView):
     paginate_by = 30
 
     def get_queryset(self):
-        qs = AwesomeList.objects.annotate(indexed_repo_count=Count("items", distinct=True))
+        qs = AwesomeList.objects.filter(is_active=True).annotate(
+            indexed_repo_count=Count("items", distinct=True)
+        )
         q = (self.request.GET.get("q") or "").strip()
         if q:
             qs = qs.filter(
@@ -161,7 +175,9 @@ class AwesomeListDetailView(DetailView):
     context_object_name = "awesome_list"
 
     def get_queryset(self):
-        return AwesomeList.objects.annotate(indexed_repo_count=Count("items", distinct=True))
+        return AwesomeList.objects.filter(is_active=True).annotate(
+            indexed_repo_count=Count("items", distinct=True)
+        )
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

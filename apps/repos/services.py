@@ -208,21 +208,31 @@ def fetch_awesome_readme(full_name: str) -> tuple[str, dict]:
     last_error = None
     for _filename, url in readme_candidate_urls(full_name, branch):
         try:
-            readme = fetch_text(url)
-            if repo_meta.get("default_branch"):
-                try:
-                    repo_meta["commits_count"] = fetch_github_commit_count(full_name, branch)
-                except Exception as exc:  # noqa: BLE001 - commit count is useful but optional
-                    logger.warning(
-                        "awesome_list_commit_count_fetch_failed",
-                        repo_full_name=full_name,
-                        error=str(exc),
-                        exc_info=True,
-                    )
-            return readme, repo_meta
+            return fetch_text(url), repo_meta
         except (RuntimeError, URLError, TimeoutError) as exc:
             last_error = exc
     raise RuntimeError(f"Could not fetch README for {full_name}: {last_error}")
+
+
+def attach_awesome_list_commit_count(full_name: str, meta: dict) -> None:
+    default_branch = meta.get("default_branch") or ""
+    if not default_branch:
+        logger.warning(
+            "awesome_list_commit_count_skipped",
+            repo_full_name=full_name,
+            reason="missing_default_branch",
+        )
+        return
+
+    try:
+        meta["commits_count"] = fetch_github_commit_count(full_name, default_branch)
+    except Exception as exc:  # noqa: BLE001 - commit count is useful but optional
+        logger.warning(
+            "awesome_list_commit_count_fetch_failed",
+            repo_full_name=full_name,
+            error=str(exc),
+            exc_info=True,
+        )
 
 
 def fetch_repository_readme_data(full_name: str) -> dict:
@@ -519,6 +529,7 @@ def sync_awesome_list(awesome_list: AwesomeList, limit: int | None = None) -> di
         limit=limit,
     )
     markdown, meta = fetch_awesome_readme(full_name)
+    attach_awesome_list_commit_count(full_name, meta)
     discovered_repo_names = extract_github_repos(markdown)
     scanned_at = timezone.now()
     repo_names = discovered_repo_names

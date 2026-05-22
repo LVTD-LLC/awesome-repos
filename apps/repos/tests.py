@@ -24,6 +24,7 @@ from apps.repos.models import (
     RepositorySnapshot,
 )
 from apps.repos.services import (
+    attach_awesome_list_commit_count,
     add_repository_to_awesome_list,
     discover_missing_awesome_list_repositories,
     extract_github_repos,
@@ -136,7 +137,7 @@ def github_awesome_list_payload(
         "forks_count": forks,
         "open_issues_count": 7,
         "subscribers_count": watchers,
-        "watchers_count": stars,
+        "watchers_count": watchers,
         "default_branch": "main",
         "archived": False,
         "disabled": False,
@@ -163,6 +164,7 @@ def test_sync_awesome_list_stores_list_activity_metadata(monkeypatch):
         "apps.repos.services.fetch_awesome_readme",
         lambda full_name: (markdown, github_awesome_list_payload(full_name)),
     )
+    monkeypatch.setattr("apps.repos.services.fetch_github_commit_count", lambda *args: 350)
 
     def fake_upsert(full_name):
         owner, name = full_name.split("/", 1)
@@ -472,6 +474,34 @@ def test_fetch_github_commit_count_uses_last_link_page(monkeypatch):
 def test_fetch_github_commit_count_requires_default_branch():
     with pytest.raises(ValueError, match="default branch"):
         fetch_github_commit_count("owner/repo", "")
+
+
+def test_attach_awesome_list_commit_count_is_explicit_about_commit_fetch(monkeypatch):
+    calls = []
+
+    def fake_fetch_commit_count(full_name, default_branch):
+        calls.append((full_name, default_branch))
+        return 456
+
+    monkeypatch.setattr("apps.repos.services.fetch_github_commit_count", fake_fetch_commit_count)
+    meta = {"default_branch": "trunk"}
+
+    attach_awesome_list_commit_count("owner/repo", meta)
+
+    assert calls == [("owner/repo", "trunk")]
+    assert meta["commits_count"] == 456
+
+
+def test_attach_awesome_list_commit_count_skips_missing_default_branch(monkeypatch):
+    def fail_fetch_commit_count(full_name, default_branch):
+        raise AssertionError("commit count should not be fetched without a default branch")
+
+    monkeypatch.setattr("apps.repos.services.fetch_github_commit_count", fail_fetch_commit_count)
+    meta = {}
+
+    attach_awesome_list_commit_count("owner/repo", meta)
+
+    assert "commits_count" not in meta
 
 
 @pytest.mark.django_db
@@ -1462,6 +1492,22 @@ def test_awesome_list_directory_totals_aggregates_in_one_query():
         stars=80000,
     )
     AwesomeListItem.objects.create(awesome_list=awesome_list, repository=repo)
+    inactive_list = AwesomeList.objects.create(
+        name="Inactive List",
+        slug="inactive-list",
+        source_url="https://github.com/example/inactive-list",
+        stars=9999,
+        readme_repository_count=500,
+        is_active=False,
+    )
+    inactive_repo = Repository.objects.create(
+        full_name="example/inactive",
+        owner="example",
+        name="inactive",
+        url="https://github.com/example/inactive",
+        stars=1,
+    )
+    AwesomeListItem.objects.create(awesome_list=inactive_list, repository=inactive_repo)
 
     with CaptureQueriesContext(connection) as queries:
         totals = awesome_list_directory_totals()
@@ -1713,11 +1759,20 @@ def test_awesome_list_list_page_renders_activity_metrics(client):
         stars=80000,
     )
     AwesomeListItem.objects.create(awesome_list=awesome_list, repository=repo)
+    AwesomeList.objects.create(
+        name="Inactive List",
+        slug="inactive-list",
+        source_url="https://github.com/example/inactive-list",
+        is_active=False,
+        stars=9999,
+        readme_repository_count=500,
+    )
 
     response = client.get(reverse("repos:list"))
 
     assert response.status_code == 200
     assert b"Awesome Django" in response.content
+    assert b"Inactive List" not in response.content
     assert b"wsvincent/awesome-django" in response.content
     assert b"README repos" in response.content
     assert b"42" in response.content
@@ -1765,6 +1820,20 @@ def test_awesome_list_detail_page_renders_activity_metrics(client):
     assert b"Commits" in response.content
     assert b"django/django" in response.content
     assert b"Python" in response.content
+
+
+@pytest.mark.django_db
+def test_awesome_list_detail_page_hides_inactive_lists(client):
+    AwesomeList.objects.create(
+        name="Inactive List",
+        slug="inactive-list",
+        source_url="https://github.com/example/inactive-list",
+        is_active=False,
+    )
+
+    response = client.get(reverse("repos:list_detail", kwargs={"slug": "inactive-list"}))
+
+    assert response.status_code == 404
 
 
 @pytest.mark.django_db
