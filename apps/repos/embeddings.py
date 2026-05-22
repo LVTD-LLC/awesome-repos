@@ -46,11 +46,11 @@ def repository_embeddings_configured() -> bool:
 
 def build_repository_embedding_text(repository: Repository, readme_text: str) -> str:
     content_parts = []
-    description = repository.description.strip()
+    description = (repository.description or "").strip()
     if description:
         content_parts.append(f"Description:\n{description}")
 
-    readme_text = readme_text.strip()
+    readme_text = (readme_text or "").strip()
     if readme_text:
         content_parts.append(f"README:\n{readme_text}")
 
@@ -76,6 +76,18 @@ def build_repository_embedding_payload(
         text=text,
         text_hash=hashlib.sha256(text.encode("utf-8")).hexdigest(),
     )
+
+
+def repository_embedding_is_current(
+    repository: Repository,
+    payload: EmbeddingPayload,
+) -> bool:
+    return RepositoryEmbedding.objects.filter(
+        repository=repository,
+        model=settings.REPOSITORY_EMBEDDING_MODEL,
+        dimensions=settings.REPOSITORY_EMBEDDING_DIMENSIONS,
+        source_text_hash=payload.text_hash,
+    ).exists()
 
 
 def _embedding_model() -> OpenAIEmbeddingModel:
@@ -120,15 +132,8 @@ def save_repository_embedding(
             "for the current pgvector column."
         )
 
-    existing = RepositoryEmbedding.objects.filter(repository=repository).first()
-    if (
-        existing
-        and not force
-        and existing.model == expected_model
-        and existing.dimensions == dimensions
-        and existing.source_text_hash == payload.text_hash
-    ):
-        return existing
+    if not force and repository_embedding_is_current(repository, payload):
+        return RepositoryEmbedding.objects.get(repository=repository)
 
     response = generate_embedding(payload.text, input_type="document")
     if len(response.vector) != dimensions:

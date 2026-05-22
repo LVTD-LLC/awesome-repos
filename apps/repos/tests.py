@@ -1,11 +1,14 @@
 import base64
 from datetime import timedelta
+from io import StringIO
 
 import pytest
+from django.core.management import call_command
 from django.urls import reverse
 from django.utils import timezone
 
 from apps.repos.embeddings import (
+    build_repository_embedding_payload,
     build_repository_embedding_text,
     save_repository_embedding,
 )
@@ -29,6 +32,7 @@ from apps.repos.services import (
     sync_awesome_list,
     upsert_repository_from_github,
 )
+from apps.repos.tasks import refresh_repositories_task, refresh_repository_task
 
 
 @pytest.mark.parametrize(
@@ -542,6 +546,191 @@ def test_repository_embedding_text_uses_description_and_readme(settings):
     assert "Description:" in text
     assert "README:" in text
     assert len(text) == 80
+
+
+def test_repository_embedding_text_handles_null_description(settings):
+    settings.REPOSITORY_EMBEDDING_MAX_CHARS = 24000
+    repo = Repository(full_name="owner/repo", description=None)
+
+    text = build_repository_embedding_text(repo, "# README")
+
+    assert text == "Repository: owner/repo\n\nREADME:\n# README"
+
+
+@pytest.mark.django_db
+def test_embed_repositories_command_reports_unchanged_embeddings(monkeypatch, settings):
+    settings.OPENROUTER_API_KEY = "or-test"
+    settings.REPOSITORY_EMBEDDINGS_ENABLED = True
+    settings.REPOSITORY_EMBEDDING_MODEL = "openai/text-embedding-3-small"
+    settings.REPOSITORY_EMBEDDING_DIMENSIONS = REPOSITORY_EMBEDDING_DIMENSIONS
+    settings.REPOSITORY_EMBEDDING_MAX_CHARS = 24000
+    repo = Repository.objects.create(
+        full_name="django/django",
+        owner="django",
+        name="django",
+        url="https://github.com/django/django",
+        description="The Web framework",
+    )
+    readme_text = "# Django"
+    payload = build_repository_embedding_payload(repo, readme_text)
+    assert payload is not None
+    RepositoryEmbedding.objects.create(
+        repository=repo,
+        model="openai/text-embedding-3-small",
+        dimensions=REPOSITORY_EMBEDDING_DIMENSIONS,
+        source_text_hash=payload.text_hash,
+        source_text_chars=len(payload.text),
+        embedding=[0.1] * REPOSITORY_EMBEDDING_DIMENSIONS,
+        embedded_at=timezone.now(),
+    )
+
+    def fail_generate_embedding(text, input_type="document"):
+        raise AssertionError("unchanged embeddings should not be regenerated")
+
+    monkeypatch.setattr("apps.repos.embeddings.generate_embedding", fail_generate_embedding)
+    monkeypatch.setattr(
+        "apps.repos.management.commands.embed_repositories.fetch_repository_readme",
+        lambda full_name: readme_text,
+    )
+
+    stdout = StringIO()
+    call_command("embed_repositories", stdout=stdout)
+
+    output = stdout.getvalue()
+    assert "'embedded': 0" in output
+    assert "'skipped': 0" in output
+    assert "'unchanged': 1" in output
+
+
+@pytest.mark.django_db
+def test_refresh_repository_task_updates_single_repository(monkeypatch):
+    repository = Repository.objects.create(
+        full_name="django/django",
+        owner="django",
+        name="django",
+        url="https://github.com/django/django",
+    )
+    refreshed = []
+
+    def fake_upsert_repository_from_github(full_name):
+        refreshed.append(full_name)
+        return repository
+
+    monkeypatch.setattr(
+        "apps.repos.tasks.upsert_repository_from_github",
+        fake_upsert_repository_from_github,
+    )
+
+    result = refresh_repository_task(repository.id, repository.full_name)
+
+    assert refreshed == ["django/django"]
+    assert result == {"repository_id": repository.id, "full_name": "django/django"}
+
+
+@pytest.mark.django_db
+def test_refresh_repository_task_logs_and_reraises_failures(monkeypatch):
+    repository = Repository.objects.create(
+        full_name="django/django",
+        owner="django",
+        name="django",
+        url="https://github.com/django/django",
+    )
+
+    class DummyLogger:
+        def __init__(self):
+            self.errors = []
+
+        def info(self, event, **kwargs):
+            pass
+
+        def error(self, event, **kwargs):
+            self.errors.append((event, kwargs))
+
+    dummy_logger = DummyLogger()
+
+    def fake_upsert_repository_from_github(full_name):
+        raise RuntimeError(f"could not refresh {full_name}")
+
+    monkeypatch.setattr("apps.repos.tasks.logger", dummy_logger)
+    monkeypatch.setattr(
+        "apps.repos.tasks.upsert_repository_from_github",
+        fake_upsert_repository_from_github,
+    )
+
+    with pytest.raises(RuntimeError, match="could not refresh django/django"):
+        refresh_repository_task(repository.id, repository.full_name)
+
+    assert dummy_logger.errors == [
+        (
+            "repository_refresh_task_failed",
+            {
+                "repository_id": repository.id,
+                "repository_full_name": "django/django",
+                "error": "could not refresh django/django",
+                "exc_info": True,
+            },
+        )
+    ]
+
+
+@pytest.mark.django_db
+def test_refresh_repositories_task_queues_one_task_per_repository(monkeypatch):
+    stale = Repository.objects.create(
+        full_name="owner/stale",
+        owner="owner",
+        name="stale",
+        url="https://github.com/owner/stale",
+        last_synced_at=timezone.now() - timedelta(days=7),
+    )
+    fresh = Repository.objects.create(
+        full_name="owner/fresh",
+        owner="owner",
+        name="fresh",
+        url="https://github.com/owner/fresh",
+        last_synced_at=timezone.now(),
+    )
+    queued = []
+
+    def fake_async_task(func_path, repository_id, full_name, **kwargs):
+        task_id = f"task-{repository_id}"
+        queued.append((func_path, repository_id, full_name, kwargs, task_id))
+        return task_id
+
+    monkeypatch.setattr("apps.repos.tasks.async_task", fake_async_task)
+
+    result = refresh_repositories_task()
+
+    assert queued == [
+        (
+            "apps.repos.tasks.refresh_repository_task",
+            stale.id,
+            "owner/stale",
+            {"group": "Refresh repositories"},
+            f"task-{stale.id}",
+        ),
+        (
+            "apps.repos.tasks.refresh_repository_task",
+            fresh.id,
+            "owner/fresh",
+            {"group": "Refresh repositories"},
+            f"task-{fresh.id}",
+        ),
+    ]
+    assert result == {
+        "queued": 2,
+        "repositories": [
+            {
+                "repository_id": stale.id,
+                "full_name": "owner/stale",
+                "task_id": f"task-{stale.id}",
+            },
+            {
+                "repository_id": fresh.id,
+                "full_name": "owner/fresh",
+                "task_id": f"task-{fresh.id}",
+            },
+        ],
+    }
 
 
 @pytest.mark.django_db

@@ -22,6 +22,7 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Awesome Repos admin panel now lets superusers retry scans for existing awesome-list repos.
 - Awesome Repos: added a daily scheduled task that queues per-list missing repository discovery and only ingests newly discovered repositories.
 - Awesome Repos: added pgvector-backed repository embeddings from GitHub descriptions and READMEs via OpenRouter/PydanticAI.
+- Awesome Repos: added a monthly repository metadata refresh schedule that fans out one background task per saved repository.
 
 ### Changed
 - Awesome Repos admin-panel add flow now only asks for the GitHub URL; list names and slugs are derived automatically from the source repo.
