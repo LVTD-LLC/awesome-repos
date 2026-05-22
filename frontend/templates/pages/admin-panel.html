@@ -14,7 +14,7 @@
     </div>
 
     <div class="px-6 py-8">
-      <div class="grid grid-cols-1 gap-6 mb-8 lg:grid-cols-2">
+      <div class="grid grid-cols-1 gap-6 mb-8 lg:grid-cols-3">
         <div class="p-6 bg-white rounded-lg border border-gray-200 shadow-sm">
           <div class="flex justify-between items-start">
             <div>
@@ -53,6 +53,41 @@
               Add awesome list
             </button>
           </form>
+        </div>
+
+        <div class="bg-white rounded-lg border border-gray-200 shadow-sm">
+          <div class="p-6 border-b border-gray-200">
+            <h2 class="text-lg font-semibold text-gray-900">GitHub API status</h2>
+            <p class="mt-1 text-sm text-gray-600">Current scanner rate limit from the configured token.</p>
+          </div>
+          <div class="p-6">
+            {% if github_rate_limit.ok %}
+            <div class="grid grid-cols-3 gap-3 text-center">
+              <div class="rounded-lg bg-green-50 p-3">
+                <p class="text-xs font-medium text-green-700">Remaining</p>
+                <p class="mt-1 text-2xl font-bold text-green-900">{{ github_rate_limit.core.remaining }}</p>
+              </div>
+              <div class="rounded-lg bg-gray-50 p-3">
+                <p class="text-xs font-medium text-gray-600">Used</p>
+                <p class="mt-1 text-2xl font-bold text-gray-900">{{ github_rate_limit.core.used }}</p>
+              </div>
+              <div class="rounded-lg bg-gray-50 p-3">
+                <p class="text-xs font-medium text-gray-600">Limit</p>
+                <p class="mt-1 text-2xl font-bold text-gray-900">{{ github_rate_limit.core.limit }}</p>
+              </div>
+            </div>
+            <p class="mt-4 text-xs text-gray-500">
+              Resets {% if github_rate_limit.core.reset_at %}{{ github_rate_limit.core.reset_at|date:"M d, H:i T" }}{% else %}soon{% endif %}.
+            </p>
+            {% else %}
+            <div class="rounded-md bg-yellow-50 p-3 text-sm text-yellow-800">
+              {{ github_rate_limit.error|default:"Unable to fetch GitHub API status." }}
+            </div>
+            <p class="mt-3 text-xs text-gray-500">
+              Set <code>GITHUB_TOKEN</code> in both web and worker environments to use authenticated limits.
+            </p>
+            {% endif %}
+          </div>
         </div>
 
         <div class="bg-white rounded-lg border border-gray-200 shadow-sm">

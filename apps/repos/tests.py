@@ -9,6 +9,7 @@ from apps.repos.models import AwesomeList, AwesomeListItem, Repository
 from apps.repos.services import (
     extract_github_repos,
     fetch_json,
+    github_rate_limit_status,
     parse_github_repo_url,
     repository_search_queryset,
     sync_awesome_list,
@@ -105,6 +106,32 @@ def test_fetch_json_uses_github_token(monkeypatch):
     assert fetch_json("https://api.github.com/repos/example/example") == {"ok": True}
     headers = {k.lower(): v for k, v in captured["headers"].items()}
     assert headers["authorization"] == "Bearer ghp_test_token"
+
+
+def test_github_rate_limit_status_formats_core_limit(monkeypatch):
+    monkeypatch.setenv("GITHUB_TOKEN", "ghp_test_token")
+    monkeypatch.setattr(
+        "apps.repos.services.fetch_json",
+        lambda url: {
+            "resources": {
+                "core": {
+                    "limit": 5000,
+                    "used": 123,
+                    "remaining": 4877,
+                    "reset": 1779449000,
+                }
+            }
+        },
+    )
+
+    status = github_rate_limit_status()
+
+    assert status["ok"] is True
+    assert status["token_configured"] is True
+    assert status["core"]["limit"] == 5000
+    assert status["core"]["used"] == 123
+    assert status["core"]["remaining"] == 4877
+    assert status["core"]["reset_at"] is not None
 
 
 @pytest.mark.django_db

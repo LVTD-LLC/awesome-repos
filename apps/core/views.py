@@ -26,6 +26,7 @@ from apps.core.forms import ProfileUpdateForm
 from apps.core.models import Feedback, Profile
 from apps.repos.forms import AwesomeListCreateForm
 from apps.repos.models import AwesomeList
+from apps.repos.services import github_rate_limit_status
 from awesome_repos.utils import get_awesome_repos_logger
 
 logger = get_awesome_repos_logger(__name__)
@@ -243,6 +244,7 @@ class AdminPanelView(UserPassesTestMixin, TemplateView):
             'avg_users_per_day': avg_users_per_day,
             'awesome_list_form': kwargs.get('awesome_list_form') or AwesomeListCreateForm(),
             'recent_awesome_lists': recent_awesome_lists,
+            'github_rate_limit': github_rate_limit_status(),
         })
 
         logger.info(
