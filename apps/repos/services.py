@@ -25,27 +25,56 @@ SKIP_REPO_NAMES = {"stargazers", "network", "issues", "pulls", "pull", "wiki", "
 README_CANDIDATES = ("README.md", "readme.md", "README.markdown", "README.rst")
 
 
+def github_token() -> str:
+    return (
+        os.environ.get("GITHUB_TOKEN")
+        or os.environ.get("GH_TOKEN")
+        or os.environ.get("GITHUB_API_TOKEN")
+        or ""
+    )
+
+
 def github_headers():
     headers = {
         "Accept": "application/vnd.github+json",
         "User-Agent": "awesome-repos-bot",
     }
-    token = os.environ.get("GITHUB_TOKEN")
+    token = github_token()
     if token:
         headers["Authorization"] = f"Bearer {token}"
     return headers
 
 
+def _github_error_message(url: str, exc: HTTPError) -> str:
+    retry_after = exc.headers.get("Retry-After") if exc.headers else None
+    remaining = exc.headers.get("X-RateLimit-Remaining") if exc.headers else None
+    reset = exc.headers.get("X-RateLimit-Reset") if exc.headers else None
+    parts = [f"{exc.code} {exc.reason}", url]
+    if remaining is not None:
+        parts.append(f"rate_limit_remaining={remaining}")
+    if reset is not None:
+        parts.append(f"rate_limit_reset={reset}")
+    if retry_after is not None:
+        parts.append(f"retry_after={retry_after}")
+    return " | ".join(parts)
+
+
 def fetch_json(url: str):
     request = Request(url, headers=github_headers())
-    with urlopen(request, timeout=30) as response:
-        return json.loads(response.read().decode("utf-8"))
+    try:
+        with urlopen(request, timeout=30) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except HTTPError as exc:
+        raise RuntimeError(_github_error_message(url, exc)) from exc
 
 
 def fetch_text(url: str) -> str:
-    request = Request(url, headers={"User-Agent": "awesome-repos-bot"})
-    with urlopen(request, timeout=30) as response:
-        return response.read().decode("utf-8", errors="replace")
+    request = Request(url, headers=github_headers())
+    try:
+        with urlopen(request, timeout=30) as response:
+            return response.read().decode("utf-8", errors="replace")
+    except HTTPError as exc:
+        raise RuntimeError(_github_error_message(url, exc)) from exc
 
 
 def parse_github_repo_url(url: str) -> str:
