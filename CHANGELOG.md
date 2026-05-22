@@ -28,6 +28,7 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Awesome Repos: added a daily budgeted repository metadata refresh that walks the oldest-synced repositories first and skips README refreshes by default.
 - Awesome Repos: store each ingested repository README alongside the GitHub API metadata.
 - Awesome Repos: generate repository discovery tags from descriptions and READMEs, and add filters for generated tags and GitHub topics.
+- Awesome Repos: added an awesome-list directory and detail pages with stored list activity metrics including stars, commits, README repository counts, forks, issues, and scan freshness.
 
 ### Changed
 - Awesome Repos: moved repository search filters into a compact vertical modal opened from a single filter button.

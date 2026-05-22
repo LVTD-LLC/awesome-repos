@@ -23,9 +23,36 @@ def queue_scan(modeladmin, request, queryset):
 
 @admin.register(AwesomeList)
 class AwesomeListAdmin(admin.ModelAdmin):
-    list_display = ("name", "slug", "repo_full_name", "is_active", "last_scanned_at", "item_count")
+    list_display = (
+        "name",
+        "slug",
+        "repo_full_name",
+        "stars",
+        "readme_repository_count",
+        "commits_count",
+        "is_active",
+        "last_scanned_at",
+        "item_count",
+    )
     prepopulated_fields = {"slug": ("name",)}
-    search_fields = ("name", "slug", "repo_full_name", "source_url")
+    search_fields = ("name", "slug", "repo_full_name", "source_url", "description")
+    list_filter = ("is_active", "is_archived", "is_disabled")
+    readonly_fields = (
+        "topics",
+        "stars",
+        "forks",
+        "open_issues",
+        "watchers",
+        "commits_count",
+        "readme_repository_count",
+        "default_branch",
+        "is_archived",
+        "is_disabled",
+        "github_created_at",
+        "github_updated_at",
+        "github_pushed_at",
+        "raw",
+    )
     actions = [queue_scan]
 
     def item_count(self, obj):
