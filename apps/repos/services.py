@@ -7,7 +7,7 @@ import os
 import re
 from datetime import UTC, datetime
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlencode, urlparse
 from urllib.request import Request, urlopen
 
 from django.conf import settings
@@ -82,6 +82,46 @@ def fetch_json(url: str):
             return json.loads(response.read().decode("utf-8"))
     except HTTPError as exc:
         raise RuntimeError(_github_error_message(url, exc)) from exc
+
+
+def _last_page_from_link_header(link_header: str) -> int | None:
+    for section in link_header.split(","):
+        if 'rel="last"' not in section:
+            continue
+        match = re.search(r"<([^>]+)>", section)
+        if not match:
+            return None
+        page_values = parse_qs(urlparse(match.group(1)).query).get("page")
+        if not page_values:
+            return None
+        try:
+            return int(page_values[0])
+        except ValueError:
+            return None
+    return None
+
+
+def fetch_repository_commit_count(full_name: str, default_branch: str = "") -> int:
+    params = {"per_page": "1"}
+    if default_branch:
+        params["sha"] = default_branch
+    url = f"https://api.github.com/repos/{full_name}/commits?{urlencode(params)}"
+    request = Request(url, headers=github_headers())
+    try:
+        with urlopen(request, timeout=30) as response:
+            data = json.loads(response.read().decode("utf-8"))
+            link_header = response.headers.get("Link", "")
+    except HTTPError as exc:
+        if exc.code == 409:
+            return 0
+        raise RuntimeError(_github_error_message(url, exc)) from exc
+
+    last_page = _last_page_from_link_header(link_header)
+    if last_page is not None:
+        return last_page
+    if isinstance(data, list):
+        return len(data)
+    return 0
 
 
 def fetch_text(url: str) -> str:
@@ -198,7 +238,7 @@ def fetch_repository_readme_data(full_name: str) -> dict:
     if data.get("encoding") == "base64" and content:
         try:
             readme = base64.b64decode(content).decode("utf-8", errors="replace")
-        except (binascii.Error, ValueError):
+        except binascii.Error, ValueError:
             logger.warning(
                 "repository_readme_decode_failed",
                 repo_full_name=full_name,
@@ -255,6 +295,7 @@ def record_repository_snapshot(
         topics=repository.topics,
         stars=repository.stars,
         forks=repository.forks,
+        commit_count=repository.commit_count,
         open_issues=repository.open_issues,
         watchers=repository.watchers,
         default_branch=repository.default_branch,
@@ -268,7 +309,13 @@ def record_repository_snapshot(
 
 
 @transaction.atomic
-def _upsert_repository_metadata(data: dict, *, synced_at, readme_data: dict) -> Repository:
+def _upsert_repository_metadata(
+    data: dict,
+    *,
+    synced_at,
+    readme_data: dict,
+    commit_count: int | None,
+) -> Repository:
     full_name = data["full_name"]
     license_data = data.get("license") or {}
     default_branch = data.get("default_branch") or ""
@@ -285,33 +332,37 @@ def _upsert_repository_metadata(data: dict, *, synced_at, readme_data: dict) -> 
             "readme_last_error": readme_data["readme_last_error"],
         }
 
+    defaults = {
+        "host": "github",
+        "owner": data.get("owner", {}).get("login", full_name.split("/", 1)[0]),
+        "name": data.get("name", full_name.split("/", 1)[1]),
+        "url": data.get("html_url", f"https://github.com/{full_name}"),
+        "description": data.get("description") or "",
+        "homepage_url": data.get("homepage") or "",
+        "language": data.get("language") or "",
+        "license_name": license_data.get("spdx_id") or license_data.get("name") or "",
+        "topics": data.get("topics") or [],
+        "stars": data.get("stargazers_count") or 0,
+        "forks": data.get("forks_count") or 0,
+        "open_issues": data.get("open_issues_count") or 0,
+        "watchers": data.get("subscribers_count") or data.get("watchers_count") or 0,
+        "default_branch": default_branch,
+        "is_archived": bool(data.get("archived")),
+        "is_disabled": bool(data.get("disabled")),
+        "is_fork": bool(data.get("fork")),
+        "github_created_at": dt(data.get("created_at")),
+        "github_updated_at": dt(data.get("updated_at")),
+        "github_pushed_at": dt(data.get("pushed_at")),
+        "last_synced_at": synced_at,
+        **readme_defaults,
+        "raw": data,
+    }
+    if commit_count is not None:
+        defaults["commit_count"] = commit_count
+
     repo, _ = Repository.objects.update_or_create(
         full_name=full_name,
-        defaults={
-            "host": "github",
-            "owner": data.get("owner", {}).get("login", full_name.split("/", 1)[0]),
-            "name": data.get("name", full_name.split("/", 1)[1]),
-            "url": data.get("html_url", f"https://github.com/{full_name}"),
-            "description": data.get("description") or "",
-            "homepage_url": data.get("homepage") or "",
-            "language": data.get("language") or "",
-            "license_name": license_data.get("spdx_id") or license_data.get("name") or "",
-            "topics": data.get("topics") or [],
-            "stars": data.get("stargazers_count") or 0,
-            "forks": data.get("forks_count") or 0,
-            "open_issues": data.get("open_issues_count") or 0,
-            "watchers": data.get("subscribers_count") or data.get("watchers_count") or 0,
-            "default_branch": default_branch,
-            "is_archived": bool(data.get("archived")),
-            "is_disabled": bool(data.get("disabled")),
-            "is_fork": bool(data.get("fork")),
-            "github_created_at": dt(data.get("created_at")),
-            "github_updated_at": dt(data.get("updated_at")),
-            "github_pushed_at": dt(data.get("pushed_at")),
-            "last_synced_at": synced_at,
-            **readme_defaults,
-            "raw": data,
-        },
+        defaults=defaults,
     )
     record_repository_snapshot(repo, captured_at=synced_at)
     return repo
@@ -335,11 +386,25 @@ def upsert_repository_from_github(full_name: str) -> Repository:
             "readme_url": "",
             "readme_last_error": str(exc),
         }
+    try:
+        commit_count = fetch_repository_commit_count(
+            data["full_name"],
+            data.get("default_branch") or "",
+        )
+    except Exception as exc:  # noqa: BLE001 - commit count should not block metadata sync
+        logger.warning(
+            "repository_commit_count_fetch_failed",
+            repo_full_name=data["full_name"],
+            error=str(exc),
+            exc_info=True,
+        )
+        commit_count = None
 
     repo = _upsert_repository_metadata(
         data,
         synced_at=timezone.now(),
         readme_data=readme_data,
+        commit_count=commit_count,
     )
     if repository_embeddings_configured():
         sync_repository_embedding(repo, repo.readme)
@@ -347,12 +412,18 @@ def upsert_repository_from_github(full_name: str) -> Repository:
     return repo
 
 
-def _format_delta(value: int | None) -> str:
+def _format_delta(value: int | None, *, none_label: str = "baseline") -> str:
     if value is None:
-        return "baseline"
+        return none_label
     if value > 0:
         return f"+{value}"
     return str(value)
+
+
+def _optional_delta(current: int | None, previous: int | None) -> int | None:
+    if current is None or previous is None:
+        return None
+    return current - previous
 
 
 def repository_performance_summary(repository: Repository, limit: int = 12) -> dict:
@@ -374,6 +445,11 @@ def repository_performance_summary(repository: Repository, limit: int = 12) -> d
         older_snapshot = recent_snapshots[index + 1] if index + 1 < len(recent_snapshots) else None
         stars_delta = snapshot.stars - older_snapshot.stars if older_snapshot else None
         forks_delta = snapshot.forks - older_snapshot.forks if older_snapshot else None
+        commit_delta = (
+            _optional_delta(snapshot.commit_count, older_snapshot.commit_count)
+            if older_snapshot
+            else None
+        )
         history.append(
             {
                 "snapshot": snapshot,
@@ -381,6 +457,11 @@ def repository_performance_summary(repository: Repository, limit: int = 12) -> d
                 "stars_delta_label": _format_delta(stars_delta),
                 "forks_delta": forks_delta,
                 "forks_delta_label": _format_delta(forks_delta),
+                "commit_delta": commit_delta,
+                "commit_delta_label": _format_delta(
+                    commit_delta,
+                    none_label="n/a" if older_snapshot else "baseline",
+                ),
             }
         )
 
@@ -388,6 +469,16 @@ def repository_performance_summary(repository: Repository, limit: int = 12) -> d
     forks_since_first = repository.forks - first_snapshot.forks if first_snapshot else 0
     watchers_since_first = repository.watchers - first_snapshot.watchers if first_snapshot else 0
     stars_since_previous = repository.stars - previous_snapshot.stars if previous_snapshot else None
+    commits_since_first = (
+        _optional_delta(repository.commit_count, first_snapshot.commit_count)
+        if first_snapshot
+        else None
+    )
+    commits_since_previous = (
+        _optional_delta(repository.commit_count, previous_snapshot.commit_count)
+        if previous_snapshot
+        else None
+    )
 
     return {
         "has_history": bool(recent_snapshots),
@@ -403,6 +494,10 @@ def repository_performance_summary(repository: Repository, limit: int = 12) -> d
         "watchers_since_first_label": _format_delta(watchers_since_first),
         "stars_since_previous": stars_since_previous,
         "stars_since_previous_label": _format_delta(stars_since_previous),
+        "commits_since_first": commits_since_first,
+        "commits_since_first_label": _format_delta(commits_since_first, none_label="n/a"),
+        "commits_since_previous": commits_since_previous,
+        "commits_since_previous_label": _format_delta(commits_since_previous, none_label="n/a"),
         "history": history,
     }
 
@@ -664,6 +759,10 @@ def repository_search_queryset(params):
             first_snapshot.values("stars")[:1],
             output_field=models.PositiveIntegerField(),
         ),
+        first_snapshot_commit_count=models.Subquery(
+            first_snapshot.values("commit_count")[:1],
+            output_field=models.PositiveIntegerField(),
+        ),
     ).annotate(
         stars_since_first=models.Case(
             models.When(
@@ -672,7 +771,16 @@ def repository_search_queryset(params):
             ),
             default=models.Value(0),
             output_field=models.IntegerField(),
-        )
+        ),
+        commits_since_first=models.Case(
+            models.When(
+                commit_count__isnull=False,
+                first_snapshot_commit_count__isnull=False,
+                then=models.F("commit_count") - models.F("first_snapshot_commit_count"),
+            ),
+            default=models.Value(None),
+            output_field=models.IntegerField(),
+        ),
     )
     q = (params.get("q") or "").strip()
     semantic_search = False
@@ -705,6 +813,7 @@ def repository_search_queryset(params):
         "stars": "-stars",
         "recent": "-github_pushed_at",
         "created": "-github_created_at",
+        "commits": "-commit_count",
         "awesome": "-awesome_count",
         "name": "full_name",
     }

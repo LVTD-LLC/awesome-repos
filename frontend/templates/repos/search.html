@@ -59,6 +59,7 @@
         <option value="stars" {% if request.GET.sort == "stars" or not request.GET.sort %}selected{% endif %}>Sort by stars</option>
         <option value="recent" {% if request.GET.sort == "recent" %}selected{% endif %}>Recently updated</option>
         <option value="created" {% if request.GET.sort == "created" %}selected{% endif %}>Recently created</option>
+        <option value="commits" {% if request.GET.sort == "commits" %}selected{% endif %}>Most commits</option>
         <option value="awesome" {% if request.GET.sort == "awesome" %}selected{% endif %}>Most awesome-list mentions</option>
         <option value="name" {% if request.GET.sort == "name" %}selected{% endif %}>Name</option>
       </select>
@@ -77,6 +78,7 @@
               {% if repo.language %}<span class="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-800">{{ repo.language }}</span>{% endif %}
               {% if repo.is_archived %}<span class="rounded-full bg-yellow-100 px-3 py-1 text-yellow-800">archived</span>{% endif %}
               <span class="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-800">{{ repo.awesome_count }} awesome list{{ repo.awesome_count|pluralize }}</span>
+              {% if repo.commit_count != None %}<span class="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-800">{{ repo.commit_count }} commits</span>{% endif %}
               {% if repo.snapshot_count %}<span class="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-800">{{ repo.snapshot_count }} history point{{ repo.snapshot_count|pluralize }}</span>{% endif %}
               {% if repo.github_pushed_at %}<span class="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-800">updated {{ repo.github_pushed_at|date:"Y-m-d" }}</span>{% endif %}
             </div>

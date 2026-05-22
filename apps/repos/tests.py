@@ -28,6 +28,7 @@ from apps.repos.services import (
     discover_missing_awesome_list_repositories,
     extract_github_repos,
     fetch_json,
+    fetch_repository_commit_count,
     fetch_repository_readme,
     fetch_repository_readme_data,
     github_rate_limit_status,
@@ -38,6 +39,14 @@ from apps.repos.services import (
     upsert_repository_from_github,
 )
 from apps.repos.tasks import refresh_repositories_task, refresh_repository_task
+
+
+@pytest.fixture(autouse=True)
+def stub_repository_commit_count_fetch(monkeypatch):
+    monkeypatch.setattr(
+        "apps.repos.services.fetch_repository_commit_count",
+        lambda full_name, default_branch="": 123,
+    )
 
 
 @pytest.mark.parametrize(
@@ -233,9 +242,11 @@ def test_upsert_repository_from_github_records_snapshot(monkeypatch):
     assert repo.stars == 80000
     assert repo.forks == 32000
     assert repo.watchers == 1200
+    assert repo.commit_count == 123
     assert snapshot.stars == repo.stars
     assert snapshot.forks == repo.forks
     assert snapshot.watchers == repo.watchers
+    assert snapshot.commit_count == repo.commit_count
     assert snapshot.captured_at == repo.last_synced_at
 
 
@@ -377,6 +388,33 @@ def test_upsert_repository_from_github_preserves_readme_when_refresh_fails(monke
     assert repo.readme_url == ("https://raw.githubusercontent.com/django/django/main/README.md")
     assert repo.readme_last_error == "404 Not Found"
     assert repo.readme_synced_at == previous_readme_synced_at
+
+
+@pytest.mark.django_db
+def test_upsert_repository_from_github_preserves_commit_count_when_fetch_fails(monkeypatch):
+    repo = Repository.objects.create(
+        full_name="django/django",
+        owner="django",
+        name="django",
+        url="https://github.com/django/django",
+        commit_count=42,
+    )
+    monkeypatch.setattr(
+        "apps.repos.services.fetch_json",
+        lambda url: github_repo_payload(stars=15, forks=4, watchers=2),
+    )
+    stub_repository_readme(monkeypatch, content="# Updated Django\n")
+
+    def fail_commit_count(full_name, default_branch=""):
+        raise RuntimeError("commit count unavailable")
+
+    monkeypatch.setattr("apps.repos.services.fetch_repository_commit_count", fail_commit_count)
+
+    repo = upsert_repository_from_github(repo.full_name)
+    snapshot = RepositorySnapshot.objects.get(repository=repo)
+
+    assert repo.commit_count == 42
+    assert snapshot.commit_count == 42
 
 
 @pytest.mark.django_db
@@ -570,6 +608,56 @@ def test_fetch_json_uses_github_token(monkeypatch):
     assert fetch_json("https://api.github.com/repos/example/example") == {"ok": True}
     headers = {k.lower(): v for k, v in captured["headers"].items()}
     assert headers["authorization"] == "Bearer ghp_test_token"
+
+
+def test_fetch_repository_commit_count_uses_github_pagination_link(monkeypatch):
+    captured = {}
+
+    class DummyResponse:
+        headers = {
+            "Link": (
+                "<https://api.github.com/repos/django/django/commits?per_page=1"
+                '&sha=main&page=456>; rel="last"'
+            )
+        }
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self):
+            return b'[{"sha":"abc"}]'
+
+    def fake_urlopen(request, timeout=30):
+        captured["url"] = request.full_url
+        return DummyResponse()
+
+    monkeypatch.setattr("apps.repos.services.urlopen", fake_urlopen)
+
+    assert fetch_repository_commit_count("django/django", "main") == 456
+    assert (
+        captured["url"] == "https://api.github.com/repos/django/django/commits?per_page=1&sha=main"
+    )
+
+
+def test_fetch_repository_commit_count_counts_single_unpaginated_page(monkeypatch):
+    class DummyResponse:
+        headers = {}
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self):
+            return b'[{"sha":"abc"}]'
+
+    monkeypatch.setattr("apps.repos.services.urlopen", lambda request, timeout=30: DummyResponse())
+
+    assert fetch_repository_commit_count("django/django", "main") == 1
 
 
 def test_github_rate_limit_status_formats_core_limit(monkeypatch):
@@ -1035,6 +1123,7 @@ def test_repository_search_filters_and_sorts():
         description="Django tool",
         language="Python",
         stars=50,
+        commit_count=20,
         github_pushed_at=timezone.now(),
     )
     old = Repository.objects.create(
@@ -1045,6 +1134,7 @@ def test_repository_search_filters_and_sorts():
         description="Node app",
         language="JavaScript",
         stars=100,
+        commit_count=40,
         github_pushed_at=timezone.now() - timedelta(days=500),
     )
     awesome = AwesomeList.objects.create(
@@ -1059,6 +1149,9 @@ def test_repository_search_filters_and_sorts():
 
     qs = repository_search_queryset({"min_stars": "80"})
     assert list(qs) == [old]
+
+    qs = repository_search_queryset({"sort": "commits"})
+    assert list(qs) == [old, recent]
 
 
 @pytest.mark.django_db
@@ -1145,16 +1238,19 @@ def test_repository_search_queryset_annotates_tracked_growth():
         description="Django tool",
         language="Python",
         stars=75,
+        commit_count=80,
     )
     RepositorySnapshot.objects.create(
         repository=repo,
         captured_at=timezone.now() - timedelta(days=2),
         stars=50,
+        commit_count=50,
     )
     RepositorySnapshot.objects.create(
         repository=repo,
         captured_at=timezone.now() - timedelta(days=1),
         stars=75,
+        commit_count=80,
     )
 
     result = repository_search_queryset({"q": "django"}).get()
@@ -1162,6 +1258,8 @@ def test_repository_search_queryset_annotates_tracked_growth():
     assert result.snapshot_count == 2
     assert result.first_snapshot_stars == 50
     assert result.stars_since_first == 25
+    assert result.first_snapshot_commit_count == 50
+    assert result.commits_since_first == 30
 
 
 @pytest.mark.django_db
@@ -1174,6 +1272,7 @@ def test_repository_performance_summary_returns_recent_growth():
         stars=75,
         forks=12,
         watchers=5,
+        commit_count=90,
     )
     RepositorySnapshot.objects.create(
         repository=repo,
@@ -1181,6 +1280,7 @@ def test_repository_performance_summary_returns_recent_growth():
         stars=50,
         forks=10,
         watchers=4,
+        commit_count=70,
     )
     RepositorySnapshot.objects.create(
         repository=repo,
@@ -1188,6 +1288,7 @@ def test_repository_performance_summary_returns_recent_growth():
         stars=75,
         forks=12,
         watchers=5,
+        commit_count=90,
     )
 
     summary = repository_performance_summary(repo)
@@ -1197,8 +1298,12 @@ def test_repository_performance_summary_returns_recent_growth():
     assert summary["stars_since_first_label"] == "+25"
     assert summary["forks_since_first"] == 2
     assert summary["watchers_since_first"] == 1
+    assert summary["commits_since_first"] == 20
+    assert summary["commits_since_first_label"] == "+20"
     assert summary["history"][0]["stars_delta"] == 25
+    assert summary["history"][0]["commit_delta"] == 20
     assert summary["history"][1]["stars_delta_label"] == "baseline"
+    assert summary["history"][1]["commit_delta_label"] == "baseline"
 
 
 @pytest.mark.django_db
@@ -1281,6 +1386,7 @@ def test_repository_detail_page_renders_performance_history(client):
         stars=75,
         forks=12,
         watchers=5,
+        commit_count=90,
     )
     RepositorySnapshot.objects.create(
         repository=repo,
@@ -1288,6 +1394,7 @@ def test_repository_detail_page_renders_performance_history(client):
         stars=50,
         forks=10,
         watchers=4,
+        commit_count=70,
     )
     RepositorySnapshot.objects.create(
         repository=repo,
@@ -1295,6 +1402,7 @@ def test_repository_detail_page_renders_performance_history(client):
         stars=75,
         forks=12,
         watchers=5,
+        commit_count=90,
     )
 
     response = client.get(
@@ -1304,3 +1412,5 @@ def test_repository_detail_page_renders_performance_history(client):
     assert response.status_code == 200
     assert b"Tracked growth" in response.content
     assert b"+25" in response.content
+    assert b"Commits since first" in response.content
+    assert b"+20" in response.content
