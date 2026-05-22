@@ -1,8 +1,10 @@
 import pytest
+from django.contrib.auth import get_user_model
 from django.test import override_settings
 from django.urls import reverse
 
 from apps.core.views import build_absolute_public_url
+from apps.repos.models import AwesomeList
 
 
 @pytest.mark.django_db
@@ -36,6 +38,44 @@ class TestHomeView:
 
         assert "Copy this key now" not in content
         assert profile.api_key_prefix in content
+
+
+@pytest.mark.django_db
+def test_admin_panel_can_add_awesome_list_and_queue_scan(client, monkeypatch):
+    user = get_user_model().objects.create_superuser(
+        username="admin",
+        email="admin@example.com",
+        password="password123",
+    )
+    client.force_login(user)
+
+    queued = []
+
+    def fake_async_task(func_path, awesome_list_id, **kwargs):
+        queued.append((func_path, awesome_list_id, kwargs))
+
+    monkeypatch.setattr("apps.core.views.async_task", fake_async_task)
+
+    response = client.post(
+        reverse("admin_panel"),
+        data={
+            "source_url": "https://github.com/wsvincent/awesome-django",
+            "name": "Awesome Django",
+        },
+        follow=True,
+    )
+
+    assert response.status_code == 200
+    awesome_list = AwesomeList.objects.get(source_url="https://github.com/wsvincent/awesome-django")
+    assert awesome_list.name == "Awesome Django"
+    assert queued == [
+        (
+            "apps.repos.tasks.sync_awesome_list_task",
+            awesome_list.id,
+            {"group": "Scan awesome list"},
+        )
+    ]
+    assert "Added Awesome Django and queued a scan." in response.content.decode()
 
 
 @override_settings(SITE_URL="http://example.com")

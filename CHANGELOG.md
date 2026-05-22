@@ -17,11 +17,13 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 ## [Unreleased]
 ### Added
 - Awesome Repos: ingest GitHub awesome-list READMEs, index the linked repositories, and expose searchable repository/list detail pages with stars, freshness, archive-state, and cross-list counts.
+- Awesome Repos: added an admin-panel flow to create new awesome-list sources and queue their initial scan.
 
 ### Fixed
 - Awesome Repos: removed manifest-dependent logo static references so production template rendering works after `collectstatic`.
 
 ### Changed
+- Awesome Repos landing pages now use a minimal header and no longer show sign-in/sign-up navbar buttons.
 - Frontend assets now use Tailwind CLI plus Django staticfiles instead of a JavaScript bundler.
 - AI-assisted development guidance now uses tool-neutral `AGENTS.md` files
   instead of agent-vendor-specific instruction files.

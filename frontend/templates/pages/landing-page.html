@@ -7,7 +7,9 @@
   <p class="mx-auto mt-6 max-w-2xl text-lg text-gray-600 dark:text-gray-300">Ingest awesome-selfhosted, awesome-django, and any other GitHub awesome list. Then filter by stars, freshness, archive status, language, and how many curated lists mention each repository.</p>
   <div class="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
     <a href="{% url 'repos:search' %}" class="rounded-full bg-green-600 px-6 py-3 font-semibold text-white hover:bg-green-700">Explore repos</a>
-    <a href="/admin/repos/awesomelist/add/" class="rounded-full border border-gray-300 px-6 py-3 font-semibold hover:bg-gray-100 dark:border-gray-700 dark:hover:bg-gray-800">Add awesome list</a>
+    {% if user.is_superuser %}
+      <a href="{% url 'admin_panel' %}" class="rounded-full border border-gray-300 px-6 py-3 font-semibold hover:bg-gray-100 dark:border-gray-700 dark:hover:bg-gray-800">Admin panel</a>
+    {% endif %}
   </div>
 </section>
 <section class="mx-auto grid max-w-6xl gap-4 px-6 pb-20 md:grid-cols-3 lg:px-8">

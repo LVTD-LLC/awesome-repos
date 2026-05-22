@@ -26,6 +26,7 @@ def test_login_page_shows_passkey_option(client):
 
     content = response.content.decode()
     assert "Sign in with a passkey" in content
+    assert "Access is invite-only right now." in content
     assert 'id="mfa_login"' in content
     assert "window.webauthnJSON.get(requestOptions)" in content
     assert "X-Requested-With" in content
@@ -183,6 +184,15 @@ def test_dashboard_does_not_show_email_confirmation_reminder(client):
     content = response.content.decode()
     assert "Your email is not yet confirmed" not in content
     assert "Welcome to Awesome Repos" in content
+
+
+def test_landing_page_does_not_show_sign_in_or_sign_up_buttons(client):
+    response = client.get(reverse("landing"))
+
+    assert response.status_code == 200
+    content = response.content.decode()
+    assert "Sign In" not in content
+    assert "Start for Free" not in content
 
 
 def test_settings_requires_email_confirmation_before_passkey_setup(client):

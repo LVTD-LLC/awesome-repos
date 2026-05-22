@@ -1,34 +1,32 @@
-from urllib.parse import urlsplit, urlunsplit, urlencode
-
+from datetime import timedelta
+from urllib.parse import urlsplit, urlunsplit
 
 from allauth.account.internal.flows.email_verification import (
     send_verification_email_to_address,
 )
 from allauth.account.models import EmailAddress
 from allauth.mfa.models import Authenticator
-from django.contrib.auth.decorators import login_required
-from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
-from django.core.cache import cache
-from django.http import HttpResponse, HttpResponseBadRequest
-from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_POST
-from django.contrib.messages.views import SuccessMessageMixin
-from django.shortcuts import redirect
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import logout
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.contrib.auth.models import User
+from django.contrib.messages.views import SuccessMessageMixin
 from django.db import transaction
+from django.db.models import Count
+from django.shortcuts import redirect
 from django.urls import reverse, reverse_lazy
+from django.utils import timezone
+from django.views.decorators.http import require_POST
 from django.views.generic import TemplateView, UpdateView
-
-
+from django_q.tasks import async_task
 
 from apps.core.forms import ProfileUpdateForm
-from apps.core.models import Profile
-
+from apps.core.models import Feedback, Profile
+from apps.repos.forms import AwesomeListCreateForm
+from apps.repos.models import AwesomeList
 from awesome_repos.utils import get_awesome_repos_logger
-
-
 
 logger = get_awesome_repos_logger(__name__)
 NEW_API_KEY_SESSION_KEY = "new_api_key"
@@ -39,7 +37,9 @@ def build_absolute_public_url(path: str) -> str:
     base_url = settings.SITE_URL.rstrip("/")
     parsed = urlsplit(base_url)
     hostname = parsed.hostname or ""
-    is_local = hostname in {"localhost", "127.0.0.1", "0.0.0.0", "::1"} or hostname.endswith(".localhost")
+    is_local = hostname in {"localhost", "127.0.0.1", "0.0.0.0", "::1"} or hostname.endswith(
+        ".localhost"
+    )
 
     if parsed.scheme == "http" and not is_local:
         parsed = parsed._replace(scheme="https")
@@ -204,12 +204,6 @@ class AdminPanelView(UserPassesTestMixin, TemplateView):
         return redirect("home")
 
     def get_context_data(self, **kwargs):
-        from django.db.models import Count
-        from django.contrib.auth.models import User
-        from django.utils import timezone
-        from datetime import timedelta
-        from apps.core.models import Profile, Feedback
-
         context = super().get_context_data(**kwargs)
 
         now = timezone.now()
@@ -224,8 +218,14 @@ class AdminPanelView(UserPassesTestMixin, TemplateView):
         new_users_month = User.objects.filter(date_joined__gte=month_ago).count()
         feedback_week = Feedback.objects.filter(created_at__gte=week_ago).count()
 
-        recent_users = User.objects.select_related('profile').order_by('-date_joined')[:10]
-        recent_feedback = Feedback.objects.select_related('profile__user').order_by('-created_at')[:10]
+        recent_users = User.objects.select_related("profile").order_by("-date_joined")[:10]
+        recent_feedback = Feedback.objects.select_related("profile__user").order_by(
+            "-created_at"
+        )[:10]
+        recent_awesome_lists = AwesomeList.objects.annotate(item_count=Count("items")).order_by(
+            "-last_scanned_at",
+            "name",
+        )[:10]
 
         # Calculate average users per day for last 30 days
         avg_users_per_day = new_users_month / 30 if new_users_month > 0 else 0
@@ -240,15 +240,33 @@ class AdminPanelView(UserPassesTestMixin, TemplateView):
             'recent_users': recent_users,
             'recent_feedback': recent_feedback,
             'avg_users_per_day': avg_users_per_day,
+            'awesome_list_form': kwargs.get('awesome_list_form') or AwesomeListCreateForm(),
+            'recent_awesome_lists': recent_awesome_lists,
         })
 
         logger.info(
             "Admin panel accessed",
             email=self.request.user.email,
-            profile_id=self.request.user.profile.id
+            profile_id=self.request.user.profile.id,
         )
 
         return context
 
+    def post(self, request, *args, **kwargs):
+        form = AwesomeListCreateForm(request.POST)
+        if form.is_valid():
+            awesome_list = form.save()
+            async_task(
+                "apps.repos.tasks.sync_awesome_list_task",
+                awesome_list.id,
+                group="Scan awesome list",
+            )
+            messages.success(
+                request,
+                f"Added {awesome_list.name} and queued a scan.",
+            )
+            return redirect("admin_panel")
 
+        context = self.get_context_data(awesome_list_form=form)
+        return self.render_to_response(context)
 
