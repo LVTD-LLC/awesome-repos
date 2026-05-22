@@ -41,7 +41,11 @@ class TestHomeView:
 
 
 @pytest.mark.django_db
-def test_admin_panel_can_add_awesome_list_and_queue_scan(client, monkeypatch):
+def test_admin_panel_can_add_awesome_list_and_queue_scan(
+    client,
+    monkeypatch,
+    sync_state_transitions,
+):
     user = get_user_model().objects.create_superuser(
         username="admin",
         email="admin@example.com",
@@ -55,12 +59,12 @@ def test_admin_panel_can_add_awesome_list_and_queue_scan(client, monkeypatch):
         queued.append((func_path, awesome_list_id, kwargs))
 
     monkeypatch.setattr("apps.core.views.async_task", fake_async_task)
+    monkeypatch.setattr("apps.core.views.transaction.on_commit", lambda callback: callback())
 
     response = client.post(
         reverse("admin_panel"),
         data={
             "source_url": "https://github.com/wsvincent/awesome-django",
-            "name": "Awesome Django",
         },
         follow=True,
     )

@@ -4,11 +4,13 @@ import pytest
 from django.urls import reverse
 from django.utils import timezone
 
+from apps.repos.forms import AwesomeListCreateForm
 from apps.repos.models import AwesomeList, AwesomeListItem, Repository
 from apps.repos.services import (
     extract_github_repos,
     parse_github_repo_url,
     repository_search_queryset,
+    sync_awesome_list,
 )
 
 
@@ -34,6 +36,47 @@ def test_extract_github_repos_dedupes_and_skips_non_repo_paths():
     - duplicate https://github.com/django/django
     """
     assert extract_github_repos(markdown) == ["django/django", "paperless-ngx/paperless-ngx"]
+
+
+@pytest.mark.django_db
+def test_awesome_list_form_derives_name_and_unique_slug_from_url():
+    AwesomeList.objects.create(
+        name="Awesome Django",
+        slug="awesome-django",
+        source_url="https://github.com/old/awesome-django",
+    )
+
+    form = AwesomeListCreateForm(
+        data={"source_url": "https://github.com/wsvincent/awesome-django"}
+    )
+
+    assert form.is_valid()
+    awesome_list = form.save()
+
+    assert awesome_list.name == "Awesome Django"
+    assert awesome_list.slug == "awesome-django-2"
+
+
+@pytest.mark.django_db
+def test_sync_awesome_list_marks_empty_scan_as_error(monkeypatch):
+    awesome_list = AwesomeList.objects.create(
+        name="Empty List",
+        slug="empty-list",
+        source_url="https://github.com/example/empty-list",
+        repo_full_name="example/empty-list",
+    )
+
+    monkeypatch.setattr(
+        "apps.repos.services.fetch_awesome_readme",
+        lambda full_name: ("# Empty\n", {"full_name": full_name, "description": ""}),
+    )
+
+    result = sync_awesome_list(awesome_list)
+    awesome_list.refresh_from_db()
+
+    assert result["discovered"] == 0
+    assert result["synced"] == 0
+    assert awesome_list.last_error == "No GitHub repository links found in README."
 
 
 @pytest.mark.django_db

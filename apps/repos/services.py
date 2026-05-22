@@ -13,6 +13,9 @@ from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
 from apps.repos.models import AwesomeList, AwesomeListItem, Repository
+from awesome_repos.utils import get_awesome_repos_logger
+
+logger = get_awesome_repos_logger(__name__)
 
 GITHUB_REPO_RE = re.compile(
     r"https?://github\.com/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)(?:[/#?][^\s)\]>'\"]*)?",
@@ -134,10 +137,37 @@ def upsert_repository_from_github(full_name: str) -> Repository:
 @transaction.atomic
 def sync_awesome_list(awesome_list: AwesomeList, limit: int | None = None) -> dict:
     full_name = awesome_list.repo_full_name or parse_github_repo_url(awesome_list.source_url)
+    logger.info(
+        "awesome_list_scan_started",
+        awesome_list_id=awesome_list.id,
+        awesome_list_slug=awesome_list.slug,
+        source_url=awesome_list.source_url,
+        repo_full_name=full_name,
+        limit=limit,
+    )
     markdown, meta = fetch_awesome_readme(full_name)
     repo_names = extract_github_repos(markdown)
     if limit:
         repo_names = repo_names[:limit]
+
+    if not repo_names:
+        awesome_list.last_scanned_at = timezone.now()
+        awesome_list.last_error = "No GitHub repository links found in README."
+        awesome_list.save(update_fields=["last_scanned_at", "last_error", "updated_at"])
+        logger.warning(
+            "awesome_list_scan_found_no_repos",
+            awesome_list_id=awesome_list.id,
+            awesome_list_slug=awesome_list.slug,
+            repo_full_name=full_name,
+        )
+        return {
+            "awesome_list": awesome_list.slug,
+            "discovered": 0,
+            "synced": 0,
+            "created_links": 0,
+            "failures": [],
+            "failure_count": 0,
+        }
 
     awesome_list.repo_full_name = meta.get("full_name", full_name)
     awesome_list.description = meta.get("description") or awesome_list.description
@@ -167,6 +197,20 @@ def sync_awesome_list(awesome_list: AwesomeList, limit: int | None = None) -> di
             created_links += int(created)
         except Exception as exc:  # noqa: BLE001 - keep one bad repo from killing a scan
             failures.append({"repo": repo_name, "error": str(exc)})
+
+    if failures:
+        awesome_list.last_error = f"{len(failures)} repo(s) failed to sync."
+        awesome_list.save(update_fields=["last_error", "updated_at"])
+
+    logger.info(
+        "awesome_list_scan_finished",
+        awesome_list_id=awesome_list.id,
+        awesome_list_slug=awesome_list.slug,
+        discovered=len(repo_names),
+        synced=synced,
+        created_links=created_links,
+        failure_count=len(failures),
+    )
 
     return {
         "awesome_list": awesome_list.slug,

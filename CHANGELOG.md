@@ -19,6 +19,10 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Awesome Repos: ingest GitHub awesome-list READMEs, index the linked repositories, and expose searchable repository/list detail pages with stars, freshness, archive-state, and cross-list counts.
 - Awesome Repos: added an admin-panel flow to create new awesome-list sources and queue their initial scan.
 
+### Changed
+- Awesome Repos admin-panel add flow now only asks for the GitHub URL; list names and slugs are derived automatically from the source repo.
+- Awesome-list scans now log start/finish/failure details and surface empty scans or sync failures in the admin panel.
+
 ### Fixed
 - Awesome Repos: removed manifest-dependent logo static references so production template rendering works after `collectstatic`.
 
