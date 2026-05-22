@@ -350,7 +350,6 @@ def repository_performance_summary(repository: Repository, limit: int = 12) -> d
     }
 
 
-@transaction.atomic
 def sync_awesome_list(awesome_list: AwesomeList, limit: int | None = None) -> dict:
     full_name = awesome_list.repo_full_name or parse_github_repo_url(awesome_list.source_url)
     logger.info(
