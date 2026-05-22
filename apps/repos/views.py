@@ -107,7 +107,9 @@ class RepositorySearchView(ListView):
         )
         context["topic_options"] = repository_json_value_counts("topics")
         context["generated_tag_options"] = repository_json_value_counts("generated_tags")
-        context["params"] = self.request.GET.copy()
+        params = self.request.GET.copy()
+        params.pop("page", None)
+        context["querystring"] = params.urlencode()
         context["total_repositories"] = Repository.objects.count()
         context["total_lists"] = AwesomeList.objects.filter(is_active=True).count()
         return context

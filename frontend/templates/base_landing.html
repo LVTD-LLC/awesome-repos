@@ -95,40 +95,6 @@
   {% endif %}
 
   <div class="min-h-screen bg-white text-gray-900 dark:bg-gray-950 dark:text-gray-100">
-    <header class="sticky left-0 top-3 z-10">
-      <div class="mx-auto w-full max-w-[1376px] px-4">
-        <div class="flex items-center justify-between gap-2 rounded-xl border border-gray-200 bg-white px-4 py-3.5 dark:border-gray-800 dark:bg-gray-900 md:px-6 lg:rounded-full">
-          <a href="{% url 'landing' %}" class="flex items-center gap-2" aria-label="Awesome Repos home">
-            <img src="{% static 'brand/awesome-repos-mark.svg' %}" alt="" width="32" height="32" class="h-8 w-8" />
-            <span class="text-base font-semibold text-gray-900 dark:text-gray-100">Awesome Repos</span>
-          </a>
-
-          <button
-            type="button"
-            data-theme-toggle
-            class="inline-flex h-11 w-11 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-900 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:hover:bg-gray-800"
-            aria-label="Toggle theme"
-          >
-            <span class="sr-only" data-theme-label>Theme</span>
-            <svg data-theme-icon="light" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5">
-              <circle cx="12" cy="12" r="4" />
-              <path d="M12 2v2" />
-              <path d="M12 20v2" />
-              <path d="M4.93 4.93l1.41 1.41" />
-              <path d="M17.66 17.66l1.41 1.41" />
-              <path d="M2 12h2" />
-              <path d="M20 12h2" />
-              <path d="M4.93 19.07l1.41-1.41" />
-              <path d="M17.66 6.34l1.41-1.41" />
-            </svg>
-            <svg data-theme-icon="dark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="hidden w-5 h-5">
-              <path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z" />
-            </svg>
-          </button>
-        </div>
-      </div>
-    </header>
-
     <div class="px-2 sm:px-0">
       {% block content %}
       {% endblock content %}

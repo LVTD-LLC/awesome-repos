@@ -187,7 +187,7 @@ def delete_account(request):
         user.delete()
 
     logger.info("User account deleted", user_id=user_id)
-    return redirect(f"{reverse('landing')}?account_deleted=1")
+    return redirect(f"{reverse('repos:search')}?account_deleted=1")
 
 
 
