@@ -1,0 +1,19 @@
+{% if chatwoot_website_token and chatwoot_base_url %}
+<script>
+  (function (d, t) {
+    var BASE_URL = "{{ chatwoot_base_url|escapejs }}";
+    var g = d.createElement(t);
+    var s = d.getElementsByTagName(t)[0];
+    g.src = BASE_URL + "/packs/js/sdk.js";
+    g.defer = true;
+    g.async = true;
+    s.parentNode.insertBefore(g, s);
+    g.onload = function () {
+      window.chatwootSDK.run({
+        websiteToken: "{{ chatwoot_website_token|escapejs }}",
+        baseUrl: BASE_URL,
+      });
+    };
+  })(document, "script");
+</script>
+{% endif %}
