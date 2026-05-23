@@ -1,10 +1,14 @@
+import json
+from datetime import timedelta
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
-from django.test import SimpleTestCase
+import pytest
 from django.http import HttpRequest
+from django.test import SimpleTestCase
+from django.utils import timezone
 
-
+from apps.repos.models import AwesomeList, AwesomeListItem, Repository, RepositorySnapshot
 
 
 class PlaceholderApiTests(SimpleTestCase):
@@ -29,7 +33,6 @@ class UserInfoApiUnitTests(SimpleTestCase):
             id=11,
             user=user,
             state="signed_up",
-            
         )
         request = HttpRequest()
         request.auth = profile
@@ -74,6 +77,428 @@ def test_api_key_auth_returns_profile_for_valid_key():
 
     assert response is None
     objects.select_related.assert_not_called()
+
+
+def _api_key_header(profile):
+    return {"HTTP_X_API_KEY": profile.rotate_api_key()}
+
+
+def _mcp_headers(api_key):
+    return {
+        "HTTP_AUTHORIZATION": f"Bearer {api_key}",
+        "HTTP_ACCEPT": "application/json, text/event-stream",
+        "HTTP_MCP_PROTOCOL_VERSION": "2025-11-25",
+    }
+
+
+@pytest.mark.django_db
+def test_repository_search_api_uses_existing_filters(client, profile):
+    awesome_list = AwesomeList.objects.create(
+        name="Awesome Django",
+        slug="awesome-django",
+        source_url="https://github.com/wsvincent/awesome-django",
+        repo_full_name="wsvincent/awesome-django",
+        stars=1200,
+    )
+    django_repo = Repository.objects.create(
+        full_name="django/django",
+        owner="django",
+        name="django",
+        url="https://github.com/django/django",
+        description="Python web framework",
+        language="Python",
+        stars=90000,
+        topics=["django", "web"],
+        generated_tags=["web-framework"],
+    )
+    Repository.objects.create(
+        full_name="expressjs/express",
+        owner="expressjs",
+        name="express",
+        url="https://github.com/expressjs/express",
+        description="Node web framework",
+        language="JavaScript",
+        stars=65000,
+        topics=["node", "web"],
+    )
+    AwesomeListItem.objects.create(awesome_list=awesome_list, repository=django_repo)
+
+    response = client.get(
+        "/api/repositories",
+        {
+            "q": "framework",
+            "language": "Python",
+            "min_stars": "100",
+            "topic": "django",
+            "sort": "stars",
+        },
+        **_api_key_header(profile),
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["pagination"]["count"] == 1
+    assert payload["results"][0]["full_name"] == "django/django"
+    assert payload["results"][0]["awesome_count"] == 1
+    assert payload["results"][0]["awesome_lists"][0]["slug"] == "awesome-django"
+
+
+@pytest.mark.django_db
+def test_repository_detail_api_includes_history(client, profile):
+    repository = Repository.objects.create(
+        full_name="django/django",
+        owner="django",
+        name="django",
+        url="https://github.com/django/django",
+        description="Python web framework",
+        language="Python",
+        stars=90000,
+        forks=32000,
+        watchers=500,
+        commit_count=100,
+        readme="# Django",
+        ai_development_signals=[{"tool": "Codex", "path": "AGENTS.md"}],
+        uses_ai_for_development=True,
+    )
+    RepositorySnapshot.objects.create(
+        repository=repository,
+        captured_at=timezone.now() - timedelta(days=2),
+        stars=89900,
+        forks=31900,
+        watchers=490,
+        commit_count=95,
+    )
+    RepositorySnapshot.objects.create(
+        repository=repository,
+        captured_at=timezone.now() - timedelta(days=1),
+        stars=90000,
+        forks=32000,
+        watchers=500,
+        commit_count=100,
+    )
+
+    response = client.get(
+        "/api/repositories/django/django",
+        **_api_key_header(profile),
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["full_name"] == "django/django"
+    assert payload["readme"] == "# Django"
+    assert payload["performance"]["has_history"] is True
+    assert payload["performance"]["stars_since_first"] == 100
+    assert [point["stars"] for point in payload["history"]] == [89900, 90000]
+    assert payload["ai_development_signals"] == [{"tool": "Codex", "path": "AGENTS.md"}]
+
+
+@pytest.mark.django_db
+def test_awesome_list_api_search_detail_and_repository_filters(client, profile):
+    awesome_list = AwesomeList.objects.create(
+        name="Awesome Django",
+        slug="awesome-django",
+        source_url="https://github.com/wsvincent/awesome-django",
+        repo_full_name="wsvincent/awesome-django",
+        description="Curated Django resources",
+        topics=["django", "awesome-list"],
+        stars=1200,
+        readme_repository_count=20,
+        last_scanned_at=timezone.now(),
+    )
+    AwesomeList.objects.create(
+        name="Inactive List",
+        slug="inactive-list",
+        source_url="https://github.com/example/inactive-list",
+        is_active=False,
+    )
+    django_repo = Repository.objects.create(
+        full_name="django/django",
+        owner="django",
+        name="django",
+        url="https://github.com/django/django",
+        description="Python web framework",
+        language="Python",
+        stars=90000,
+        forks=32000,
+    )
+    node_repo = Repository.objects.create(
+        full_name="expressjs/express",
+        owner="expressjs",
+        name="express",
+        url="https://github.com/expressjs/express",
+        description="Node web framework",
+        language="JavaScript",
+        stars=65000,
+        forks=12000,
+    )
+    AwesomeListItem.objects.create(awesome_list=awesome_list, repository=django_repo)
+    AwesomeListItem.objects.create(awesome_list=awesome_list, repository=node_repo)
+
+    search_response = client.get(
+        "/api/awesome-lists",
+        {"q": "django"},
+        **_api_key_header(profile),
+    )
+
+    assert search_response.status_code == 200
+    search_payload = search_response.json()
+    assert search_payload["pagination"]["count"] == 1
+    assert search_payload["totals"]["total_lists"] == 1
+    assert search_payload["results"][0]["indexed_repo_count"] == 2
+
+    detail_response = client.get(
+        "/api/awesome-lists/awesome-django",
+        **_api_key_header(profile),
+    )
+
+    assert detail_response.status_code == 200
+    detail_payload = detail_response.json()
+    assert detail_payload["awesome_list"]["slug"] == "awesome-django"
+    assert detail_payload["repo_stats"]["total_stars"] == 155000
+    assert detail_payload["language_counts"] == [
+        {"name": "JavaScript", "count": 1},
+        {"name": "Python", "count": 1},
+    ]
+
+    repos_response = client.get(
+        "/api/awesome-lists/awesome-django/repositories",
+        {"language": "Python"},
+        **_api_key_header(profile),
+    )
+
+    assert repos_response.status_code == 200
+    repos_payload = repos_response.json()
+    assert repos_payload["pagination"]["count"] == 1
+    assert repos_payload["results"][0]["full_name"] == "django/django"
+
+
+@pytest.mark.django_db
+def test_mcp_initialize_and_tools_list(client, profile):
+    api_key = profile.rotate_api_key()
+
+    initialize_response = client.post(
+        "/mcp",
+        data=json.dumps(
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "initialize",
+                "params": {
+                    "protocolVersion": "2025-11-25",
+                    "capabilities": {},
+                    "clientInfo": {"name": "pytest", "version": "1.0.0"},
+                },
+            }
+        ),
+        content_type="application/json",
+        **_mcp_headers(api_key),
+    )
+
+    assert initialize_response.status_code == 200
+    initialize_payload = initialize_response.json()
+    assert initialize_payload["result"]["protocolVersion"] == "2025-11-25"
+    assert initialize_payload["result"]["capabilities"] == {"tools": {"listChanged": False}}
+    assert initialize_payload["result"]["serverInfo"]["name"] == "awesome-repos"
+
+    tools_response = client.post(
+        "/mcp",
+        data=json.dumps({"jsonrpc": "2.0", "id": 2, "method": "tools/list"}),
+        content_type="application/json",
+        **_mcp_headers(api_key),
+    )
+
+    assert tools_response.status_code == 200
+    tool_names = {tool["name"] for tool in tools_response.json()["result"]["tools"]}
+    assert {
+        "search_repositories",
+        "get_repository",
+        "search_awesome_lists",
+        "get_awesome_list",
+        "search_awesome_list_repositories",
+    } <= tool_names
+
+
+@pytest.mark.django_db
+def test_mcp_search_repositories_tool_uses_shared_search_service(client, profile):
+    awesome_list = AwesomeList.objects.create(
+        name="Awesome Django",
+        slug="awesome-django",
+        source_url="https://github.com/wsvincent/awesome-django",
+        repo_full_name="wsvincent/awesome-django",
+    )
+    django_repo = Repository.objects.create(
+        full_name="django/django",
+        owner="django",
+        name="django",
+        url="https://github.com/django/django",
+        description="Python web framework",
+        language="Python",
+        stars=90000,
+        topics=["django", "web"],
+    )
+    Repository.objects.create(
+        full_name="expressjs/express",
+        owner="expressjs",
+        name="express",
+        url="https://github.com/expressjs/express",
+        description="Node web framework",
+        language="JavaScript",
+        stars=65000,
+        topics=["node", "web"],
+    )
+    AwesomeListItem.objects.create(awesome_list=awesome_list, repository=django_repo)
+
+    response = client.post(
+        "/mcp",
+        data=json.dumps(
+            {
+                "jsonrpc": "2.0",
+                "id": 3,
+                "method": "tools/call",
+                "params": {
+                    "name": "search_repositories",
+                    "arguments": {
+                        "q": "framework",
+                        "language": "Python",
+                        "topic": "django",
+                    },
+                },
+            }
+        ),
+        content_type="application/json",
+        **_mcp_headers(profile.rotate_api_key()),
+    )
+
+    assert response.status_code == 200
+    result = response.json()["result"]
+    assert result["isError"] is False
+    assert result["structuredContent"]["pagination"]["count"] == 1
+    assert result["structuredContent"]["results"][0]["full_name"] == "django/django"
+    assert "django/django" in result["content"][0]["text"]
+
+
+@pytest.mark.django_db
+def test_mcp_auth_origin_get_and_notification_handling(client, profile):
+    message = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "tools/list"})
+
+    unauthenticated_response = client.post(
+        "/mcp",
+        data=message,
+        content_type="application/json",
+    )
+
+    assert unauthenticated_response.status_code == 401
+
+    invalid_origin_response = client.post(
+        "/mcp",
+        data=message,
+        content_type="application/json",
+        HTTP_ORIGIN="https://evil.example",
+        **_mcp_headers(profile.rotate_api_key()),
+    )
+
+    assert invalid_origin_response.status_code == 403
+
+    get_response = client.get(
+        "/mcp",
+        HTTP_ACCEPT="text/event-stream",
+    )
+
+    assert get_response.status_code == 405
+
+    notification_response = client.post(
+        "/mcp",
+        data=json.dumps({"jsonrpc": "2.0", "method": "notifications/initialized"}),
+        content_type="application/json",
+        **_mcp_headers(profile.rotate_api_key()),
+    )
+
+    assert notification_response.status_code == 202
+    assert notification_response.content == b""
+
+
+@pytest.mark.django_db
+def test_superuser_api_can_create_lists_and_queue_refreshes(client, django_user_model, monkeypatch):
+    admin = django_user_model.objects.create_superuser(
+        username="admin",
+        email="admin@example.com",
+        password="password123",
+    )
+    admin_api_key = admin.profile.rotate_api_key()
+    headers = {"HTTP_X_API_KEY": admin_api_key}
+    queued = []
+
+    def fake_async_task(func_path, *args, **kwargs):
+        queued.append((func_path, args, kwargs))
+        return "task-1"
+
+    monkeypatch.setattr("apps.api.views.async_task", fake_async_task)
+    monkeypatch.setattr("apps.api.views.transaction.on_commit", lambda callback: callback())
+
+    create_response = client.post(
+        "/api/awesome-lists",
+        data=json.dumps(
+            {
+                "source_url": "https://github.com/wsvincent/awesome-django",
+                "queue_scan": True,
+            }
+        ),
+        content_type="application/json",
+        **headers,
+    )
+
+    assert create_response.status_code == 201
+    awesome_list = AwesomeList.objects.get(slug="awesome-django")
+    assert create_response.json()["awesome_list"]["repo_full_name"] == "wsvincent/awesome-django"
+    assert queued == [
+        (
+            "apps.repos.tasks.sync_awesome_list_task",
+            (awesome_list.id,),
+            {"group": "Scan awesome list"},
+        )
+    ]
+
+    repo = Repository.objects.create(
+        full_name="django/django",
+        owner="django",
+        name="django",
+        url="https://github.com/django/django",
+    )
+
+    list_rescan_response = client.post(
+        "/api/awesome-lists/awesome-django/rescan",
+        **headers,
+    )
+    discover_response = client.post(
+        "/api/awesome-lists/awesome-django/discover-missing",
+        **headers,
+    )
+    repo_rescan_response = client.post(
+        "/api/repositories/django/django/rescan",
+        **headers,
+    )
+
+    assert list_rescan_response.status_code == 200
+    assert list_rescan_response.json()["queued"] is True
+    assert discover_response.status_code == 200
+    assert repo_rescan_response.status_code == 200
+    assert queued[-3:] == [
+        (
+            "apps.repos.tasks.sync_awesome_list_task",
+            (awesome_list.id,),
+            {"group": "Scan awesome list"},
+        ),
+        (
+            "apps.repos.tasks.enqueue_missing_repositories_for_awesome_list_task",
+            (awesome_list.id,),
+            {"group": "Manual awesome-list missing repo discovery"},
+        ),
+        (
+            "apps.repos.tasks.refresh_repository_task",
+            (repo.id, repo.full_name),
+            {"include_readme": True, "group": "Refresh repositories"},
+        ),
+    ]
 
 
 def test_superuser_api_key_auth_eager_loads_user_and_requires_superuser():

@@ -13,12 +13,14 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
+
 from django.conf import settings
 from django.contrib import admin
 from django.contrib.sitemaps.views import sitemap
 from django.urls import include, path
 from django.views.generic import TemplateView
 
+from apps.api.mcp import mcp_endpoint
 from apps.pages.views import AccountSignupByPasskeyView, AccountSignupView
 from awesome_repos.sitemaps import sitemaps
 
@@ -41,13 +43,11 @@ urlpatterns += [
     path("accounts/", include("allauth.urls")),
     path("anymail/", include("anymail.urls")),
     path("uses", TemplateView.as_view(template_name="pages/uses.html"), name="uses"),
-    
+    path("mcp", mcp_endpoint, name="mcp"),
     path("api/", include("apps.api.urls")),
-    
     path("", include("apps.repos.urls")),
     path("", include("apps.pages.urls")),
     path("", include("apps.core.urls")),
-    
     path(
         "sitemap.xml",
         sitemap,

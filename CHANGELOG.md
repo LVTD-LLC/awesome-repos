@@ -36,6 +36,8 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Awesome Repos: added superuser-only rescan controls on awesome-list and repository detail pages, plus a missing-repository discovery action for awesome lists.
 - Awesome Repos search now has desktop side sponsor placements for future ads.
 - Awesome Repos: show semantically similar repositories on repository detail pages when pgvector embeddings are available.
+- Awesome Repos: added API endpoints for authenticated repository search, awesome-list search/detail, list-scoped repository search, and superuser scan queue actions.
+- Awesome Repos: added an authenticated Streamable HTTP MCP endpoint at `/mcp` for AI agents to search repositories and awesome lists.
 
 ### Changed
 - Awesome Repos: repository search is now the root landing page, with `/repos/` permanently redirecting to `/` and a prominent link to the `/lists/` awesome-list directory.

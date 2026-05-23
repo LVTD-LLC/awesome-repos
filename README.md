@@ -70,6 +70,16 @@ This project keeps Django apps inside the `/apps` directory. This is both for hu
 
 All generated projects include `GET /api/user`, which returns safe account/profile details for the authenticated API key. This is intentionally small but useful as the first "agent can authenticate and know who it is acting for" endpoint.
 
+### MCP endpoint
+
+Awesome Repos exposes a Streamable HTTP MCP endpoint at `/mcp` so users can connect
+AI agents to the same search surface as the API. Use an account API key as either
+`Authorization: Bearer <api-key>` or `X-API-Key: <api-key>`.
+
+The MCP server currently exposes read-only tools for repository search, repository
+detail lookup, awesome-list search, awesome-list detail lookup, and list-scoped
+repository search.
+
 
 
 
@@ -231,5 +241,4 @@ If you generated the project with `use_ci = y`, it includes a GitHub Actions wor
 It boots Postgres + Redis, runs `python manage.py makemigrations --check --dry-run`, then `python manage.py check`, and then runs `pytest`.
 
 If you don’t want CI, set `use_ci = n` during Cookiecutter generation and the workflow will be removed.
-
 
