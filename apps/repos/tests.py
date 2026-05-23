@@ -2715,6 +2715,8 @@ def test_repository_detail_page_renders_performance_history(client):
     assert b"32,000" in response.content
     assert b"Stars history" in response.content
     assert b"Commits history" in response.content
+    assert b"/static/vendors/js/d3.min.js" in response.content
+    assert b"/static/js/modules/repository-history-charts.js" in response.content
     assert b"repository-history-data" in response.content
     assert b"data-metric=\"stars\"" in response.content
     assert b"data-metric=\"commit_count\"" in response.content
@@ -2750,6 +2752,8 @@ def test_repository_detail_page_skips_chart_data_without_history(client, monkeyp
     )
 
     assert response.status_code == 200
+    assert b"/static/vendors/js/d3.min.js" not in response.content
+    assert b"/static/js/modules/repository-history-charts.js" not in response.content
     assert b"repository-history-data" not in response.content
     assert b"Stars history" not in response.content
 
