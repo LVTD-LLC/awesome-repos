@@ -2814,6 +2814,42 @@ def test_regular_user_cannot_queue_awesome_list_rescan(
 
 
 @pytest.mark.django_db
+def test_regular_user_cannot_queue_awesome_list_missing_repo_discovery(
+    client,
+    django_user_model,
+    monkeypatch,
+):
+    django_user_model.objects.create_superuser(
+        username="admin",
+        email="admin@example.com",
+        password="password123",
+    )
+    user = django_user_model.objects.create_user(
+        username="regular",
+        email="regular@example.com",
+        password="password123",
+    )
+    client.force_login(user)
+    awesome_list = AwesomeList.objects.create(
+        name="Awesome Django",
+        slug="awesome-django",
+        source_url="https://github.com/wsvincent/awesome-django",
+    )
+
+    def fail_async_task(*args, **kwargs):
+        raise AssertionError("regular users should not queue missing repo discovery")
+
+    monkeypatch.setattr("apps.repos.views.async_task", fail_async_task)
+    monkeypatch.setattr("apps.repos.views.transaction.on_commit", lambda callback: callback())
+
+    response = client.post(
+        reverse("repos:list_discover_missing", kwargs={"slug": awesome_list.slug})
+    )
+
+    assert response.status_code == 403
+
+
+@pytest.mark.django_db
 def test_repository_detail_page_renders_performance_history(client):
     repo = Repository.objects.create(
         full_name="django/django",
@@ -2940,6 +2976,43 @@ def test_superuser_can_queue_repository_rescan_from_detail(
         )
     ]
     assert "Queued a rescan for django/django." in response.content.decode()
+
+
+@pytest.mark.django_db
+def test_regular_user_cannot_queue_repository_rescan(
+    client,
+    django_user_model,
+    monkeypatch,
+):
+    django_user_model.objects.create_superuser(
+        username="admin",
+        email="admin@example.com",
+        password="password123",
+    )
+    user = django_user_model.objects.create_user(
+        username="regular",
+        email="regular@example.com",
+        password="password123",
+    )
+    client.force_login(user)
+    repo = Repository.objects.create(
+        full_name="django/django",
+        owner="django",
+        name="django",
+        url="https://github.com/django/django",
+    )
+
+    def fail_async_task(*args, **kwargs):
+        raise AssertionError("regular users should not queue repository rescans")
+
+    monkeypatch.setattr("apps.repos.views.async_task", fail_async_task)
+    monkeypatch.setattr("apps.repos.views.transaction.on_commit", lambda callback: callback())
+
+    response = client.post(
+        reverse("repos:repo_rescan", kwargs={"owner": repo.owner, "name": repo.name})
+    )
+
+    assert response.status_code == 403
 
 
 @pytest.mark.django_db
