@@ -40,6 +40,7 @@ from apps.repos.services import (
     parse_github_repo_url,
     repository_performance_summary,
     repository_search_queryset,
+    similar_repositories_for_repository,
     sync_awesome_list,
     update_awesome_list_metadata,
     upsert_repository_from_github,
@@ -2063,6 +2064,91 @@ def test_repository_search_semantic_mode_orders_by_vector(monkeypatch, settings)
 
 
 @pytest.mark.django_db
+def test_similar_repositories_for_repository_orders_by_vector(settings):
+    settings.REPOSITORY_EMBEDDING_MODEL = "openai/text-embedding-3-small"
+    source = Repository.objects.create(
+        full_name="django/django",
+        owner="django",
+        name="django",
+        url="https://github.com/django/django",
+        description="Python web framework",
+        stars=100,
+    )
+    near = Repository.objects.create(
+        full_name="encode/django-rest-framework",
+        owner="encode",
+        name="django-rest-framework",
+        url="https://github.com/encode/django-rest-framework",
+        description="API toolkit for Django",
+        stars=80,
+    )
+    far = Repository.objects.create(
+        full_name="owner/theme",
+        owner="owner",
+        name="theme",
+        url="https://github.com/owner/theme",
+        description="Terminal theme",
+        stars=1000,
+    )
+    stale_model = Repository.objects.create(
+        full_name="owner/stale-model",
+        owner="owner",
+        name="stale-model",
+        url="https://github.com/owner/stale-model",
+        description="Old embedding model",
+        stars=2000,
+    )
+    awesome_list = AwesomeList.objects.create(
+        name="Awesome Django",
+        slug="awesome-django",
+        source_url="https://github.com/wsvincent/awesome-django",
+    )
+    AwesomeListItem.objects.create(awesome_list=awesome_list, repository=near)
+    RepositoryEmbedding.objects.create(
+        repository=source,
+        model="openai/text-embedding-3-small",
+        dimensions=REPOSITORY_EMBEDDING_DIMENSIONS,
+        source_text_hash="s" * 64,
+        source_text_chars=10,
+        embedding=[1.0] + [0.0] * (REPOSITORY_EMBEDDING_DIMENSIONS - 1),
+        embedded_at=timezone.now(),
+    )
+    RepositoryEmbedding.objects.create(
+        repository=near,
+        model="openai/text-embedding-3-small",
+        dimensions=REPOSITORY_EMBEDDING_DIMENSIONS,
+        source_text_hash="n" * 64,
+        source_text_chars=10,
+        embedding=[1.0] + [0.0] * (REPOSITORY_EMBEDDING_DIMENSIONS - 1),
+        embedded_at=timezone.now(),
+    )
+    RepositoryEmbedding.objects.create(
+        repository=far,
+        model="openai/text-embedding-3-small",
+        dimensions=REPOSITORY_EMBEDDING_DIMENSIONS,
+        source_text_hash="f" * 64,
+        source_text_chars=10,
+        embedding=[0.0, 1.0] + [0.0] * (REPOSITORY_EMBEDDING_DIMENSIONS - 2),
+        embedded_at=timezone.now(),
+    )
+    RepositoryEmbedding.objects.create(
+        repository=stale_model,
+        model="older-embedding-model",
+        dimensions=REPOSITORY_EMBEDDING_DIMENSIONS,
+        source_text_hash="o" * 64,
+        source_text_chars=10,
+        embedding=[1.0] + [0.0] * (REPOSITORY_EMBEDDING_DIMENSIONS - 1),
+        embedded_at=timezone.now(),
+    )
+
+    with CaptureQueriesContext(connection) as queries:
+        assert list(similar_repositories_for_repository(source)) == [near, far]
+
+    assert len(queries) == 2
+    assert list(similar_repositories_for_repository(source, limit=1)) == [near]
+
+
+@pytest.mark.django_db
 def test_repository_search_queryset_annotates_tracked_growth():
     repo = Repository.objects.create(
         full_name="django/django",
@@ -2237,7 +2323,7 @@ def test_search_page_exposes_semantic_search_filter(client):
 
 
 @pytest.mark.django_db
-def test_search_page_renders_negative_tracked_growth(client):
+def test_search_page_humanizes_stars_and_hides_tracked_star_growth(client):
     repo = Repository.objects.create(
         full_name="django/django",
         owner="django",
@@ -2245,24 +2331,25 @@ def test_search_page_renders_negative_tracked_growth(client):
         url="https://github.com/django/django",
         description="The Web framework",
         language="Python",
-        stars=80,
+        stars=123456,
     )
     RepositorySnapshot.objects.create(
         repository=repo,
         captured_at=timezone.now() - timedelta(days=2),
-        stars=100,
+        stars=123521,
     )
     RepositorySnapshot.objects.create(
         repository=repo,
         captured_at=timezone.now() - timedelta(days=1),
-        stars=80,
+        stars=123456,
     )
 
     response = client.get(reverse("repos:search"), {"q": "framework"})
 
     assert response.status_code == 200
-    assert b"-20 tracked" in response.content
-    assert b">0 tracked<" not in response.content
+    assert b"123,456" in response.content
+    assert b"-65 tracked" not in response.content
+    assert b" tracked</div>" not in response.content
 
 
 @pytest.mark.django_db
@@ -2338,6 +2425,7 @@ def test_awesome_list_list_page_renders_activity_metrics(client):
     assert b"Inactive List" not in response.content
     assert b"wsvincent/awesome-django" in response.content
     assert b"README repos" in response.content
+    assert b"1,200" in response.content
     assert b"42" in response.content
     assert b"350" in response.content
     assert b"django" in response.content
@@ -2383,6 +2471,8 @@ def test_awesome_list_detail_page_renders_activity_metrics(client):
     assert b"Commits" in response.content
     assert b"django/django" in response.content
     assert b"Python" in response.content
+    assert b"1,200" in response.content
+    assert b"80,000" in response.content
 
 
 @pytest.mark.django_db
@@ -2571,24 +2661,24 @@ def test_repository_detail_page_renders_performance_history(client):
         url="https://github.com/django/django",
         description="The Web framework",
         language="Python",
-        stars=75,
-        forks=12,
+        stars=123456,
+        forks=32000,
         watchers=5,
         commit_count=90,
     )
     RepositorySnapshot.objects.create(
         repository=repo,
         captured_at=timezone.now() - timedelta(days=2),
-        stars=50,
-        forks=10,
+        stars=123431,
+        forks=31990,
         watchers=4,
         commit_count=70,
     )
     RepositorySnapshot.objects.create(
         repository=repo,
         captured_at=timezone.now() - timedelta(days=1),
-        stars=75,
-        forks=12,
+        stars=123456,
+        forks=32000,
         watchers=5,
         commit_count=90,
     )
@@ -2599,7 +2689,67 @@ def test_repository_detail_page_renders_performance_history(client):
 
     assert response.status_code == 200
     assert b"Tracked growth" in response.content
+    assert b"123,456" in response.content
+    assert b"32,000" in response.content
     assert b"+25" in response.content
     assert b"Commits since first" in response.content
     assert b"Commits since last" in response.content
     assert b"+20" in response.content
+
+
+@pytest.mark.django_db
+def test_repository_detail_page_renders_similar_repositories(client, settings):
+    settings.REPOSITORY_EMBEDDING_MODEL = "openai/text-embedding-3-small"
+    repo = Repository.objects.create(
+        full_name="django/django",
+        owner="django",
+        name="django",
+        url="https://github.com/django/django",
+        description="The Web framework",
+        language="Python",
+        stars=75,
+    )
+    similar_repo = Repository.objects.create(
+        full_name="encode/django-rest-framework",
+        owner="encode",
+        name="django-rest-framework",
+        url="https://github.com/encode/django-rest-framework",
+        description="API toolkit for Django",
+        language="Python",
+        stars=30,
+    )
+    Repository.objects.create(
+        full_name="owner/no-vector",
+        owner="owner",
+        name="no-vector",
+        url="https://github.com/owner/no-vector",
+        description="No embedding",
+        stars=1000,
+    )
+    RepositoryEmbedding.objects.create(
+        repository=repo,
+        model="openai/text-embedding-3-small",
+        dimensions=REPOSITORY_EMBEDDING_DIMENSIONS,
+        source_text_hash="r" * 64,
+        source_text_chars=10,
+        embedding=[1.0] + [0.0] * (REPOSITORY_EMBEDDING_DIMENSIONS - 1),
+        embedded_at=timezone.now(),
+    )
+    RepositoryEmbedding.objects.create(
+        repository=similar_repo,
+        model="openai/text-embedding-3-small",
+        dimensions=REPOSITORY_EMBEDDING_DIMENSIONS,
+        source_text_hash="m" * 64,
+        source_text_chars=10,
+        embedding=[1.0] + [0.0] * (REPOSITORY_EMBEDDING_DIMENSIONS - 1),
+        embedded_at=timezone.now(),
+    )
+
+    response = client.get(
+        reverse("repos:repo_detail", kwargs={"owner": "django", "name": "django"})
+    )
+
+    assert response.status_code == 200
+    assert b"Similar repositories" in response.content
+    assert b"encode/django-rest-framework" in response.content
+    assert b"owner/no-vector" not in response.content
