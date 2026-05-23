@@ -49,6 +49,7 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Awesome-list scans now log start/finish/failure details and surface empty scans or sync failures in the admin panel.
 - Awesome Repos: repository detail history now relies on D3 charts instead of duplicating growth cards and a snapshot table.
 - Awesome Repos: GitHub star counts now render with thousands separators, and repository search results no longer show tracked star-growth deltas.
+- Awesome Repos: moved the MCP endpoint into its own Django app and rebuilt it on FastMCP while keeping API and MCP search payloads on shared service functions.
 
 ### Fixed
 - Awesome Repos: repair repository migration graph ordering so production can migrate past the AI-development and activity merge branches.

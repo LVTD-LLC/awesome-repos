@@ -17,6 +17,7 @@ dependencies = [
     "django-structlog>=10.0.0",
     "django-widget-tweaks>=1.5.1",
     "fido2>=2.2.0,<3",
+    "fastmcp>=3.3.1",
     "gunicorn>=26.0.0",
     
     "ipython>=9.13.0",

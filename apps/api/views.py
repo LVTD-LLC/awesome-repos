@@ -22,6 +22,12 @@ from apps.api.schemas import (
     UserSettingsOut,
 )
 from apps.api.services import (
+    serialize_user_info,
+)
+from apps.core.models import Feedback
+from apps.repos.forms import AwesomeListCreateForm
+from apps.repos.models import AwesomeList, Repository
+from apps.repos.search_services import (
     DEFAULT_API_PAGE_SIZE,
     get_awesome_list_detail_payload,
     get_awesome_list_repository_options_payload,
@@ -30,11 +36,7 @@ from apps.api.services import (
     search_awesome_lists_payload,
     search_repositories_payload,
     serialize_awesome_list_summary,
-    serialize_user_info,
 )
-from apps.core.models import Feedback
-from apps.repos.forms import AwesomeListCreateForm
-from apps.repos.models import AwesomeList, Repository
 from apps.repos.views import (
     AWESOME_LIST_SCAN_TASK_GROUP,
     MISSING_REPOSITORY_DISCOVERY_TASK_GROUP,

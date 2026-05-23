@@ -61,6 +61,7 @@ This project keeps Django apps inside the `/apps` directory. This is both for hu
 - `apps/core`: main app functionality (shared domain logic, base models, services, etc.)
 - `apps/docs`: user-facing documentation
 - `apps/api`: all API needs (Django Ninja routers, schemas, API-specific logic)
+- `apps/mcp_server`: MCP server transport and FastMCP tool definitions
 
 - `apps/pages`: landing/marketing pages (pricing, TOS, privacy policy, etc.)
 - `apps/blog`: user-facing blog
@@ -76,9 +77,9 @@ Awesome Repos exposes a Streamable HTTP MCP endpoint at `/mcp` so users can conn
 AI agents to the same search surface as the API. Use an account API key as either
 `Authorization: Bearer <api-key>` or `X-API-Key: <api-key>`.
 
-The MCP server currently exposes read-only tools for repository search, repository
-detail lookup, awesome-list search, awesome-list detail lookup, and list-scoped
-repository search.
+The MCP server lives in `apps/mcp_server/` and is implemented with FastMCP. It reuses the
+same repository and awesome-list search service functions as the HTTP API while
+keeping the MCP transport and tools separate from `apps/api/`.
 
 
 
@@ -241,4 +242,3 @@ If you generated the project with `use_ci = y`, it includes a GitHub Actions wor
 It boots Postgres + Redis, runs `python manage.py makemigrations --check --dry-run`, then `python manage.py check`, and then runs `pytest`.
 
 If you don’t want CI, set `use_ci = n` during Cookiecutter generation and the workflow will be removed.
-
