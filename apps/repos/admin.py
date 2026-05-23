@@ -66,7 +66,7 @@ class AwesomeListRequestAdmin(admin.ModelAdmin):
     list_display = ("repo_full_name", "status", "requester_email", "created_at", "reviewed_at")
     search_fields = ("repo_full_name", "source_url", "requester_email", "note")
     list_filter = ("status", "created_at", "reviewed_at")
-    readonly_fields = ("repo_full_name", "created_at", "updated_at")
+    readonly_fields = ("source_url", "repo_full_name", "created_at", "updated_at")
 
     def save_model(self, request, obj, form, change):
         if obj.status == AwesomeListRequest.Status.PENDING:
