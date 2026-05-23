@@ -20,7 +20,7 @@
     </div>
     <dl class="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
       <div class="rounded-2xl bg-gray-50 p-4 dark:bg-gray-900"><dt class="text-sm text-gray-500">Stars</dt><dd class="text-2xl font-bold">{{ repository.stars|intcomma }}</dd></div>
-      <div class="rounded-2xl bg-gray-50 p-4 dark:bg-gray-900"><dt class="text-sm text-gray-500">Forks</dt><dd class="text-2xl font-bold">{{ repository.forks }}</dd></div>
+      <div class="rounded-2xl bg-gray-50 p-4 dark:bg-gray-900"><dt class="text-sm text-gray-500">Forks</dt><dd class="text-2xl font-bold">{{ repository.forks|intcomma }}</dd></div>
       <div class="rounded-2xl bg-gray-50 p-4 dark:bg-gray-900"><dt class="text-sm text-gray-500">Commits</dt><dd class="text-2xl font-bold">{{ repository.commit_count|default_if_none:"—" }}</dd></div>
       <div class="rounded-2xl bg-gray-50 p-4 dark:bg-gray-900"><dt class="text-sm text-gray-500">Language</dt><dd class="text-2xl font-bold">{{ repository.language|default:"—" }}</dd></div>
       <div class="rounded-2xl bg-gray-50 p-4 dark:bg-gray-900"><dt class="text-sm text-gray-500">Awesome lists</dt><dd class="text-2xl font-bold">{{ repository.awesome_list_count }}</dd></div>
@@ -58,7 +58,7 @@
                 <tr>
                   <td class="px-4 py-3 text-gray-600 dark:text-gray-300">{{ row.snapshot.captured_at|date:"Y-m-d H:i" }}</td>
                   <td class="px-4 py-3 font-semibold">{{ row.snapshot.stars|intcomma }} <span class="text-xs text-gray-500 dark:text-gray-400">{{ row.stars_delta_label }}</span></td>
-                  <td class="px-4 py-3">{{ row.snapshot.forks }} <span class="text-xs text-gray-500 dark:text-gray-400">{{ row.forks_delta_label }}</span></td>
+                  <td class="px-4 py-3">{{ row.snapshot.forks|intcomma }} <span class="text-xs text-gray-500 dark:text-gray-400">{{ row.forks_delta_label }}</span></td>
                   <td class="px-4 py-3">{{ row.snapshot.commit_count|default_if_none:"—" }} <span class="text-xs text-gray-500 dark:text-gray-400">{{ row.commit_delta_label }}</span></td>
                   <td class="px-4 py-3">{{ row.snapshot.open_issues }}</td>
                 </tr>

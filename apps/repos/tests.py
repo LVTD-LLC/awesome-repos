@@ -2261,7 +2261,7 @@ def test_search_page_humanizes_stars_and_hides_tracked_star_growth(client):
     assert response.status_code == 200
     assert b"123,456" in response.content
     assert b"-65 tracked" not in response.content
-    assert b">0 tracked<" not in response.content
+    assert b" tracked</div>" not in response.content
 
 
 @pytest.mark.django_db
@@ -2574,7 +2574,7 @@ def test_repository_detail_page_renders_performance_history(client):
         description="The Web framework",
         language="Python",
         stars=123456,
-        forks=12,
+        forks=32000,
         watchers=5,
         commit_count=90,
     )
@@ -2582,7 +2582,7 @@ def test_repository_detail_page_renders_performance_history(client):
         repository=repo,
         captured_at=timezone.now() - timedelta(days=2),
         stars=123431,
-        forks=10,
+        forks=31990,
         watchers=4,
         commit_count=70,
     )
@@ -2590,7 +2590,7 @@ def test_repository_detail_page_renders_performance_history(client):
         repository=repo,
         captured_at=timezone.now() - timedelta(days=1),
         stars=123456,
-        forks=12,
+        forks=32000,
         watchers=5,
         commit_count=90,
     )
@@ -2602,6 +2602,7 @@ def test_repository_detail_page_renders_performance_history(client):
     assert response.status_code == 200
     assert b"Tracked growth" in response.content
     assert b"123,456" in response.content
+    assert b"32,000" in response.content
     assert b"+25" in response.content
     assert b"Commits since first" in response.content
     assert b"Commits since last" in response.content
