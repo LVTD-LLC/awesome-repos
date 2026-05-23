@@ -1,28 +1,53 @@
+from datetime import timedelta
+
 from django.core.paginator import Paginator
 from django.db import connection
-from django.db.models import Count, F, Max, Q, Sum
+from django.db.models import Count, F, Max, OuterRef, PositiveIntegerField, Q, Subquery, Sum
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from django.views.generic import DetailView, ListView
 
 from apps.repos.models import AwesomeList, AwesomeListItem, Repository
 from apps.repos.services import repository_performance_summary, repository_search_queryset
+from apps.repos.tags import normalize_repository_tag
 
 REPOSITORY_JSON_FILTER_FIELDS = {"topics", "generated_tags"}
+MAX_UPDATED_DAYS_FILTER = 36500
 
 
 def repository_json_value_counts(
     field_name: str,
     *,
+    awesome_list: AwesomeList | None = None,
     limit: int = 200,
 ) -> list[dict[str, int | str]]:
     if field_name not in REPOSITORY_JSON_FILTER_FIELDS:
         raise ValueError(f"Unsupported repository JSON filter field: {field_name}")
 
     table_name = connection.ops.quote_name(Repository._meta.db_table)
+    repository_pk = connection.ops.quote_name(Repository._meta.pk.column)
     column_name = connection.ops.quote_name(field_name)
+    join_clause = ""
+    params = []
+    if awesome_list is not None:
+        item_table = connection.ops.quote_name(AwesomeListItem._meta.db_table)
+        item_repository_id = connection.ops.quote_name(
+            AwesomeListItem._meta.get_field("repository").column
+        )
+        item_list_id = connection.ops.quote_name(
+            AwesomeListItem._meta.get_field("awesome_list").column
+        )
+        join_clause = f"""
+        INNER JOIN {item_table} AS list_item
+            ON list_item.{item_repository_id} = repository.{repository_pk}
+            AND list_item.{item_list_id} = %s
+        """
+        params.append(awesome_list.pk)
+
     query = f"""
         SELECT item.value AS name, COUNT(*) AS count
         FROM {table_name} AS repository
+        {join_clause}
         CROSS JOIN LATERAL jsonb_array_elements_text(repository.{column_name}) AS item(value)
         WHERE jsonb_typeof(repository.{column_name}) = 'array'
             AND item.value <> ''
@@ -30,8 +55,9 @@ def repository_json_value_counts(
         ORDER BY count DESC, item.value ASC
         LIMIT %s
     """
+    params.append(limit)
     with connection.cursor() as cursor:
-        cursor.execute(query, [limit])
+        cursor.execute(query, params)
         return [{"name": name, "count": count} for name, count in cursor.fetchall()]
 
 
@@ -43,9 +69,7 @@ def awesome_list_directory_totals() -> dict:
     list_last_scanned_at = connection.ops.quote_name("last_scanned_at")
     list_readme_repository_count = connection.ops.quote_name("readme_repository_count")
     list_stars = connection.ops.quote_name("stars")
-    item_list_id = connection.ops.quote_name(
-        AwesomeListItem._meta.get_field("awesome_list").column
-    )
+    item_list_id = connection.ops.quote_name(AwesomeListItem._meta.get_field("awesome_list").column)
     query = f"""
         SELECT
             COUNT(*) AS total_lists,
@@ -82,6 +106,103 @@ def awesome_list_directory_totals() -> dict:
     }
 
 
+def _positive_int_param(params, name: str) -> int | None:
+    value = (params.get(name) or "").strip()
+    if not value:
+        return None
+    try:
+        parsed = int(value)
+    except ValueError:
+        return None
+    if parsed < 0:
+        return None
+    return parsed
+
+
+def _apply_list_repository_keyword_filter(qs, params):
+    q = (params.get("q") or "").strip()
+    if q:
+        return qs.filter(
+            Q(full_name__icontains=q)
+            | Q(description__icontains=q)
+            | Q(language__icontains=q)
+            | Q(license_name__icontains=q)
+            | Q(topics__icontains=q)
+            | Q(generated_tags__icontains=q)
+        )
+    return qs
+
+
+def _apply_list_repository_taxonomy_filters(qs, params):
+    language = (params.get("language") or "").strip()
+    if language:
+        qs = qs.filter(language__iexact=language)
+
+    topic = normalize_repository_tag(params.get("topic") or "")
+    if topic:
+        qs = qs.filter(topics__contains=[topic])
+
+    generated_tag = normalize_repository_tag(params.get("generated_tag") or "")
+    if generated_tag:
+        qs = qs.filter(generated_tags__contains=[generated_tag])
+    return qs
+
+
+def _apply_list_repository_state_filters(qs, params):
+    min_stars = _positive_int_param(params, "min_stars")
+    if min_stars is not None:
+        qs = qs.filter(stars__gte=min_stars)
+
+    updated_days = _positive_int_param(params, "updated_days")
+    if updated_days and updated_days <= MAX_UPDATED_DAYS_FILTER:
+        cutoff = timezone.now() - timedelta(days=updated_days)
+        qs = qs.filter(github_pushed_at__gte=cutoff)
+
+    archived = params.get("archived")
+    if archived == "yes":
+        qs = qs.filter(is_archived=True)
+    elif archived == "no":
+        qs = qs.filter(is_archived=False)
+
+    ai_development = params.get("ai_development")
+    if ai_development == "yes":
+        qs = qs.filter(uses_ai_for_development=True)
+    elif ai_development == "no":
+        qs = qs.filter(uses_ai_for_development=False)
+    return qs
+
+
+def _order_list_repositories(qs, params):
+    sort = params.get("sort") or "stars"
+    sort_map = {
+        "stars": "-stars",
+        "forks": "-forks",
+        "recent": F("github_pushed_at").desc(nulls_last=True),
+        "created": F("github_created_at").desc(nulls_last=True),
+        "commits": F("commit_count").desc(nulls_last=True),
+        "awesome": F("awesome_count").desc(nulls_last=True),
+        "least_awesome": F("awesome_count").asc(nulls_last=True),
+        "name": "full_name",
+    }
+    return qs.order_by(sort_map.get(sort, "-stars"), "full_name")
+
+
+def awesome_list_repository_queryset(awesome_list: AwesomeList, params):
+    mention_count = (
+        AwesomeListItem.objects.filter(repository=OuterRef("pk"))
+        .values("repository")
+        .annotate(total=Count("id"))
+        .values("total")
+    )
+    qs = Repository.objects.filter(awesome_items__awesome_list=awesome_list).annotate(
+        awesome_count=Subquery(mention_count, output_field=PositiveIntegerField())
+    )
+    qs = _apply_list_repository_keyword_filter(qs, params)
+    qs = _apply_list_repository_taxonomy_filters(qs, params)
+    qs = _apply_list_repository_state_filters(qs, params)
+    return _order_list_repositories(qs, params)
+
+
 class RepositorySearchView(ListView):
     template_name = "repos/search.html"
     context_object_name = "repositories"
@@ -95,9 +216,9 @@ class RepositorySearchView(ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["awesome_lists"] = (
-            AwesomeList.objects.filter(is_active=True).annotate(repo_count=Count("items")).order_by(
-                "name"
-            )
+            AwesomeList.objects.filter(is_active=True)
+            .annotate(repo_count=Count("items"))
+            .order_by("name")
         )
         context["languages"] = (
             Repository.objects.exclude(language="")
@@ -189,11 +310,33 @@ class AwesomeListDetailView(DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        repos = Repository.objects.filter(awesome_items__awesome_list=self.object).order_by(
-            "-stars",
-            "full_name",
+        repos = awesome_list_repository_queryset(self.object, self.request.GET)
+        all_list_repos = Repository.objects.filter(awesome_items__awesome_list=self.object)
+        params = self.request.GET.copy()
+        params.pop("page", None)
+        filter_names = (
+            "q",
+            "language",
+            "topic",
+            "generated_tag",
+            "min_stars",
+            "updated_days",
+            "archived",
+            "ai_development",
         )
-        context["repo_stats"] = repos.aggregate(
+        context["filters_applied"] = any(params.get(name) for name in filter_names)
+        context["querystring"] = params.urlencode()
+        context["languages"] = (
+            all_list_repos.exclude(language="")
+            .values_list("language", flat=True)
+            .distinct()
+            .order_by("language")
+        )
+        context["topic_options"] = repository_json_value_counts("topics", awesome_list=self.object)
+        context["generated_tag_options"] = repository_json_value_counts(
+            "generated_tags", awesome_list=self.object
+        )
+        context["repo_stats"] = all_list_repos.aggregate(
             total_stars=Sum("stars"),
             total_forks=Sum("forks"),
             active_count=Count("id", filter=Q(is_archived=False)),
@@ -201,7 +344,7 @@ class AwesomeListDetailView(DetailView):
             latest_repo_push=Max("github_pushed_at"),
         )
         context["language_counts"] = (
-            repos.exclude(language="")
+            all_list_repos.exclude(language="")
             .values("language")
             .annotate(count=Count("id"))
             .order_by("-count", "language")[:12]
