@@ -889,6 +889,28 @@ def repository_performance_summary(repository: Repository, limit: int = 12) -> d
     }
 
 
+def repository_history_chart_data(
+    repository: Repository,
+    *,
+    limit: int = 365,
+) -> list[dict[str, int | str | None]]:
+    snapshots = list(
+        repository.snapshots.order_by("-captured_at", "-id").only(
+            "captured_at",
+            "stars",
+            "commit_count",
+        )[:limit]
+    )
+    return [
+        {
+            "captured_at": snapshot.captured_at.isoformat(),
+            "stars": snapshot.stars,
+            "commit_count": snapshot.commit_count,
+        }
+        for snapshot in reversed(snapshots)
+    ]
+
+
 def sync_awesome_list(awesome_list: AwesomeList, limit: int | None = None) -> dict:
     full_name = awesome_list.repo_full_name or parse_github_repo_url(awesome_list.source_url)
     logger.info(

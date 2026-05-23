@@ -81,6 +81,7 @@
   <script defer src="{% static 'vendors/js/htmx.min.js' %}"></script>
   <script defer src="{% static 'vendors/js/alpine.min.js' %}"></script>
   <script type="module" src="{% static 'js/app.js' %}"></script>
+  {% block extra_head %}{% endblock extra_head %}
 </head>
 
 <body {% if request.user.is_authenticated %}data-user-settings-cache{% endif %}>

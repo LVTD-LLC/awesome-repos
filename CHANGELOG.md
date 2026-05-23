@@ -31,17 +31,20 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Awesome Repos: detect AI development config files during repository sync and add an AI dev signals filter to repository search.
 - Awesome Repos: generate repository discovery tags from descriptions and READMEs, and add filters for generated tags and GitHub topics.
 - Awesome Repos: added an awesome-list directory and detail pages with stored list activity metrics including stars, commits, README repository counts, forks, issues, and scan freshness.
+- Awesome Repos: added D3 charts to repository detail pages for historical stars and commit counts.
 - Awesome Repos: added search, filters, and sorting to awesome-list detail repository tables.
 - Awesome Repos: added superuser-only rescan controls on awesome-list and repository detail pages, plus a missing-repository discovery action for awesome lists.
 - Awesome Repos search now has desktop side sponsor placements for future ads.
 - Awesome Repos: show semantically similar repositories on repository detail pages when pgvector embeddings are available.
 - Awesome Repos: added a public awesome-list request form with an admin-reviewable request queue.
+- Awesome Repos: repository topic badges now link to the matching topic-filtered search results.
 
 ### Changed
 - Awesome Repos: repository search is now the root landing page, with `/repos/` permanently redirecting to `/` and a prominent link to the `/lists/` awesome-list directory.
 - Awesome Repos: moved repository search filters into a compact vertical modal opened from a single filter button.
 - Awesome Repos admin-panel add flow now only asks for the GitHub URL; list names and slugs are derived automatically from the source repo.
 - Awesome-list scans now log start/finish/failure details and surface empty scans or sync failures in the admin panel.
+- Awesome Repos: repository detail history now relies on D3 charts instead of duplicating growth cards and a snapshot table.
 - Awesome Repos: GitHub star counts now render with thousands separators, and repository search results no longer show tracked star-growth deltas.
 
 ### Fixed
