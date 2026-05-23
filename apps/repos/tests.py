@@ -38,6 +38,7 @@ from apps.repos.services import (
     fetch_repository_tree_items,
     github_rate_limit_status,
     parse_github_repo_url,
+    repository_history_chart_data,
     repository_performance_summary,
     repository_search_queryset,
     sync_awesome_list,
@@ -2164,6 +2165,29 @@ def test_repository_performance_summary_reuses_recent_snapshots_for_short_histor
 
 
 @pytest.mark.django_db
+def test_repository_history_chart_data_limits_latest_snapshots_chronologically():
+    repo = Repository.objects.create(
+        full_name="django/django",
+        owner="django",
+        name="django",
+        url="https://github.com/django/django",
+    )
+    now = timezone.now()
+    for index in range(5):
+        RepositorySnapshot.objects.create(
+            repository=repo,
+            captured_at=now - timedelta(days=5 - index),
+            stars=100 + index,
+            commit_count=200 + index,
+        )
+
+    chart_data = repository_history_chart_data(repo, limit=3)
+
+    assert [point["stars"] for point in chart_data] == [102, 103, 104]
+    assert [point["commit_count"] for point in chart_data] == [202, 203, 204]
+
+
+@pytest.mark.django_db
 def test_search_page_renders(client):
     active_list = AwesomeList.objects.create(
         name="Awesome Django",
@@ -2607,3 +2631,32 @@ def test_repository_detail_page_renders_performance_history(client):
     assert b"Commits since first" not in response.content
     assert b"Forks since first" not in response.content
     assert b"<table" not in response.content
+
+
+@pytest.mark.django_db
+def test_repository_detail_page_skips_chart_data_without_history(client, monkeypatch):
+    Repository.objects.create(
+        full_name="django/django",
+        owner="django",
+        name="django",
+        url="https://github.com/django/django",
+        description="The Web framework",
+        language="Python",
+        stars=75,
+        forks=12,
+        watchers=5,
+        commit_count=90,
+    )
+
+    def fail_chart_data(repository):
+        raise AssertionError("chart data should not be queried without snapshot history")
+
+    monkeypatch.setattr("apps.repos.views.repository_history_chart_data", fail_chart_data)
+
+    response = client.get(
+        reverse("repos:repo_detail", kwargs={"owner": "django", "name": "django"})
+    )
+
+    assert response.status_code == 200
+    assert b"repository-history-data" not in response.content
+    assert b"Stars history" not in response.content

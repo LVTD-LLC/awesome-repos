@@ -18,12 +18,12 @@ export function initRepositoryHistoryCharts(root = document) {
   charts.forEach((chart) => {
     const data = historyData(chart.dataset.historySource);
     const renderer = () => renderChart(chart, data);
-    renderer();
 
     if (window.ResizeObserver) {
       const observer = new ResizeObserver(renderer);
       observer.observe(chart);
     } else {
+      renderer();
       window.addEventListener("resize", renderer);
     }
   });

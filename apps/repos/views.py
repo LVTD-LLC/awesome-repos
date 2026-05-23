@@ -298,8 +298,10 @@ class RepositoryDetailView(DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["performance"] = repository_performance_summary(self.object)
-        context["repository_history_chart_data"] = repository_history_chart_data(self.object)
+        performance = repository_performance_summary(self.object)
+        context["performance"] = performance
+        if performance["has_history"]:
+            context["repository_history_chart_data"] = repository_history_chart_data(self.object)
         return context
 
 
