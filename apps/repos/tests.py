@@ -2235,7 +2235,7 @@ def test_search_page_exposes_semantic_search_filter(client):
 
 
 @pytest.mark.django_db
-def test_search_page_renders_negative_tracked_growth(client):
+def test_search_page_humanizes_stars_and_hides_tracked_star_growth(client):
     repo = Repository.objects.create(
         full_name="django/django",
         owner="django",
@@ -2243,23 +2243,24 @@ def test_search_page_renders_negative_tracked_growth(client):
         url="https://github.com/django/django",
         description="The Web framework",
         language="Python",
-        stars=80,
+        stars=123456,
     )
     RepositorySnapshot.objects.create(
         repository=repo,
         captured_at=timezone.now() - timedelta(days=2),
-        stars=100,
+        stars=123521,
     )
     RepositorySnapshot.objects.create(
         repository=repo,
         captured_at=timezone.now() - timedelta(days=1),
-        stars=80,
+        stars=123456,
     )
 
     response = client.get(reverse("repos:search"), {"q": "framework"})
 
     assert response.status_code == 200
-    assert b"-20 tracked" in response.content
+    assert b"123,456" in response.content
+    assert b"-65 tracked" not in response.content
     assert b">0 tracked<" not in response.content
 
 
@@ -2336,6 +2337,7 @@ def test_awesome_list_list_page_renders_activity_metrics(client):
     assert b"Inactive List" not in response.content
     assert b"wsvincent/awesome-django" in response.content
     assert b"README repos" in response.content
+    assert b"1,200" in response.content
     assert b"42" in response.content
     assert b"350" in response.content
     assert b"django" in response.content
@@ -2381,6 +2383,8 @@ def test_awesome_list_detail_page_renders_activity_metrics(client):
     assert b"Commits" in response.content
     assert b"django/django" in response.content
     assert b"Python" in response.content
+    assert b"1,200" in response.content
+    assert b"80,000" in response.content
 
 
 @pytest.mark.django_db
@@ -2569,7 +2573,7 @@ def test_repository_detail_page_renders_performance_history(client):
         url="https://github.com/django/django",
         description="The Web framework",
         language="Python",
-        stars=75,
+        stars=123456,
         forks=12,
         watchers=5,
         commit_count=90,
@@ -2577,7 +2581,7 @@ def test_repository_detail_page_renders_performance_history(client):
     RepositorySnapshot.objects.create(
         repository=repo,
         captured_at=timezone.now() - timedelta(days=2),
-        stars=50,
+        stars=123431,
         forks=10,
         watchers=4,
         commit_count=70,
@@ -2585,7 +2589,7 @@ def test_repository_detail_page_renders_performance_history(client):
     RepositorySnapshot.objects.create(
         repository=repo,
         captured_at=timezone.now() - timedelta(days=1),
-        stars=75,
+        stars=123456,
         forks=12,
         watchers=5,
         commit_count=90,
@@ -2597,6 +2601,7 @@ def test_repository_detail_page_renders_performance_history(client):
 
     assert response.status_code == 200
     assert b"Tracked growth" in response.content
+    assert b"123,456" in response.content
     assert b"+25" in response.content
     assert b"Commits since first" in response.content
     assert b"Commits since last" in response.content
