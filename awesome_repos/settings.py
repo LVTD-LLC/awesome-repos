@@ -150,6 +150,7 @@ TEMPLATES = [
                 "apps.core.context_processors.current_state",
                 "apps.core.context_processors.mfa_recovery_codes_settings",
                 "apps.core.context_processors.posthog_api_key",
+                "apps.core.context_processors.chatwoot_settings",
                 "apps.core.context_processors.available_social_providers",
                 "apps.pages.context_processors.referrer_banner",
             ],
@@ -557,6 +558,8 @@ if SENTRY_DSN and ENVIRONMENT == "prod":
 
 
 POSTHOG_API_KEY = env("POSTHOG_API_KEY", default="")
+CHATWOOT_BASE_URL = env("CHATWOOT_BASE_URL", default="https://app.chatwoot.com").rstrip("/")
+CHATWOOT_WEBSITE_TOKEN = env("CHATWOOT_WEBSITE_TOKEN", default="")
 
 
 SHELL_PLUS_IMPORTS = [
