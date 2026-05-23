@@ -162,7 +162,7 @@ def _int_argument(arguments: dict, name: str, default: int | None = None) -> int
     except (TypeError, ValueError) as exc:
         raise ValueError(f"{name} must be an integer.") from exc
     if parsed < 0:
-        raise ValueError(f"{name} must be positive.")
+        raise ValueError(f"{name} must be non-negative.")
     return parsed
 
 
@@ -472,7 +472,7 @@ def mcp_endpoint(request: HttpRequest):
 
     try:
         message = json.loads(request.body.decode("utf-8"))
-    except UnicodeDecodeError, json.JSONDecodeError:
+    except (UnicodeDecodeError, json.JSONDecodeError):
         return _json_response(_jsonrpc_error(None, PARSE_ERROR, "Parse error."), status=400)
 
     if not isinstance(message, dict):

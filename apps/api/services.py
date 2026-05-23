@@ -8,15 +8,13 @@ from django.shortcuts import get_object_or_404
 from apps.core.models import Profile
 from apps.repos.models import AwesomeList, Repository, RepositorySnapshot
 from apps.repos.services import (
+    awesome_list_directory_totals,
+    awesome_list_repository_queryset,
     repository_history_chart_data,
+    repository_json_value_counts,
     repository_performance_summary,
     repository_search_queryset,
     similar_repositories_for_repository,
-)
-from apps.repos.views import (
-    awesome_list_directory_totals,
-    awesome_list_repository_queryset,
-    repository_json_value_counts,
 )
 
 
