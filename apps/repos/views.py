@@ -7,11 +7,13 @@ from django.core.paginator import Paginator
 from django.db import connection, transaction
 from django.db.models import Count, F, Max, OuterRef, PositiveIntegerField, Q, Subquery, Sum
 from django.shortcuts import get_object_or_404, redirect
+from django.urls import reverse_lazy
 from django.utils import timezone
 from django.views.decorators.http import require_POST
-from django.views.generic import DetailView, ListView
+from django.views.generic import DetailView, FormView, ListView
 from django_q.tasks import async_task
 
+from apps.repos.forms import AwesomeListRequestForm
 from apps.repos.models import AwesomeList, AwesomeListItem, Repository
 from apps.repos.services import (
     repository_performance_summary,
@@ -351,6 +353,20 @@ class AwesomeListListView(ListView):
         context["total_list_stars"] = totals["total_list_stars"]
         context["latest_scan"] = totals["latest_scan"]
         return context
+
+
+class AwesomeListRequestView(FormView):
+    template_name = "repos/request_list.html"
+    form_class = AwesomeListRequestForm
+    success_url = reverse_lazy("repos:request_list")
+
+    def form_valid(self, form):
+        form.save()
+        messages.success(
+            self.request,
+            "Thanks, your awesome-list request has been submitted.",
+        )
+        return super().form_valid(form)
 
 
 class RepositoryDetailView(DetailView):

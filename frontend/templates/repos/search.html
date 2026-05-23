@@ -105,6 +105,9 @@
         <a href="{% url 'repos:list' %}" class="inline-flex min-h-11 items-center justify-center rounded-xl border border-gray-300 px-5 text-sm font-semibold text-gray-900 transition hover:bg-gray-100 dark:border-gray-700 dark:text-gray-100 dark:hover:bg-gray-900">
           Browse awesome lists
         </a>
+        <a href="{% url 'repos:request_list' %}" class="inline-flex min-h-11 items-center justify-center rounded-xl border border-green-200 px-5 text-sm font-semibold text-green-700 transition hover:bg-green-50 dark:border-green-900 dark:text-green-300 dark:hover:bg-green-950">
+          Request a list
+        </a>
         {% if user.is_superuser %}
           <a href="{% url 'admin_panel' %}" class="inline-flex min-h-11 items-center justify-center rounded-xl border border-green-200 px-5 text-sm font-semibold text-green-700 transition hover:bg-green-50 dark:border-green-900 dark:text-green-300 dark:hover:bg-green-950">
             Admin panel

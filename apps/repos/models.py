@@ -48,6 +48,35 @@ class AwesomeList(BaseModel):
         return reverse("repos:list_detail", args=[self.slug])
 
 
+class AwesomeListRequest(BaseModel):
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        ADDED = "added", "Added"
+        DECLINED = "declined", "Declined"
+
+    source_url = models.URLField(help_text="GitHub awesome-list repo URL")
+    repo_full_name = models.CharField(max_length=255, unique=True)
+    requester_email = models.EmailField(blank=True, default="")
+    note = models.TextField(blank=True, default="")
+    status = models.CharField(
+        max_length=20,
+        choices=Status,
+        default=Status.PENDING,
+        db_index=True,
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    reviewer_notes = models.TextField(blank=True, default="")
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["status", "-created_at"]),
+        ]
+
+    def __str__(self):
+        return f"{self.repo_full_name} ({self.get_status_display()})"
+
+
 class Repository(BaseModel):
     host = models.CharField(max_length=50, default="github")
     full_name = models.CharField(max_length=255, unique=True)
