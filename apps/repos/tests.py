@@ -5,12 +5,16 @@ from io import StringIO
 from types import SimpleNamespace
 
 import pytest
+from django.contrib import admin as django_admin
+from django.core.cache import cache
 from django.core.management import call_command
-from django.db import connection
+from django.db import IntegrityError, connection
+from django.test import override_settings
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
 
+from apps.repos.admin import AwesomeListRequestAdmin
 from apps.repos.embeddings import (
     build_repository_embedding_payload,
     build_repository_embedding_text,
@@ -61,6 +65,8 @@ from apps.repos.tasks import (
     refresh_repository_task,
 )
 from apps.repos.views import awesome_list_directory_totals, repository_json_value_counts
+
+LOC_MEM_CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
 
 
 @pytest.fixture(autouse=True)
@@ -160,6 +166,27 @@ def test_awesome_list_request_form_rejects_duplicate_requests_by_repo_name():
 
     assert not form.is_valid()
     assert "already been submitted" in form.errors["source_url"][0]
+
+
+@pytest.mark.django_db
+def test_awesome_list_request_admin_clears_reviewed_at_when_reset_to_pending():
+    list_request = AwesomeListRequest.objects.create(
+        source_url="https://github.com/wsvincent/awesome-django",
+        repo_full_name="wsvincent/awesome-django",
+        status=AwesomeListRequest.Status.ADDED,
+    )
+    model_admin = AwesomeListRequestAdmin(AwesomeListRequest, django_admin.site)
+
+    model_admin.save_model(None, list_request, None, change=True)
+    list_request.refresh_from_db()
+
+    assert list_request.reviewed_at is not None
+
+    list_request.status = AwesomeListRequest.Status.PENDING
+    model_admin.save_model(None, list_request, None, change=True)
+    list_request.refresh_from_db()
+
+    assert list_request.reviewed_at is None
 
 
 @pytest.mark.django_db
@@ -2641,6 +2668,7 @@ def test_awesome_list_list_page_renders_activity_metrics(client):
 
 
 @pytest.mark.django_db
+@override_settings(CACHES=LOC_MEM_CACHES)
 def test_awesome_list_request_page_accepts_public_requests(client):
     response = client.get(reverse("repos:request_list"))
 
@@ -2663,6 +2691,44 @@ def test_awesome_list_request_page_accepts_public_requests(client):
     assert list_request.repo_full_name == "wsvincent/awesome-django"
     assert list_request.requester_email == "reader@example.com"
     assert "has been submitted" in response.content.decode()
+
+
+@pytest.mark.django_db
+@override_settings(CACHES=LOC_MEM_CACHES)
+def test_awesome_list_request_page_handles_duplicate_submit_race(client, monkeypatch):
+    def raise_integrity_error(self, commit=True):
+        raise IntegrityError("duplicate key value violates unique constraint")
+
+    monkeypatch.setattr(AwesomeListRequestForm, "save", raise_integrity_error)
+
+    response = client.post(
+        reverse("repos:request_list"),
+        data={"source_url": "https://github.com/wsvincent/awesome-django"},
+    )
+
+    assert response.status_code == 200
+    assert AwesomeListRequest.objects.count() == 0
+    assert "already been submitted" in response.content.decode()
+
+
+@pytest.mark.django_db
+@override_settings(CACHES=LOC_MEM_CACHES)
+def test_awesome_list_request_page_rate_limits_public_posts(client, monkeypatch):
+    cache.clear()
+    monkeypatch.setattr("apps.repos.views.AwesomeListRequestView.rate_limit_count", 1)
+
+    response = client.post(
+        reverse("repos:request_list"),
+        data={"source_url": "https://github.com/wsvincent/awesome-django"},
+    )
+    assert response.status_code == 302
+
+    response = client.post(
+        reverse("repos:request_list"),
+        data={"source_url": "https://github.com/vinta/awesome-python"},
+    )
+
+    assert response.status_code == 429
 
 
 @pytest.mark.django_db

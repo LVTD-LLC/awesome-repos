@@ -69,7 +69,9 @@ class AwesomeListRequestAdmin(admin.ModelAdmin):
     readonly_fields = ("repo_full_name", "created_at", "updated_at")
 
     def save_model(self, request, obj, form, change):
-        if obj.status != AwesomeListRequest.Status.PENDING and obj.reviewed_at is None:
+        if obj.status == AwesomeListRequest.Status.PENDING:
+            obj.reviewed_at = None
+        elif obj.reviewed_at is None:
             obj.reviewed_at = timezone.now()
         super().save_model(request, obj, form, change)
 
