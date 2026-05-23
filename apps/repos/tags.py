@@ -18,6 +18,11 @@ logger = get_awesome_repos_logger(__name__)
 
 TAG_SEPARATOR_RE = re.compile(r"[\s_/]+")
 TAG_DISALLOWED_RE = re.compile(r"[^a-z0-9.+#-]+")
+NO_USABLE_TAGS_ERROR = "Repository tag generation returned no usable tags."
+
+
+class EmptyRepositoryTagsError(ValueError):
+    pass
 
 
 @dataclass(frozen=True, slots=True)
@@ -127,6 +132,18 @@ def repository_tags_are_current(
     )
 
 
+def repository_tagging_failure_is_current(
+    repository: Repository,
+    payload: RepositoryTaggingPayload,
+) -> bool:
+    return bool(
+        not repository.generated_tags
+        and repository.generated_tags_last_error == NO_USABLE_TAGS_ERROR
+        and repository.generated_tags_model == repository_tagging_model_id()
+        and repository.generated_tags_source_hash == payload.text_hash
+    )
+
+
 def _tagging_agent() -> Agent[None, RepositoryTagsOutput]:
     model = build_model(
         provider=settings.REPOSITORY_TAGGING_PROVIDER,
@@ -156,7 +173,7 @@ def generate_repository_tags(text: str) -> list[str]:
 
 def _require_generated_tags(tags: list[str]) -> list[str]:
     if not tags:
-        raise ValueError("Repository tag generation returned no usable tags.")
+        raise EmptyRepositoryTagsError(NO_USABLE_TAGS_ERROR)
     return tags
 
 
@@ -179,6 +196,28 @@ def _clear_repository_tags(repository: Repository) -> list[str]:
     return []
 
 
+def _record_repository_tagging_failure(
+    repository: Repository,
+    payload: RepositoryTaggingPayload,
+    error: Exception,
+) -> None:
+    repository.generated_tags = []
+    repository.generated_tags_model = repository_tagging_model_id()
+    repository.generated_tags_source_hash = payload.text_hash
+    repository.generated_tags_synced_at = timezone.now()
+    repository.generated_tags_last_error = str(error)
+    repository.save(
+        update_fields=[
+            "generated_tags",
+            "generated_tags_model",
+            "generated_tags_source_hash",
+            "generated_tags_synced_at",
+            "generated_tags_last_error",
+            "updated_at",
+        ]
+    )
+
+
 def save_repository_tags(
     repository: Repository,
     readme_text: str,
@@ -189,10 +228,18 @@ def save_repository_tags(
     if payload is None:
         return _clear_repository_tags(repository)
 
-    if not force and repository_tags_are_current(repository, payload):
-        return repository.generated_tags
+    if not force:
+        if repository_tags_are_current(repository, payload):
+            return repository.generated_tags
+        if repository_tagging_failure_is_current(repository, payload):
+            return repository.generated_tags
 
-    tags = generate_repository_tags(payload.text)
+    try:
+        tags = generate_repository_tags(payload.text)
+    except EmptyRepositoryTagsError as exc:
+        _record_repository_tagging_failure(repository, payload, exc)
+        raise
+
     repository.generated_tags = tags
     repository.generated_tags_model = repository_tagging_model_id()
     repository.generated_tags_source_hash = payload.text_hash

@@ -1491,7 +1491,7 @@ def test_generate_repository_tags_rejects_empty_normalized_output(monkeypatch):
 
 
 @pytest.mark.django_db
-def test_sync_repository_tags_records_error_when_generation_returns_no_tags(
+def test_sync_repository_tags_records_and_skips_current_empty_generation_failure(
     monkeypatch,
     settings,
 ):
@@ -1509,19 +1509,31 @@ def test_sync_repository_tags_records_error_when_generation_returns_no_tags(
         description="The Web framework",
         readme="# Django",
     )
+    payload = build_repository_tagging_payload(repo, repo.readme)
+    assert payload is not None
+    calls = 0
 
     class FakeAgent:
         def run_sync(self, prompt):
+            nonlocal calls
+            calls += 1
             return SimpleNamespace(output=SimpleNamespace(tags=["!!!", "   "]))
 
     monkeypatch.setattr("apps.repos.tags._tagging_agent", lambda: FakeAgent())
 
     tags = sync_repository_tags(repo, repo.readme)
+    second = sync_repository_tags(repo, repo.readme)
+    third = sync_repository_tags(repo, "# Django\nUpdated docs")
 
     repo.refresh_from_db()
+    assert calls == 2
     assert tags == []
+    assert second == []
+    assert third == []
     assert repo.generated_tags == []
-    assert repo.generated_tags_synced_at is None
+    assert repo.generated_tags_model == repository_tagging_model_id()
+    assert repo.generated_tags_source_hash != payload.text_hash
+    assert repo.generated_tags_synced_at is not None
     assert repo.generated_tags_last_error == "Repository tag generation returned no usable tags."
 
 
