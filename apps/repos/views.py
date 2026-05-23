@@ -5,7 +5,11 @@ from django.shortcuts import get_object_or_404
 from django.views.generic import DetailView, ListView
 
 from apps.repos.models import AwesomeList, AwesomeListItem, Repository
-from apps.repos.services import repository_performance_summary, repository_search_queryset
+from apps.repos.services import (
+    repository_history_chart_data,
+    repository_performance_summary,
+    repository_search_queryset,
+)
 
 REPOSITORY_JSON_FILTER_FIELDS = {"topics", "generated_tags"}
 
@@ -174,6 +178,7 @@ class RepositoryDetailView(DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["performance"] = repository_performance_summary(self.object)
+        context["repository_history_chart_data"] = repository_history_chart_data(self.object)
         return context
 
 

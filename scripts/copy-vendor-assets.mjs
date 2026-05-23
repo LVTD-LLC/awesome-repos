@@ -10,6 +10,10 @@ const vendorFiles = [
     source: "node_modules/alpinejs/dist/cdn.min.js",
     destination: "frontend/static/vendors/js/alpine.min.js",
   },
+  {
+    source: "node_modules/d3/dist/d3.min.js",
+    destination: "frontend/static/vendors/js/d3.min.js",
+  },
 ];
 
 for (const file of vendorFiles) {

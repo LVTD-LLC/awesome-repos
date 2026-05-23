@@ -2401,3 +2401,8 @@ def test_repository_detail_page_renders_performance_history(client):
     assert b"Commits since first" in response.content
     assert b"Commits since last" in response.content
     assert b"+20" in response.content
+    assert b"repository-history-data" in response.content
+    assert b"data-metric=\"stars\"" in response.content
+    assert b"data-metric=\"commit_count\"" in response.content
+    assert b'"stars": 50' in response.content
+    assert b'"commit_count": 90' in response.content

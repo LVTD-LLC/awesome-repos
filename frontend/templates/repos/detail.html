@@ -1,5 +1,10 @@
 {% extends "base_landing.html" %}
+{% load static %}
 {% block meta %}<title>{{ repository.full_name }} · Awesome Repos</title>{% endblock meta %}
+{% block extra_head %}
+  <script defer src="{% static 'vendors/js/d3.min.js' %}"></script>
+  <script type="module" src="{% static 'js/modules/repository-history-charts.js' %}"></script>
+{% endblock extra_head %}
 {% block content %}
 <section class="mx-auto max-w-5xl px-4 py-12 sm:px-6 lg:px-8">
   <a href="{% url 'repos:search' %}" class="text-sm font-semibold text-green-700 hover:underline">← Back to search</a>
@@ -25,6 +30,7 @@
       <div class="rounded-2xl bg-gray-50 p-4 dark:bg-gray-900"><dt class="text-sm text-gray-500">Awesome lists</dt><dd class="text-2xl font-bold">{{ repository.awesome_list_count }}</dd></div>
     </dl>
     {% if performance.has_history %}
+      {{ repository_history_chart_data|json_script:"repository-history-data" }}
       <div class="mt-8 border-t border-gray-200 pt-8 dark:border-gray-800">
         <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
@@ -32,6 +38,22 @@
             <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ performance.snapshot_count }} capture{{ performance.snapshot_count|pluralize }} since {{ performance.first_snapshot.captured_at|date:"Y-m-d" }}</p>
           </div>
           <div class="text-sm text-gray-500 dark:text-gray-400">Latest capture {{ performance.latest_snapshot.captured_at|date:"Y-m-d H:i" }}</div>
+        </div>
+        <div class="mt-6 grid gap-4 lg:grid-cols-2">
+          <section class="rounded-2xl border border-gray-200 p-4 dark:border-gray-800" data-repository-history-chart data-history-source="repository-history-data" data-metric="stars" data-label="Stars">
+            <div class="flex items-baseline justify-between gap-3">
+              <h3 class="text-sm font-semibold text-gray-950 dark:text-white">Stars history</h3>
+              <span class="text-xs font-medium text-gray-500 dark:text-gray-400">Total stars</span>
+            </div>
+            <div class="mt-4 h-64 w-full" data-chart-plot></div>
+          </section>
+          <section class="rounded-2xl border border-gray-200 p-4 dark:border-gray-800" data-repository-history-chart data-history-source="repository-history-data" data-metric="commit_count" data-label="Commits">
+            <div class="flex items-baseline justify-between gap-3">
+              <h3 class="text-sm font-semibold text-gray-950 dark:text-white">Commits history</h3>
+              <span class="text-xs font-medium text-gray-500 dark:text-gray-400">Default branch commits</span>
+            </div>
+            <div class="mt-4 h-64 w-full" data-chart-plot></div>
+          </section>
         </div>
         <dl class="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
           <div class="rounded-2xl bg-gray-50 p-4 dark:bg-gray-900"><dt class="text-sm text-gray-500">Stars since first</dt><dd class="text-2xl font-bold {% if performance.stars_since_first > 0 %}text-green-700 dark:text-green-400{% elif performance.stars_since_first < 0 %}text-red-600 dark:text-red-400{% endif %}">{{ performance.stars_since_first_label }}</dd></div>
