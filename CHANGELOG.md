@@ -37,6 +37,8 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Awesome Repos: added superuser-only rescan controls on awesome-list and repository detail pages, plus a missing-repository discovery action for awesome lists.
 - Awesome Repos search now has desktop side sponsor placements for future ads.
 - Awesome Repos: show semantically similar repositories on repository detail pages when pgvector embeddings are available.
+- Awesome Repos: added API endpoints for authenticated repository search, awesome-list search/detail, list-scoped repository search, and superuser scan queue actions.
+- Awesome Repos: added an authenticated Streamable HTTP MCP endpoint at `/mcp` for AI agents to search repositories and awesome lists.
 - Awesome Repos: added a public awesome-list request form with an admin-reviewable request queue.
 - Awesome Repos: repository topic badges now link to the matching topic-filtered search results.
 
@@ -47,6 +49,7 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Awesome-list scans now log start/finish/failure details and surface empty scans or sync failures in the admin panel.
 - Awesome Repos: repository detail history now relies on D3 charts instead of duplicating growth cards and a snapshot table.
 - Awesome Repos: GitHub star counts now render with thousands separators, and repository search results no longer show tracked star-growth deltas.
+- Awesome Repos: moved the MCP endpoint into its own Django app and rebuilt it on FastMCP while keeping API and MCP search payloads on shared service functions.
 
 ### Fixed
 - Awesome Repos: repair repository migration graph ordering so production can migrate past the AI-development and activity merge branches.
