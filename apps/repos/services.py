@@ -28,6 +28,7 @@ from apps.repos.models import (
     AwesomeList,
     AwesomeListItem,
     Repository,
+    RepositoryEmbedding,
     RepositorySnapshot,
 )
 from apps.repos.tags import (
@@ -1242,3 +1243,27 @@ def repository_search_queryset(params):
     if semantic_search:
         return qs.order_by("vector_distance", "-stars", "full_name")
     return qs.order_by(sort_map.get(sort, "-stars"), "full_name")
+
+
+def similar_repositories_for_repository(repository: Repository, *, limit: int = 6):
+    source_embedding = RepositoryEmbedding.objects.filter(
+        repository=repository,
+        model=settings.REPOSITORY_EMBEDDING_MODEL,
+        dimensions=REPOSITORY_EMBEDDING_DIMENSIONS,
+    ).first()
+    if source_embedding is None:
+        return Repository.objects.none()
+
+    return (
+        Repository.objects.filter(
+            vector__model=source_embedding.model,
+            vector__dimensions=source_embedding.dimensions,
+        )
+        .exclude(pk=repository.pk)
+        .annotate(
+            awesome_count=Count("awesome_items", distinct=True),
+            vector_distance=CosineDistance("vector__embedding", source_embedding.embedding),
+        )
+        .prefetch_related("awesome_items__awesome_list")
+        .order_by("vector_distance", "-stars", "full_name")[:limit]
+    )

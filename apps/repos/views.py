@@ -8,7 +8,11 @@ from django.utils import timezone
 from django.views.generic import DetailView, ListView
 
 from apps.repos.models import AwesomeList, AwesomeListItem, Repository
-from apps.repos.services import repository_performance_summary, repository_search_queryset
+from apps.repos.services import (
+    repository_performance_summary,
+    repository_search_queryset,
+    similar_repositories_for_repository,
+)
 from apps.repos.tags import normalize_repository_tag
 
 REPOSITORY_JSON_FILTER_FIELDS = {"topics", "generated_tags"}
@@ -295,6 +299,7 @@ class RepositoryDetailView(DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["performance"] = repository_performance_summary(self.object)
+        context["similar_repositories"] = similar_repositories_for_repository(self.object)
         return context
 
 
