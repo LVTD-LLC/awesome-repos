@@ -1,9 +1,11 @@
 from django.contrib import admin, messages
+from django.utils import timezone
 from django_q.tasks import async_task
 
 from apps.repos.models import (
     AwesomeList,
     AwesomeListItem,
+    AwesomeListRequest,
     Repository,
     RepositoryEmbedding,
     RepositorySnapshot,
@@ -57,6 +59,21 @@ class AwesomeListAdmin(admin.ModelAdmin):
 
     def item_count(self, obj):
         return obj.items.count()
+
+
+@admin.register(AwesomeListRequest)
+class AwesomeListRequestAdmin(admin.ModelAdmin):
+    list_display = ("repo_full_name", "status", "requester_email", "created_at", "reviewed_at")
+    search_fields = ("repo_full_name", "source_url", "requester_email", "note")
+    list_filter = ("status", "created_at", "reviewed_at")
+    readonly_fields = ("source_url", "repo_full_name", "created_at", "updated_at")
+
+    def save_model(self, request, obj, form, change):
+        if obj.status == AwesomeListRequest.Status.PENDING:
+            obj.reviewed_at = None
+        elif obj.reviewed_at is None:
+            obj.reviewed_at = timezone.now()
+        super().save_model(request, obj, form, change)
 
 
 @admin.register(Repository)

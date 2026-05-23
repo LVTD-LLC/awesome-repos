@@ -21,13 +21,15 @@ def mfa_recovery_codes_settings(request):
     return {"mfa_recovery_codes_show_once": mfa_app_settings.RECOVERY_CODES_SHOW_ONCE}
 
 
-
 def posthog_api_key(request):
     return {"posthog_api_key": settings.POSTHOG_API_KEY}
 
 
-
-
+def chatwoot_settings(request):
+    return {
+        "chatwoot_base_url": settings.CHATWOOT_BASE_URL.rstrip("/"),
+        "chatwoot_website_token": settings.CHATWOOT_WEBSITE_TOKEN,
+    }
 
 
 def available_social_providers(request):

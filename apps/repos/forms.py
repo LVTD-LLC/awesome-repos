@@ -1,7 +1,8 @@
 from django import forms
+from django.db.models import Q
 from django.utils.text import slugify
 
-from apps.repos.models import AwesomeList
+from apps.repos.models import AwesomeList, AwesomeListRequest
 from apps.repos.services import parse_github_repo_url
 
 
@@ -48,3 +49,40 @@ class AwesomeListCreateForm(forms.Form):
             source_url=self.cleaned_data["source_url"],
             repo_full_name=repo_full_name,
         )
+
+
+class AwesomeListRequestForm(forms.ModelForm):
+    class Meta:
+        model = AwesomeListRequest
+        fields = ["source_url", "requester_email", "note"]
+
+    def clean_source_url(self):
+        source_url = self.cleaned_data["source_url"].strip()
+
+        try:
+            self.repo_full_name = parse_github_repo_url(source_url)
+        except ValueError as exc:
+            raise forms.ValidationError(str(exc)) from exc
+
+        if AwesomeList.objects.filter(
+            Q(source_url__iexact=source_url) | Q(repo_full_name__iexact=self.repo_full_name)
+        ).exists():
+            raise forms.ValidationError("That awesome list is already tracked.")
+
+        if AwesomeListRequest.objects.filter(repo_full_name__iexact=self.repo_full_name).exists():
+            raise forms.ValidationError("That awesome-list request has already been submitted.")
+
+        return source_url
+
+    def clean_requester_email(self):
+        return self.cleaned_data.get("requester_email", "").strip().lower()
+
+    def clean_note(self):
+        return self.cleaned_data.get("note", "").strip()
+
+    def save(self, commit=True):
+        request = super().save(commit=False)
+        request.repo_full_name = self.repo_full_name
+        if commit:
+            request.save()
+        return request

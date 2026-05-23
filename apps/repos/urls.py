@@ -28,5 +28,6 @@ urlpatterns = [
         views.queue_awesome_list_missing_repo_discovery,
         name="list_discover_missing",
     ),
+    path("lists/request/", views.AwesomeListRequestView.as_view(), name="request_list"),
     path("lists/<slug:slug>/", views.AwesomeListDetailView.as_view(), name="list_detail"),
 ]

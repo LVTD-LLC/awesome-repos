@@ -16,6 +16,7 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 
 ## [Unreleased]
 ### Added
+- Awesome Repos: added optional Chatwoot live-chat widget support configured with `CHATWOOT_BASE_URL` and `CHATWOOT_WEBSITE_TOKEN`.
 - Awesome Repos: added local logo assets and wired the navbar, favicon, touch icon, README, and base social metadata to the new branding.
 - Awesome Repos: ingest GitHub awesome-list READMEs, index the linked repositories, and expose searchable repository/list detail pages with stars, freshness, archive-state, and cross-list counts.
 - Awesome Repos: added an admin-panel flow to create new awesome-list sources and queue their initial scan.
@@ -38,6 +39,8 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Awesome Repos: show semantically similar repositories on repository detail pages when pgvector embeddings are available.
 - Awesome Repos: added API endpoints for authenticated repository search, awesome-list search/detail, list-scoped repository search, and superuser scan queue actions.
 - Awesome Repos: added an authenticated Streamable HTTP MCP endpoint at `/mcp` for AI agents to search repositories and awesome lists.
+- Awesome Repos: added a public awesome-list request form with an admin-reviewable request queue.
+- Awesome Repos: repository topic badges now link to the matching topic-filtered search results.
 
 ### Changed
 - Awesome Repos: repository search is now the root landing page, with `/repos/` permanently redirecting to `/` and a prominent link to the `/lists/` awesome-list directory.

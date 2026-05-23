@@ -2,16 +2,20 @@ from datetime import timedelta
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.cache import cache
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
-from django.db import connection, transaction
+from django.db import IntegrityError, connection, transaction
 from django.db.models import Count, F, Max, OuterRef, PositiveIntegerField, Q, Subquery, Sum
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect
+from django.urls import reverse_lazy
 from django.utils import timezone
 from django.views.decorators.http import require_POST
-from django.views.generic import DetailView, ListView
+from django.views.generic import DetailView, FormView, ListView
 from django_q.tasks import async_task
 
+from apps.repos.forms import AwesomeListRequestForm
 from apps.repos.models import AwesomeList, AwesomeListItem, Repository
 from apps.repos.services import (
     repository_history_chart_data,
@@ -26,6 +30,8 @@ MAX_UPDATED_DAYS_FILTER = 36500
 AWESOME_LIST_SCAN_TASK_GROUP = "Scan awesome list"
 MISSING_REPOSITORY_DISCOVERY_TASK_GROUP = "Manual awesome-list missing repo discovery"
 REPOSITORY_REFRESH_TASK_GROUP = "Refresh repositories"
+AWESOME_LIST_REQUEST_RATE_LIMIT = 5
+AWESOME_LIST_REQUEST_RATE_LIMIT_WINDOW_SECONDS = 60 * 60
 
 
 def _require_superuser(request):
@@ -275,6 +281,15 @@ def awesome_list_repository_queryset(awesome_list: AwesomeList, params):
     return _order_list_repositories(qs, params)
 
 
+def awesome_list_request_client_ip(request) -> str:
+    # X-Forwarded-For is only safe behind a trusted proxy that strips spoofed headers.
+    return request.META.get("REMOTE_ADDR", "unknown")
+
+
+def awesome_list_request_rate_limit_key(request) -> str:
+    return f"awesome-list-request:{awesome_list_request_client_ip(request)}"
+
+
 class RepositorySearchView(ListView):
     template_name = "repos/search.html"
     context_object_name = "repositories"
@@ -352,6 +367,34 @@ class AwesomeListListView(ListView):
         context["total_list_stars"] = totals["total_list_stars"]
         context["latest_scan"] = totals["latest_scan"]
         return context
+
+
+class AwesomeListRequestView(FormView):
+    template_name = "repos/request_list.html"
+    form_class = AwesomeListRequestForm
+    success_url = reverse_lazy("repos:request_list")
+    rate_limit_count = AWESOME_LIST_REQUEST_RATE_LIMIT
+    rate_limit_window_seconds = AWESOME_LIST_REQUEST_RATE_LIMIT_WINDOW_SECONDS
+
+    def post(self, request, *args, **kwargs):
+        cache_key = awesome_list_request_rate_limit_key(request)
+        cache.add(cache_key, 0, timeout=self.rate_limit_window_seconds)
+        if cache.incr(cache_key) > self.rate_limit_count:
+            return HttpResponse("Too many awesome-list requests. Try again later.", status=429)
+        return super().post(request, *args, **kwargs)
+
+    def form_valid(self, form):
+        try:
+            with transaction.atomic():
+                form.save()
+        except IntegrityError:
+            form.add_error("source_url", "That awesome-list request has already been submitted.")
+            return self.form_invalid(form)
+        messages.success(
+            self.request,
+            "Thanks, your awesome-list request has been submitted.",
+        )
+        return super().form_valid(form)
 
 
 class RepositoryDetailView(DetailView):

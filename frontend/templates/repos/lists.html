@@ -14,7 +14,10 @@
       <h1 class="mt-2 text-4xl font-bold tracking-tight text-gray-950 dark:text-white">Find the right awesome list</h1>
       <p class="mt-3 max-w-3xl text-gray-600 dark:text-gray-300">Compare list activity, audience size, and README coverage before deciding where a project might fit.</p>
     </div>
-    <a href="{% url 'repos:search' %}" class="inline-flex items-center justify-center rounded-xl border border-gray-300 px-5 py-3 text-sm font-semibold hover:bg-gray-100 dark:border-gray-700 dark:hover:bg-gray-800">Search repos</a>
+    <div class="flex flex-col gap-3 sm:flex-row">
+      <a href="{% url 'repos:request_list' %}" class="inline-flex items-center justify-center rounded-xl bg-green-600 px-5 py-3 text-sm font-semibold text-white hover:bg-green-700">Request a list</a>
+      <a href="{% url 'repos:search' %}" class="inline-flex items-center justify-center rounded-xl border border-gray-300 px-5 py-3 text-sm font-semibold hover:bg-gray-100 dark:border-gray-700 dark:hover:bg-gray-800">Search repos</a>
+    </div>
   </div>
 
   <dl class="mb-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
