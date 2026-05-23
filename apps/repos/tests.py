@@ -2,6 +2,7 @@ import base64
 import re
 from datetime import timedelta
 from io import StringIO
+from types import SimpleNamespace
 
 import pytest
 from django.core.management import call_command
@@ -1481,13 +1482,7 @@ def test_save_repository_tags_regenerates_when_tags_are_empty(
 def test_generate_repository_tags_rejects_empty_normalized_output(monkeypatch):
     class FakeAgent:
         def run_sync(self, prompt):
-            class Result:
-                class Output:
-                    tags = ["!!!", "   "]
-
-                output = Output()
-
-            return Result()
+            return SimpleNamespace(output=SimpleNamespace(tags=["!!!", "   "]))
 
     monkeypatch.setattr("apps.repos.tags._tagging_agent", lambda: FakeAgent())
 
@@ -1515,7 +1510,11 @@ def test_sync_repository_tags_records_error_when_generation_returns_no_tags(
         readme="# Django",
     )
 
-    monkeypatch.setattr("apps.repos.tags.generate_repository_tags", lambda text: [])
+    class FakeAgent:
+        def run_sync(self, prompt):
+            return SimpleNamespace(output=SimpleNamespace(tags=["!!!", "   "]))
+
+    monkeypatch.setattr("apps.repos.tags._tagging_agent", lambda: FakeAgent())
 
     tags = sync_repository_tags(repo, repo.readme)
 

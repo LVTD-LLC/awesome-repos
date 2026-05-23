@@ -192,7 +192,7 @@ def save_repository_tags(
     if not force and repository_tags_are_current(repository, payload):
         return repository.generated_tags
 
-    tags = _require_generated_tags(generate_repository_tags(payload.text))
+    tags = generate_repository_tags(payload.text)
     repository.generated_tags = tags
     repository.generated_tags_model = repository_tagging_model_id()
     repository.generated_tags_source_hash = payload.text_hash
