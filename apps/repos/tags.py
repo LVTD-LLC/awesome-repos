@@ -119,7 +119,8 @@ def repository_tags_are_current(
     payload: RepositoryTaggingPayload,
 ) -> bool:
     return bool(
-        repository.generated_tags_synced_at
+        repository.generated_tags
+        and repository.generated_tags_synced_at
         and not repository.generated_tags_last_error
         and repository.generated_tags_model == repository_tagging_model_id()
         and repository.generated_tags_source_hash == payload.text_hash

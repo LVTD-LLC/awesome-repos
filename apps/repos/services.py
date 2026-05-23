@@ -790,7 +790,7 @@ def upsert_repository_from_github(full_name: str, *, include_readme: bool = True
         ai_development_signals=ai_development_signals,
         commit_count=commit_count,
     )
-    if include_readme and repository_tagging_configured():
+    if repository_tagging_configured() and (include_readme or not repo.generated_tags):
         sync_repository_tags(repo, repo.readme)
     if include_readme and repository_embeddings_configured():
         sync_repository_embedding(repo, repo.readme)

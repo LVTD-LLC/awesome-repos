@@ -43,6 +43,7 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Awesome Repos admin panel now bounds the Recent awesome lists card height so long list histories do not stretch the dashboard row.
 - Awesome Repos: include `django.contrib.postgres` so pgvector HNSW indexes pass Django production checks.
 - Awesome Repos: removed manifest-dependent logo static references so production template rendering works after `collectstatic`.
+- Awesome Repos: run generated-tag sync when a repository has no stored generated tags, including metadata-only refreshes.
 
 ### Changed
 - Awesome Repos landing pages no longer render a public navbar.

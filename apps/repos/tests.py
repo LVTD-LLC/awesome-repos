@@ -1432,6 +1432,51 @@ def test_save_repository_tags_skips_unchanged_source(monkeypatch, settings):
 
 
 @pytest.mark.django_db(transaction=True)
+def test_save_repository_tags_regenerates_when_tags_are_empty(
+    monkeypatch,
+    settings,
+):
+    settings.REPOSITORY_TAGGING_ENABLED = True
+    settings.REPOSITORY_TAGGING_PROVIDER = "openai"
+    settings.REPOSITORY_TAGGING_MODEL_LABEL = "fast"
+    settings.REPOSITORY_TAGGING_MAX_CHARS = 16000
+    settings.REPOSITORY_TAGGING_MAX_TAGS = 8
+    repo = Repository.objects.create(
+        full_name="django/django",
+        owner="django",
+        name="django",
+        url="https://github.com/django/django",
+        description="The Web framework",
+        readme="# Django",
+        generated_tags=[],
+        generated_tags_model=repository_tagging_model_id(),
+        generated_tags_synced_at=timezone.now(),
+    )
+    payload = build_repository_tagging_payload(repo, repo.readme)
+    assert payload is not None
+    repo.generated_tags_source_hash = payload.text_hash
+    repo.save(update_fields=["generated_tags_source_hash", "updated_at"])
+    calls = 0
+
+    def fake_generate_repository_tags(text):
+        nonlocal calls
+        calls += 1
+        return ["web-framework"]
+
+    monkeypatch.setattr(
+        "apps.repos.tags.generate_repository_tags",
+        fake_generate_repository_tags,
+    )
+
+    tags = save_repository_tags(repo, repo.readme)
+
+    repo.refresh_from_db()
+    assert calls == 1
+    assert tags == ["web-framework"]
+    assert repo.generated_tags == tags
+
+
+@pytest.mark.django_db(transaction=True)
 def test_upsert_repository_from_github_syncs_generated_tags_from_readme(
     monkeypatch,
     settings,
@@ -1464,6 +1509,52 @@ def test_upsert_repository_from_github_syncs_generated_tags_from_readme(
         "repo": "django/django",
         "description": "The Web framework",
         "readme_text": "# Django\n",
+        "tag_sync_in_atomic": False,
+    }
+
+
+@pytest.mark.django_db(transaction=True)
+def test_upsert_repository_from_github_syncs_missing_generated_tags_without_readme_refresh(
+    monkeypatch,
+    settings,
+):
+    settings.REPOSITORY_TAGGING_ENABLED = True
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    Repository.objects.create(
+        full_name="django/django",
+        owner="django",
+        name="django",
+        url="https://github.com/django/django",
+        description="Old description",
+        readme="# Existing README\n",
+    )
+    captured = {}
+
+    def fake_fetch_json(url):
+        assert not url.endswith("/readme")
+        return github_repo_payload()
+
+    def fake_sync_repository_tags(repository, readme_text):
+        captured["repo"] = repository.full_name
+        captured["description"] = repository.description
+        captured["readme_text"] = readme_text
+        captured["tag_sync_in_atomic"] = connection.in_atomic_block
+
+    monkeypatch.setattr("apps.repos.services.fetch_json", fake_fetch_json)
+    monkeypatch.setattr(
+        "apps.repos.services.fetch_repository_ai_development_signals",
+        lambda full_name, default_branch: [],
+    )
+    monkeypatch.setattr("apps.repos.services.sync_repository_tags", fake_sync_repository_tags)
+
+    repo = upsert_repository_from_github("django/django", include_readme=False)
+
+    assert repo.description == "The Web framework for perfectionists with deadlines."
+    assert repo.readme == "# Existing README\n"
+    assert captured == {
+        "repo": "django/django",
+        "description": "The Web framework for perfectionists with deadlines.",
+        "readme_text": "# Existing README\n",
         "tag_sync_in_atomic": False,
     }
 
