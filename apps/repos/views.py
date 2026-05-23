@@ -1,11 +1,16 @@
 from datetime import timedelta
 
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
-from django.db import connection
+from django.db import connection, transaction
 from django.db.models import Count, F, Max, OuterRef, PositiveIntegerField, Q, Subquery, Sum
-from django.shortcuts import get_object_or_404
+from django.shortcuts import get_object_or_404, redirect
 from django.utils import timezone
+from django.views.decorators.http import require_POST
 from django.views.generic import DetailView, ListView
+from django_q.tasks import async_task
 
 from apps.repos.models import AwesomeList, AwesomeListItem, Repository
 from apps.repos.services import repository_performance_summary, repository_search_queryset
@@ -13,6 +18,68 @@ from apps.repos.tags import normalize_repository_tag
 
 REPOSITORY_JSON_FILTER_FIELDS = {"topics", "generated_tags"}
 MAX_UPDATED_DAYS_FILTER = 36500
+AWESOME_LIST_SCAN_TASK_GROUP = "Scan awesome list"
+MISSING_REPOSITORY_DISCOVERY_TASK_GROUP = "Manual awesome-list missing repo discovery"
+REPOSITORY_REFRESH_TASK_GROUP = "Refresh repositories"
+
+
+def _require_superuser(request):
+    if not request.user.is_superuser:
+        raise PermissionDenied("Only superusers can queue repository scans.")
+
+
+def _active_awesome_list_or_404(slug: str):
+    return get_object_or_404(AwesomeList.objects.filter(is_active=True), slug=slug)
+
+
+@login_required(login_url="account_login")
+@require_POST
+def queue_awesome_list_rescan(request, slug: str):
+    _require_superuser(request)
+    awesome_list = _active_awesome_list_or_404(slug)
+    transaction.on_commit(
+        lambda: async_task(
+            "apps.repos.tasks.sync_awesome_list_task",
+            awesome_list.id,
+            group=AWESOME_LIST_SCAN_TASK_GROUP,
+        )
+    )
+    messages.success(request, f"Queued a rescan for {awesome_list.name}.")
+    return redirect(awesome_list.get_absolute_url())
+
+
+@login_required(login_url="account_login")
+@require_POST
+def queue_awesome_list_missing_repo_discovery(request, slug: str):
+    _require_superuser(request)
+    awesome_list = _active_awesome_list_or_404(slug)
+    transaction.on_commit(
+        lambda: async_task(
+            "apps.repos.tasks.enqueue_missing_repositories_for_awesome_list_task",
+            awesome_list.id,
+            group=MISSING_REPOSITORY_DISCOVERY_TASK_GROUP,
+        )
+    )
+    messages.success(request, f"Queued missing repository discovery for {awesome_list.name}.")
+    return redirect(awesome_list.get_absolute_url())
+
+
+@login_required(login_url="account_login")
+@require_POST
+def queue_repository_rescan(request, owner: str, name: str):
+    _require_superuser(request)
+    repository = get_object_or_404(Repository, full_name=f"{owner}/{name}")
+    transaction.on_commit(
+        lambda: async_task(
+            "apps.repos.tasks.refresh_repository_task",
+            repository.id,
+            repository.full_name,
+            include_readme=True,
+            group=REPOSITORY_REFRESH_TASK_GROUP,
+        )
+    )
+    messages.success(request, f"Queued a rescan for {repository.full_name}.")
+    return redirect(repository.get_absolute_url())
 
 
 def repository_json_value_counts(

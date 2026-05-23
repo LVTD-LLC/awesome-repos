@@ -32,6 +32,7 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Awesome Repos: generate repository discovery tags from descriptions and READMEs, and add filters for generated tags and GitHub topics.
 - Awesome Repos: added an awesome-list directory and detail pages with stored list activity metrics including stars, commits, README repository counts, forks, issues, and scan freshness.
 - Awesome Repos: added search, filters, and sorting to awesome-list detail repository tables.
+- Awesome Repos: added superuser-only rescan controls on awesome-list and repository detail pages, plus a missing-repository discovery action for awesome lists.
 
 ### Changed
 - Awesome Repos: repository search is now the root landing page, with `/repos/` permanently redirecting to `/` and a prominent link to the `/lists/` awesome-list directory.

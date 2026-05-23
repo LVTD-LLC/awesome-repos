@@ -2561,6 +2561,167 @@ def test_awesome_list_detail_page_hides_inactive_lists(client):
 
 
 @pytest.mark.django_db
+def test_awesome_list_detail_page_shows_scan_controls_only_to_superusers(
+    client,
+    django_user_model,
+):
+    admin = django_user_model.objects.create_superuser(
+        username="admin",
+        email="admin@example.com",
+        password="password123",
+    )
+    user = django_user_model.objects.create_user(
+        username="regular",
+        email="regular@example.com",
+        password="password123",
+    )
+    awesome_list = AwesomeList.objects.create(
+        name="Awesome Django",
+        slug="awesome-django",
+        source_url="https://github.com/wsvincent/awesome-django",
+    )
+    url = reverse("repos:list_detail", kwargs={"slug": awesome_list.slug})
+
+    response = client.get(url)
+
+    assert response.status_code == 200
+    assert b"Rescan list" not in response.content
+    assert b"Find missing repos" not in response.content
+
+    client.force_login(user)
+
+    response = client.get(url)
+
+    assert b"Rescan list" not in response.content
+    assert b"Find missing repos" not in response.content
+
+    client.force_login(admin)
+
+    response = client.get(url)
+
+    assert b"Rescan list" in response.content
+    assert b"Find missing repos" in response.content
+
+
+@pytest.mark.django_db
+def test_superuser_can_queue_awesome_list_rescan_from_detail(
+    client,
+    django_user_model,
+    monkeypatch,
+):
+    admin = django_user_model.objects.create_superuser(
+        username="admin",
+        email="admin@example.com",
+        password="password123",
+    )
+    client.force_login(admin)
+    awesome_list = AwesomeList.objects.create(
+        name="Awesome Django",
+        slug="awesome-django",
+        source_url="https://github.com/wsvincent/awesome-django",
+    )
+    queued = []
+
+    def fake_async_task(func_path, *args, **kwargs):
+        queued.append((func_path, args, kwargs))
+        return "task-1"
+
+    monkeypatch.setattr("apps.repos.views.async_task", fake_async_task)
+    monkeypatch.setattr("apps.repos.views.transaction.on_commit", lambda callback: callback())
+
+    response = client.post(
+        reverse("repos:list_rescan", kwargs={"slug": awesome_list.slug}),
+        follow=True,
+    )
+
+    assert response.status_code == 200
+    assert queued == [
+        (
+            "apps.repos.tasks.sync_awesome_list_task",
+            (awesome_list.id,),
+            {"group": "Scan awesome list"},
+        )
+    ]
+    assert "Queued a rescan for Awesome Django." in response.content.decode()
+
+
+@pytest.mark.django_db
+def test_superuser_can_queue_awesome_list_missing_repo_discovery_from_detail(
+    client,
+    django_user_model,
+    monkeypatch,
+):
+    admin = django_user_model.objects.create_superuser(
+        username="admin",
+        email="admin@example.com",
+        password="password123",
+    )
+    client.force_login(admin)
+    awesome_list = AwesomeList.objects.create(
+        name="Awesome Django",
+        slug="awesome-django",
+        source_url="https://github.com/wsvincent/awesome-django",
+    )
+    queued = []
+
+    def fake_async_task(func_path, *args, **kwargs):
+        queued.append((func_path, args, kwargs))
+        return "task-1"
+
+    monkeypatch.setattr("apps.repos.views.async_task", fake_async_task)
+    monkeypatch.setattr("apps.repos.views.transaction.on_commit", lambda callback: callback())
+
+    response = client.post(
+        reverse("repos:list_discover_missing", kwargs={"slug": awesome_list.slug}),
+        follow=True,
+    )
+
+    assert response.status_code == 200
+    assert queued == [
+        (
+            "apps.repos.tasks.enqueue_missing_repositories_for_awesome_list_task",
+            (awesome_list.id,),
+            {"group": "Manual awesome-list missing repo discovery"},
+        )
+    ]
+    assert "Queued missing repository discovery for Awesome Django." in response.content.decode()
+
+
+@pytest.mark.django_db
+def test_regular_user_cannot_queue_awesome_list_rescan(
+    client,
+    django_user_model,
+    monkeypatch,
+):
+    django_user_model.objects.create_superuser(
+        username="admin",
+        email="admin@example.com",
+        password="password123",
+    )
+    user = django_user_model.objects.create_user(
+        username="regular",
+        email="regular@example.com",
+        password="password123",
+    )
+    client.force_login(user)
+    awesome_list = AwesomeList.objects.create(
+        name="Awesome Django",
+        slug="awesome-django",
+        source_url="https://github.com/wsvincent/awesome-django",
+    )
+
+    def fail_async_task(*args, **kwargs):
+        raise AssertionError("regular users should not queue scans")
+
+    monkeypatch.setattr("apps.repos.views.async_task", fail_async_task)
+    monkeypatch.setattr("apps.repos.views.transaction.on_commit", lambda callback: callback())
+
+    response = client.post(reverse("repos:list_rescan", kwargs={"slug": awesome_list.slug}))
+
+    assert response.status_code == 403
+
+
+@pytest.mark.django_db
 def test_repository_detail_page_renders_performance_history(client):
     repo = Repository.objects.create(
         full_name="django/django",
@@ -2601,3 +2762,87 @@ def test_repository_detail_page_renders_performance_history(client):
     assert b"Commits since first" in response.content
     assert b"Commits since last" in response.content
     assert b"+20" in response.content
+
+
+@pytest.mark.django_db
+def test_repository_detail_page_shows_rescan_control_only_to_superusers(
+    client,
+    django_user_model,
+):
+    admin = django_user_model.objects.create_superuser(
+        username="admin",
+        email="admin@example.com",
+        password="password123",
+    )
+    user = django_user_model.objects.create_user(
+        username="regular",
+        email="regular@example.com",
+        password="password123",
+    )
+    repo = Repository.objects.create(
+        full_name="django/django",
+        owner="django",
+        name="django",
+        url="https://github.com/django/django",
+    )
+    url = reverse("repos:repo_detail", kwargs={"owner": repo.owner, "name": repo.name})
+
+    response = client.get(url)
+
+    assert response.status_code == 200
+    assert b"Rescan repo" not in response.content
+
+    client.force_login(user)
+
+    response = client.get(url)
+
+    assert b"Rescan repo" not in response.content
+
+    client.force_login(admin)
+
+    response = client.get(url)
+
+    assert b"Rescan repo" in response.content
+
+
+@pytest.mark.django_db
+def test_superuser_can_queue_repository_rescan_from_detail(
+    client,
+    django_user_model,
+    monkeypatch,
+):
+    admin = django_user_model.objects.create_superuser(
+        username="admin",
+        email="admin@example.com",
+        password="password123",
+    )
+    client.force_login(admin)
+    repo = Repository.objects.create(
+        full_name="django/django",
+        owner="django",
+        name="django",
+        url="https://github.com/django/django",
+    )
+    queued = []
+
+    def fake_async_task(func_path, *args, **kwargs):
+        queued.append((func_path, args, kwargs))
+        return "task-1"
+
+    monkeypatch.setattr("apps.repos.views.async_task", fake_async_task)
+    monkeypatch.setattr("apps.repos.views.transaction.on_commit", lambda callback: callback())
+
+    response = client.post(
+        reverse("repos:repo_rescan", kwargs={"owner": repo.owner, "name": repo.name}),
+        follow=True,
+    )
+
+    assert response.status_code == 200
+    assert queued == [
+        (
+            "apps.repos.tasks.refresh_repository_task",
+            (repo.id, repo.full_name),
+            {"include_readme": True, "group": "Refresh repositories"},
+        )
+    ]
+    assert "Queued a rescan for django/django." in response.content.decode()

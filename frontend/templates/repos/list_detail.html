@@ -25,7 +25,29 @@
           {% if awesome_list.last_error %}<span class="rounded-full bg-red-50 px-3 py-1 text-red-700 dark:bg-red-950 dark:text-red-200">{{ awesome_list.last_error }}</span>{% endif %}
         </div>
       </div>
-      <a href="{{ awesome_list.source_url }}" target="_blank" rel="noopener" class="inline-flex items-center justify-center rounded-xl bg-green-600 px-5 py-3 font-semibold text-white hover:bg-green-700">Open GitHub</a>
+      <div class="flex flex-wrap gap-2 lg:justify-end">
+        {% if user.is_superuser %}
+          <form method="post" action="{% url 'repos:list_rescan' slug=awesome_list.slug %}">
+            {% csrf_token %}
+            <button type="submit" class="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-green-200 bg-white px-4 text-sm font-semibold text-green-700 transition hover:bg-green-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-green-900 dark:bg-gray-950 dark:text-green-300 dark:hover:bg-green-950 dark:focus-visible:ring-offset-gray-950">
+              <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v6h6M20 20v-6h-6M5 19a9 9 0 0 0 14-3M19 5a9 9 0 0 0-14 3" />
+              </svg>
+              Rescan list
+            </button>
+          </form>
+          <form method="post" action="{% url 'repos:list_discover_missing' slug=awesome_list.slug %}">
+            {% csrf_token %}
+            <button type="submit" class="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-gray-300 bg-white px-4 text-sm font-semibold text-gray-900 transition hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 dark:hover:bg-gray-900 dark:focus-visible:ring-offset-gray-950">
+              <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v14M5 12h14" />
+              </svg>
+              Find missing repos
+            </button>
+          </form>
+        {% endif %}
+        <a href="{{ awesome_list.source_url }}" target="_blank" rel="noopener" class="inline-flex min-h-12 items-center justify-center rounded-xl bg-green-600 px-5 text-sm font-semibold text-white hover:bg-green-700">Open GitHub</a>
+      </div>
     </div>
   </div>
 
