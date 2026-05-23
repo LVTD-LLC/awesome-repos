@@ -2098,6 +2098,12 @@ def test_similar_repositories_for_repository_orders_by_vector(settings):
         description="Old embedding model",
         stars=2000,
     )
+    awesome_list = AwesomeList.objects.create(
+        name="Awesome Django",
+        slug="awesome-django",
+        source_url="https://github.com/wsvincent/awesome-django",
+    )
+    AwesomeListItem.objects.create(awesome_list=awesome_list, repository=near)
     RepositoryEmbedding.objects.create(
         repository=source,
         model="openai/text-embedding-3-small",
@@ -2135,7 +2141,10 @@ def test_similar_repositories_for_repository_orders_by_vector(settings):
         embedded_at=timezone.now(),
     )
 
-    assert list(similar_repositories_for_repository(source)) == [near, far]
+    with CaptureQueriesContext(connection) as queries:
+        assert list(similar_repositories_for_repository(source)) == [near, far]
+
+    assert len(queries) == 2
     assert list(similar_repositories_for_repository(source, limit=1)) == [near]
 
 

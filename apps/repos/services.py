@@ -1264,6 +1264,5 @@ def similar_repositories_for_repository(repository: Repository, *, limit: int = 
             awesome_count=Count("awesome_items", distinct=True),
             vector_distance=CosineDistance("vector__embedding", source_embedding.embedding),
         )
-        .prefetch_related("awesome_items__awesome_list")
         .order_by("vector_distance", "-stars", "full_name")[:limit]
     )
