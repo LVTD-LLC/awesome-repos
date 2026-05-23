@@ -5,7 +5,7 @@ from apps.core.context_processors import chatwoot_settings
 
 
 @override_settings(
-    CHATWOOT_BASE_URL="https://chat.example.com",
+    CHATWOOT_BASE_URL="https://chat.example.com/",
     CHATWOOT_WEBSITE_TOKEN="websitetoken",
 )
 def test_chatwoot_context_processor_exposes_widget_settings():
