@@ -33,6 +33,7 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Awesome Repos: added an awesome-list directory and detail pages with stored list activity metrics including stars, commits, README repository counts, forks, issues, and scan freshness.
 - Awesome Repos: added D3 charts to repository detail pages for historical stars and commit counts.
 - Awesome Repos: added search, filters, and sorting to awesome-list detail repository tables.
+- Awesome Repos: show semantically similar repositories on repository detail pages when pgvector embeddings are available.
 
 ### Changed
 - Awesome Repos: repository search is now the root landing page, with `/repos/` permanently redirecting to `/` and a prominent link to the `/lists/` awesome-list directory.
@@ -40,6 +41,7 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Awesome Repos admin-panel add flow now only asks for the GitHub URL; list names and slugs are derived automatically from the source repo.
 - Awesome-list scans now log start/finish/failure details and surface empty scans or sync failures in the admin panel.
 - Awesome Repos: repository detail history now relies on D3 charts instead of duplicating growth cards and a snapshot table.
+- Awesome Repos: GitHub star counts now render with thousands separators, and repository search results no longer show tracked star-growth deltas.
 
 ### Fixed
 - Awesome Repos: repair repository migration graph ordering so production can migrate past the AI-development and activity merge branches.

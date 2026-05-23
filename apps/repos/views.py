@@ -12,6 +12,7 @@ from apps.repos.services import (
     repository_history_chart_data,
     repository_performance_summary,
     repository_search_queryset,
+    similar_repositories_for_repository,
 )
 from apps.repos.tags import normalize_repository_tag
 
@@ -302,6 +303,7 @@ class RepositoryDetailView(DetailView):
         context["performance"] = performance
         if performance["has_history"]:
             context["repository_history_chart_data"] = repository_history_chart_data(self.object)
+        context["similar_repositories"] = similar_repositories_for_repository(self.object)
         return context
 
 
