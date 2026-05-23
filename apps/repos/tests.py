@@ -46,9 +46,11 @@ from apps.repos.services import (
 )
 from apps.repos.tags import (
     build_repository_tagging_payload,
+    generate_repository_tags,
     normalize_repository_tags,
     repository_tagging_model_id,
     save_repository_tags,
+    sync_repository_tags,
 )
 from apps.repos.tasks import (
     daily_repository_refresh_limit,
@@ -1474,6 +1476,54 @@ def test_save_repository_tags_regenerates_when_tags_are_empty(
     assert calls == 1
     assert tags == ["web-framework"]
     assert repo.generated_tags == tags
+
+
+def test_generate_repository_tags_rejects_empty_normalized_output(monkeypatch):
+    class FakeAgent:
+        def run_sync(self, prompt):
+            class Result:
+                class Output:
+                    tags = ["!!!", "   "]
+
+                output = Output()
+
+            return Result()
+
+    monkeypatch.setattr("apps.repos.tags._tagging_agent", lambda: FakeAgent())
+
+    with pytest.raises(ValueError, match="no usable tags"):
+        generate_repository_tags("Repository: owner/repo\n\nDescription:\nUseful project")
+
+
+@pytest.mark.django_db
+def test_sync_repository_tags_records_error_when_generation_returns_no_tags(
+    monkeypatch,
+    settings,
+):
+    settings.REPOSITORY_TAGGING_ENABLED = True
+    settings.REPOSITORY_TAGGING_PROVIDER = "openai"
+    settings.REPOSITORY_TAGGING_MODEL_LABEL = "fast"
+    settings.REPOSITORY_TAGGING_MAX_CHARS = 16000
+    settings.REPOSITORY_TAGGING_MAX_TAGS = 8
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    repo = Repository.objects.create(
+        full_name="django/django",
+        owner="django",
+        name="django",
+        url="https://github.com/django/django",
+        description="The Web framework",
+        readme="# Django",
+    )
+
+    monkeypatch.setattr("apps.repos.tags.generate_repository_tags", lambda text: [])
+
+    tags = sync_repository_tags(repo, repo.readme)
+
+    repo.refresh_from_db()
+    assert tags == []
+    assert repo.generated_tags == []
+    assert repo.generated_tags_synced_at is None
+    assert repo.generated_tags_last_error == "Repository tag generation returned no usable tags."
 
 
 @pytest.mark.django_db(transaction=True)

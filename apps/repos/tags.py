@@ -151,7 +151,13 @@ def generate_repository_tags(text: str) -> list[str]:
         "Return only the structured tag list.\n\n"
         f"{text}"
     )
-    return normalize_repository_tags(result.output.tags)
+    return _require_generated_tags(normalize_repository_tags(result.output.tags))
+
+
+def _require_generated_tags(tags: list[str]) -> list[str]:
+    if not tags:
+        raise ValueError("Repository tag generation returned no usable tags.")
+    return tags
 
 
 def _clear_repository_tags(repository: Repository) -> list[str]:
@@ -186,7 +192,7 @@ def save_repository_tags(
     if not force and repository_tags_are_current(repository, payload):
         return repository.generated_tags
 
-    tags = generate_repository_tags(payload.text)
+    tags = _require_generated_tags(generate_repository_tags(payload.text))
     repository.generated_tags = tags
     repository.generated_tags_model = repository_tagging_model_id()
     repository.generated_tags_source_hash = payload.text_hash
