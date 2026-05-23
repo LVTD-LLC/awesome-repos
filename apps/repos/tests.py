@@ -2458,6 +2458,7 @@ def test_search_page_renders(client):
     assert b"Repository filters" in response.content
     assert b"Any GitHub topic" in response.content
     assert b"django (1)" in response.content
+    assert b'href="/?topic=django"' in response.content
     assert b"web-framework (1)" in response.content
     assert b'data-ad-slot="search-left-rail"' in response.content
     assert b'data-ad-slot="search-right-rail"' in response.content
@@ -3036,6 +3037,7 @@ def test_repository_detail_page_renders_performance_history(client):
         url="https://github.com/django/django",
         description="The Web framework",
         language="Python",
+        topics=["django", "python"],
         stars=123456,
         forks=32000,
         watchers=5,
@@ -3066,6 +3068,7 @@ def test_repository_detail_page_renders_performance_history(client):
     assert b"Tracked growth" in response.content
     assert b"123,456" in response.content
     assert b"32,000" in response.content
+    assert b'href="/?topic=django"' in response.content
     assert b"Stars history" in response.content
     assert b"Commits history" in response.content
     assert b"/static/vendors/js/d3.min.js" in response.content
