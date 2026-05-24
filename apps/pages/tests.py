@@ -15,10 +15,11 @@ pytestmark = pytest.mark.django_db
 def assert_standard_ad_layout(content):
     assert "data-page-ad-shell" in content
     assert "data-page-content" in content
+    assert 'data-ad-rail="left"' in content
+    assert 'data-ad-rail="right"' in content
     assert content.count('data-ad-slot="global-left-') == 4
     assert content.count('data-ad-slot="global-right-') == 4
     assert content.count("data-ad-slot=") == 8
-    assert "xl:grid-cols-[10rem_minmax(0,80rem)_10rem]" in content
 
 
 def mark_password_reauthenticated(client, username):
