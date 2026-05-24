@@ -1,0 +1,19 @@
+<aside
+  class="hidden xl:block {{ rail_class }}"
+  aria-label="{{ position }} sponsor placements"
+  data-ad-rail="{{ side }}"
+>
+  <div class="sticky top-24 grid gap-4">
+    {% if side == "left" %}
+      {% include "components/side_ad_slot.html" with slot_id="global-left-1" position="Left rail 1" headline="Sponsor Awesome Repos" body="Reach developers browsing curated GitHub projects." cta="Reserve" only %}
+      {% include "components/side_ad_slot.html" with slot_id="global-left-2" position="Left rail 2" headline="Ship dev tools" body="Put your product beside high-intent repo search." cta="Sponsor" only %}
+      {% include "components/side_ad_slot.html" with slot_id="global-left-3" position="Left rail 3" headline="Open-source launch" body="Promote frameworks, CLIs, and platforms." cta="Book" only %}
+      {% include "components/side_ad_slot.html" with slot_id="global-left-4" position="Left rail 4" headline="Hiring builders?" body="Reach engineers browsing active projects." cta="Contact" only %}
+    {% else %}
+      {% include "components/side_ad_slot.html" with slot_id="global-right-1" position="Right rail 1" headline="API products" body="Reach teams comparing GitHub infrastructure." cta="Reserve" only %}
+      {% include "components/side_ad_slot.html" with slot_id="global-right-2" position="Right rail 2" headline="AI coding tools" body="Meet developers researching modern codebases." cta="Sponsor" only %}
+      {% include "components/side_ad_slot.html" with slot_id="global-right-3" position="Right rail 3" headline="Cloud platforms" body="Show up where self-hosters evaluate stacks." cta="Book" only %}
+      {% include "components/side_ad_slot.html" with slot_id="global-right-4" position="Right rail 4" headline="Security tools" body="Promote scanners, CI, and maintainer workflows." cta="Contact" only %}
+    {% endif %}
+  </div>
+</aside>

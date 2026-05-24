@@ -8,7 +8,7 @@
 
 {% block content %}
 <section
-  class="mx-auto max-w-[104rem] px-4 pb-14 pt-10 sm:px-6 lg:px-8"
+  class="pb-14 pt-10"
   x-data="{
     filtersOpen: false,
     searchMode: '{{ request.GET.mode|escapejs }}',
@@ -47,8 +47,6 @@
   }"
   @keydown.escape.window="filtersOpen && closeFilters()"
 >
-  <div class="grid gap-6 xl:grid-cols-[9rem_minmax(0,1fr)_9rem] 2xl:grid-cols-[11rem_minmax(0,80rem)_11rem]">
-    <div class="min-w-0 xl:col-start-2 xl:row-start-1">
   <div class="grid gap-8 border-b border-gray-200 pb-8 dark:border-gray-800 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-end">
     <div class="min-w-0">
       <div class="inline-flex items-center gap-3">
@@ -397,19 +395,5 @@
       {% if page_obj.has_next %}<a class="rounded-full border px-4 py-2" href="?page={{ page_obj.next_page_number }}{% if querystring %}&{{ querystring }}{% endif %}">Next</a>{% endif %}
     </nav>
   {% endif %}
-    </div>
-
-    <aside class="hidden xl:col-start-1 xl:row-start-1 xl:block" aria-label="Left sponsor placements">
-      <div class="sticky top-6">
-        {% include "components/side_ad_slot.html" with slot_id="search-left-rail" position="Left rail" headline="Sponsor Awesome Repos" body="Reach developers browsing curated GitHub projects and awesome-list research." cta="Reserve slot" only %}
-      </div>
-    </aside>
-
-    <aside class="hidden xl:col-start-3 xl:row-start-1 xl:block" aria-label="Right sponsor placements">
-      <div class="sticky top-6">
-        {% include "components/side_ad_slot.html" with slot_id="search-right-rail" position="Right rail" headline="Promote your developer tool" body="A quiet side placement for products that help builders discover, ship, or maintain software." cta="Contact us" only %}
-      </div>
-    </aside>
-  </div>
 </section>
 {% endblock content %}
