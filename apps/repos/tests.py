@@ -2532,19 +2532,22 @@ def test_search_page_renders(client):
         stars=80000,
     )
     response = client.get(reverse("repos:search"), {"q": "framework"})
+    content = response.content
     assert response.status_code == 200
-    assert b"django/django" in response.content
-    assert b"Open filters" in response.content
-    assert b"Repository filters" in response.content
-    assert b"Any GitHub topic" in response.content
-    assert b"django (1)" in response.content
-    assert b'href="/?topic=django"' in response.content
-    assert b"web-framework (1)" in response.content
-    assert b'data-ad-slot="search-left-rail"' in response.content
-    assert b'data-ad-slot="search-right-rail"' in response.content
+    assert b"django/django" in content
+    assert b"Open filters" in content
+    assert b"Repository filters" in content
+    assert b"Any GitHub topic" in content
+    assert b"django (1)" in content
+    assert b'href="/?topic=django"' in content
+    assert b"web-framework (1)" in content
+    assert b"data-page-ad-shell" in content
+    assert content.count(b'data-ad-slot="global-left-') == 4
+    assert content.count(b'data-ad-slot="global-right-') == 4
+    assert content.count(b"data-ad-slot=") == 8
     assert response.context["total_lists"] == 1
     assert list(response.context["awesome_lists"].values_list("id", flat=True)) == [active_list.id]
-    assert b"Inactive List" not in response.content
+    assert b"Inactive List" not in content
 
 
 @pytest.mark.django_db
