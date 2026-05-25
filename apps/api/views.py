@@ -16,15 +16,12 @@ from apps.api.schemas import (
     QueuedTaskOut,
     RepositoryDetailOut,
     RepositorySearchOut,
-    SubmitFeedbackIn,
-    SubmitFeedbackOut,
     UserInfoOut,
     UserSettingsOut,
 )
 from apps.api.services import (
     serialize_user_info,
 )
-from apps.core.models import Feedback
 from apps.repos.forms import AwesomeListCreateForm
 from apps.repos.models import AwesomeList, Repository
 from apps.repos.search_services import (
@@ -119,23 +116,6 @@ def healthcheck(request: HttpRequest):
 
     logger.error("Healthcheck failed", **checks)
     return 503, payload
-
-
-@api.post(
-    "/submit-feedback",
-    response=SubmitFeedbackOut,
-    auth=[session_auth],
-    include_in_schema=False,
-    tags=["private"],
-)
-def submit_feedback(request: HttpRequest, data: SubmitFeedbackIn):
-    profile = request.auth
-    try:
-        Feedback.objects.create(profile=profile, feedback=data.feedback, page=data.page)
-        return {"status": True, "message": "Feedback submitted successfully"}
-    except Exception as e:
-        logger.error("Failed to submit feedback", error=str(e), profile_id=profile.id)
-        return {"status": False, "message": "Failed to submit feedback. Please try again."}
 
 
 @api.get(

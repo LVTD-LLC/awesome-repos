@@ -23,7 +23,7 @@ from django.views.generic import TemplateView, UpdateView
 from django_q.tasks import async_task
 
 from apps.core.forms import ProfileUpdateForm
-from apps.core.models import Feedback, Profile
+from apps.core.models import Profile
 from apps.repos.forms import AwesomeListCreateForm
 from apps.repos.models import AwesomeList
 from apps.repos.services import github_rate_limit_status
@@ -49,18 +49,12 @@ def build_absolute_public_url(path: str) -> str:
     return f"{base_url}/{path.lstrip('/')}"
 
 
-
-
 class HomeView(LoginRequiredMixin, TemplateView):
     login_url = "account_login"
     template_name = "pages/home.html"
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-
-        
-
-        
 
         return context
 
@@ -93,7 +87,7 @@ class UserSettingsView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
             user=user,
             type=Authenticator.Type.RECOVERY_CODES,
         ).exists()
-        
+
         context["api_key_prefix"] = profile.api_key_prefix
         context["has_api_key"] = profile.has_api_key
         context["new_api_key"] = self.request.session.pop(NEW_API_KEY_SESSION_KEY, "")
@@ -190,9 +184,6 @@ def delete_account(request):
     return redirect(f"{reverse('repos:search')}?account_deleted=1")
 
 
-
-
-
 class AdminPanelView(UserPassesTestMixin, TemplateView):
     template_name = "pages/admin-panel.html"
     login_url = "account_login"
@@ -214,16 +205,10 @@ class AdminPanelView(UserPassesTestMixin, TemplateView):
 
         total_users = User.objects.count()
         total_profiles = Profile.objects.count()
-        total_feedback = Feedback.objects.count()
-
         new_users_week = User.objects.filter(date_joined__gte=week_ago).count()
         new_users_month = User.objects.filter(date_joined__gte=month_ago).count()
-        feedback_week = Feedback.objects.filter(created_at__gte=week_ago).count()
 
         recent_users = User.objects.select_related("profile").order_by("-date_joined")[:10]
-        recent_feedback = Feedback.objects.select_related("profile__user").order_by(
-            "-created_at"
-        )[:10]
         recent_awesome_lists = AwesomeList.objects.annotate(item_count=Count("items")).order_by(
             "-last_scanned_at",
             "name",
@@ -232,20 +217,19 @@ class AdminPanelView(UserPassesTestMixin, TemplateView):
         # Calculate average users per day for last 30 days
         avg_users_per_day = new_users_month / 30 if new_users_month > 0 else 0
 
-        context.update({
-            'total_users': total_users,
-            'total_profiles': total_profiles,
-            'total_feedback': total_feedback,
-            'new_users_week': new_users_week,
-            'new_users_month': new_users_month,
-            'feedback_week': feedback_week,
-            'recent_users': recent_users,
-            'recent_feedback': recent_feedback,
-            'avg_users_per_day': avg_users_per_day,
-            'awesome_list_form': kwargs.get('awesome_list_form') or AwesomeListCreateForm(),
-            'recent_awesome_lists': recent_awesome_lists,
-            'github_rate_limit': github_rate_limit_status(),
-        })
+        context.update(
+            {
+                "total_users": total_users,
+                "total_profiles": total_profiles,
+                "new_users_week": new_users_week,
+                "new_users_month": new_users_month,
+                "recent_users": recent_users,
+                "avg_users_per_day": avg_users_per_day,
+                "awesome_list_form": kwargs.get("awesome_list_form") or AwesomeListCreateForm(),
+                "recent_awesome_lists": recent_awesome_lists,
+                "github_rate_limit": github_rate_limit_status(),
+            }
+        )
 
         logger.info(
             "Admin panel accessed",

@@ -4,7 +4,7 @@ import pytest
 from allauth.account.adapter import DefaultAccountAdapter
 
 from apps.core.choices import EmailType
-from apps.core.models import EmailSent, Feedback
+from apps.core.models import EmailSent
 from apps.core.utils import (
     EMAIL_DELIVERY_METRICS,
     get_email_delivery_provider,
@@ -94,28 +94,8 @@ def test_confirmation_mail_failures_do_not_bubble_to_signup(user, monkeypatch):
     )
 
     adapter = CustomAccountAdapter()
-    emailconfirmation = SimpleNamespace(
-        email_address=SimpleNamespace(user=user, email=user.email)
-    )
+    emailconfirmation = SimpleNamespace(email_address=SimpleNamespace(user=user, email=user.email))
 
     adapter.send_confirmation_mail(None, emailconfirmation, signup=True)
 
-    assert EmailSent.objects.count() == 0
-
-
-@pytest.mark.django_db
-def test_feedback_notifications_swallow_email_failures(profile, monkeypatch):
-    def fake_send_mail(*args, **kwargs):
-        raise TimeoutError("smtp timeout")
-
-    monkeypatch.setattr("apps.core.models.send_mail", fake_send_mail)
-
-    feedback = Feedback(
-        profile=profile,
-        feedback="This page helped.",
-        page="/pricing/",
-    )
-    feedback.save()
-
-    assert Feedback.objects.count() == 1
     assert EmailSent.objects.count() == 0
