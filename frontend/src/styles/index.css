@@ -45,6 +45,21 @@
     @apply rounded-xl border border-white/10 bg-gray-950 p-3 text-sm text-gray-50;
   }
 
+  .side-ad-title,
+  .side-ad-body {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .side-ad-title {
+    -webkit-line-clamp: 2;
+  }
+
+  .side-ad-body {
+    -webkit-line-clamp: 3;
+  }
+
   .docs-code-blocks pre {
     @apply border border-gray-800 bg-gray-950 text-gray-50 shadow-sm;
   }

@@ -2573,9 +2573,13 @@ def test_search_page_renders(client):
     assert b"data-page-content" in content
     assert b'data-ad-rail="left"' in content
     assert b'data-ad-rail="right"' in content
+    assert b"grid-rows-4" in content
     assert content.count(b'data-ad-slot="global-left-') == 4
     assert content.count(b'data-ad-slot="global-right-') == 4
     assert content.count(b"data-ad-slot=") == 8
+    assert content.count(b"utm_source=awesome_repos") == 8
+    assert content.count(b"utm_medium=side_ad") == 8
+    assert b"mailto:hello@awesome_repos.app" not in content
     assert response.context["total_lists"] == 1
     assert list(response.context["awesome_lists"].values_list("id", flat=True)) == [active_list.id]
     assert b"Inactive List" not in content

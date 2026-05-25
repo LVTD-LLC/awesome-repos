@@ -7,6 +7,7 @@ from allauth.mfa.recovery_codes.internal.auth import RecoveryCodes
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.messages import get_messages
+from django.template.loader import render_to_string
 from django.urls import reverse
 
 pytestmark = pytest.mark.django_db
@@ -17,9 +18,28 @@ def assert_standard_ad_layout(content):
     assert "data-page-content" in content
     assert 'data-ad-rail="left"' in content
     assert 'data-ad-rail="right"' in content
+    assert "grid-rows-4" in content
     assert content.count('data-ad-slot="global-left-') == 4
     assert content.count('data-ad-slot="global-right-') == 4
     assert content.count("data-ad-slot=") == 8
+    assert content.count("utm_source=awesome_repos") == 8
+    assert content.count("utm_medium=side_ad") == 8
+    assert "mailto:hello@awesome_repos.app" not in content
+
+
+def test_side_ad_slot_default_sponsor_email():
+    content = render_to_string(
+        "components/side_ad_slot.html",
+        {
+            "slot_id": "test-slot",
+            "position": "Test rail",
+            "headline": "Sponsor Awesome Repos",
+            "body": "Reach developers browsing curated GitHub projects.",
+            "cta": "Reserve",
+        },
+    )
+
+    assert "mailto:rasul@lvtd.dev?subject=Sponsor%20Awesome%20Repos" in content
 
 
 def mark_password_reauthenticated(client, username):
