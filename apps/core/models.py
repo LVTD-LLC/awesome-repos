@@ -1,24 +1,15 @@
-from decimal import Decimal, InvalidOperation
-
-
 from django.contrib.auth.models import User
 from django.db import models
-from django.urls import reverse
-from django.conf import settings
-from django.core.mail import send_mail
 from django_q.tasks import async_task
 
 from apps.core.base_models import BaseModel
-from apps.core.choices import ProfileStates, EmailType
+from apps.core.choices import EmailType, ProfileStates
 from apps.core.model_utils import (
     generate_api_key,
     get_api_key_prefix,
     hash_api_key,
     verify_api_key,
 )
-from apps.core.utils import send_transactional_email
-
-
 from awesome_repos.utils import get_awesome_repos_logger
 
 logger = get_awesome_repos_logger(__name__)
@@ -34,8 +25,6 @@ class Profile(BaseModel):
         default=None,
     )
     api_key_hash = models.CharField(max_length=128, blank=True, default="")
-
-    
 
     state = models.CharField(
         max_length=255,
@@ -88,7 +77,7 @@ class Profile(BaseModel):
 
         return verify_api_key(api_key, self.api_key_hash)
 
-    
+
 class ProfileStateTransition(BaseModel):
     profile = models.ForeignKey(
         Profile,
@@ -102,58 +91,6 @@ class ProfileStateTransition(BaseModel):
     backup_profile_id = models.IntegerField()
     metadata = models.JSONField(null=True, blank=True)
 
-class Feedback(BaseModel):
-    profile = models.ForeignKey(
-        Profile,
-        null=True,
-        blank=True,
-        on_delete=models.CASCADE,
-        related_name="feedback",
-        help_text="The user who submitted the feedback",
-    )
-    feedback = models.TextField(
-        help_text="The feedback text",
-    )
-    page = models.CharField(
-        max_length=255,
-        help_text="The page where the feedback was submitted",
-    )
-
-    def __str__(self):
-        return f"{self.profile.user.email}: {self.feedback}"
-
-    def save(self, *args, **kwargs):
-        is_new = self._state.adding
-        super().save(*args, **kwargs)
-
-        if is_new:
-            subject = "New Feedback Submitted"
-            message = f"""
-                New feedback was submitted:\n\n
-                User: {self.profile.user.email if self.profile else "Anonymous"}
-                Feedback: {self.feedback}
-                Page: {self.page}
-            """
-            from_email = settings.DEFAULT_FROM_EMAIL
-            recipient_list = [settings.DEFAULT_FROM_EMAIL]
-
-            for recipient_email in recipient_list:
-                send_transactional_email(
-                    lambda recipient=recipient_email: send_mail(
-                        subject,
-                        message,
-                        from_email,
-                        [recipient],
-                        fail_silently=False,
-                    ),
-                    email_address=recipient_email,
-                    email_type=EmailType.FEEDBACK_NOTIFICATION,
-                    profile=self.profile,
-                    context={
-                        "flow": "feedback_notification",
-                        "feedback_id": self.id,
-                    },
-                )
 
 class EmailSent(BaseModel):
     email_address = models.EmailField(help_text="The recipient email address")
