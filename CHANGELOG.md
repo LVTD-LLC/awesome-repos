@@ -46,7 +46,7 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Awesome Repos: replaced placeholder side-rail sponsor slots with equal-height ads for LVTD projects and attribution-tagged outbound links.
 - Awesome Repos: standardized page width around global side ad rails with four sponsor slots on each side.
 - Awesome Repos: repository search is now the root landing page, with `/repos/` permanently redirecting to `/` and a prominent link to the `/lists/` awesome-list directory.
-- Awesome Repos admin navbar now links directly to Repos and Lists instead of Dashboard and Settings.
+- Awesome Repos: admin navbar now links directly to Repos and Lists instead of Dashboard and Settings.
 - Awesome Repos: moved repository search filters into a compact vertical modal opened from a single filter button.
 - Awesome Repos admin-panel add flow now only asks for the GitHub URL; list names and slugs are derived automatically from the source repo.
 - Awesome-list scans now log start/finish/failure details and surface empty scans or sync failures in the admin panel.

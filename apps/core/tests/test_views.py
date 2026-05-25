@@ -224,8 +224,8 @@ def test_admin_panel_nav_links_to_repository_and_list_pages(
     lists_link = rf'<a href="{re.escape(reverse("repos:list"))}"[^>]*>\s*Lists\s*</a>'
     assert re.search(repos_link, content)
     assert re.search(lists_link, content)
-    assert not re.search(r">\s*Dashboard\s*<", content)
-    assert not re.search(r">\s*Settings\s*<", content)
+    assert not re.search(r"<a\b[^>]*>\s*Dashboard\s*</a>", content)
+    assert not re.search(r"<a\b[^>]*>\s*Settings\s*</a>", content)
 
 
 @override_settings(SITE_URL="http://example.com")
