@@ -18,12 +18,15 @@ def assert_standard_ad_layout(content):
     assert "data-page-content" in content
     assert 'data-ad-rail="left"' in content
     assert 'data-ad-rail="right"' in content
-    assert "grid-rows-4" in content
-    assert content.count('data-ad-slot="global-left-') == 4
-    assert content.count('data-ad-slot="global-right-') == 4
-    assert content.count("data-ad-slot=") == 8
-    assert content.count("utm_source=awesome_repos") == 8
-    assert content.count("utm_medium=side_ad") == 8
+    assert "grid-rows-5" in content
+    assert content.count('data-ad-slot="global-left-') == 5
+    assert content.count('data-ad-slot="global-right-') == 5
+    assert content.count("data-ad-slot=") == 10
+    assert content.count("data-ad-empty-slot=") == 1
+    assert 'data-ad-empty-slot="global-right-5"' in content
+    assert "Get sponsored" in content
+    assert content.count("utm_source=awesome_repos") == 9
+    assert content.count("utm_medium=side_ad") == 9
     assert "mailto:hello@awesome_repos.app" not in content
 
 
