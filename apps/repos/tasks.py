@@ -290,7 +290,8 @@ def refresh_repositories_task(
     include_readme: bool | None = None,
     min_rate_limit_remaining: int | None = None,
 ):
-    # Scheduled repository refreshes should always use the model's full sync path.
+    # Keep include_readme in the signature so older queued jobs still deserialize;
+    # scheduled repository refreshes should always use the model's full sync path.
     include_readme = True
     total_repositories = Repository.objects.count()
     refresh_limit = (

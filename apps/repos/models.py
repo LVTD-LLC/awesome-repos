@@ -153,9 +153,6 @@ class Repository(BaseModel):
 
         return upsert_repository_from_github(full_name)
 
-    def refresh_from_source(self) -> Repository:
-        return self.sync_from_source(self.full_name)
-
 
 class RepositorySnapshot(BaseModel):
     repository = models.ForeignKey(Repository, on_delete=models.CASCADE, related_name="snapshots")
