@@ -44,6 +44,7 @@ from apps.repos.services import (
     fetch_repository_tree_items,
     github_rate_limit_status,
     parse_github_repo_url,
+    refresh_repositories,
     repository_history_chart_data,
     repository_performance_summary,
     repository_search_queryset,
@@ -1906,6 +1907,31 @@ def test_daily_repository_refresh_limit_uses_target_days_and_cap(settings):
     assert daily_repository_refresh_limit(10) == 1
     assert daily_repository_refresh_limit(10_000) == 715
     assert daily_repository_refresh_limit(30_000) == 1000
+
+
+@pytest.mark.django_db
+def test_refresh_repositories_defaults_to_full_sync(monkeypatch):
+    repository = Repository.objects.create(
+        full_name="owner/project",
+        owner="owner",
+        name="project",
+        url="https://github.com/owner/project",
+    )
+    refreshed = []
+
+    def fake_upsert_repository_from_github(full_name, *, include_readme=True):
+        refreshed.append((full_name, include_readme))
+        return repository
+
+    monkeypatch.setattr(
+        "apps.repos.services.upsert_repository_from_github",
+        fake_upsert_repository_from_github,
+    )
+
+    result = refresh_repositories()
+
+    assert result == {"synced": 1, "failure_count": 0, "failures": []}
+    assert refreshed == [("owner/project", True)]
 
 
 @pytest.mark.django_db
