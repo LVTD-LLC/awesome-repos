@@ -96,13 +96,17 @@
   {% endif %}
 
   <div class="min-h-screen bg-white text-gray-900 dark:bg-gray-950 dark:text-gray-100">
-    <div class="mx-auto grid w-full max-w-[104rem] grid-cols-1 gap-6 px-4 pb-8 pt-6 sm:px-6 lg:px-8 xl:grid-cols-[10rem_minmax(0,80rem)_10rem] 2xl:grid-cols-[11rem_minmax(0,80rem)_11rem]" data-page-ad-shell>
-      {% include "components/side_ad_rail.html" with side="left" position="Left" rail_class="xl:col-start-1 xl:row-start-1" sticky_class="top-6" rail_height_class="h-[calc(100vh-3rem)]" only %}
-      <div class="min-w-0 xl:col-start-2 xl:row-start-1" data-page-content>
+    <div class="mx-auto w-full pb-8 pt-6 {% if hide_side_ad_rails %}max-w-7xl px-4 sm:px-6 lg:px-8{% else %}grid max-w-[104rem] grid-cols-1 gap-6 px-4 sm:px-6 lg:px-8 xl:grid-cols-[10rem_minmax(0,80rem)_10rem] 2xl:grid-cols-[11rem_minmax(0,80rem)_11rem]{% endif %}" data-page-ad-shell>
+      {% if not hide_side_ad_rails %}
+        {% include "components/side_ad_rail.html" with side="left" position="Left" rail_class="xl:col-start-1 xl:row-start-1" sticky_class="top-6" rail_height_class="h-[calc(100vh-3rem)]" only %}
+      {% endif %}
+      <div class="min-w-0 {% if not hide_side_ad_rails %}xl:col-start-2 xl:row-start-1{% endif %}" data-page-content>
         {% block content %}
         {% endblock content %}
       </div>
-      {% include "components/side_ad_rail.html" with side="right" position="Right" rail_class="xl:col-start-3 xl:row-start-1" sticky_class="top-6" rail_height_class="h-[calc(100vh-3rem)]" only %}
+      {% if not hide_side_ad_rails %}
+        {% include "components/side_ad_rail.html" with side="right" position="Right" rail_class="xl:col-start-3 xl:row-start-1" sticky_class="top-6" rail_height_class="h-[calc(100vh-3rem)]" only %}
+      {% endif %}
     </div>
 
     <footer class="bg-white dark:bg-gray-950">

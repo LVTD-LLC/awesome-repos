@@ -41,6 +41,7 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Awesome Repos: added an authenticated Streamable HTTP MCP endpoint at `/mcp` for AI agents to search repositories and awesome lists.
 - Awesome Repos: added a public awesome-list request form with an admin-reviewable request queue.
 - Awesome Repos: repository topic badges now link to the matching topic-filtered search results.
+- Awesome Repos: added aggregate stars and commits history charts to awesome-list detail pages when repository snapshots exist.
 
 ### Changed
 - Awesome Repos: replaced placeholder side-rail sponsor slots with equal-height ads for LVTD projects and attribution-tagged outbound links.
@@ -59,6 +60,7 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Awesome Repos: include `django.contrib.postgres` so pgvector HNSW indexes pass Django production checks.
 - Awesome Repos: removed manifest-dependent logo static references so production template rendering works after `collectstatic`.
 - Awesome Repos: run generated-tag sync when a repository has no stored generated tags, including metadata-only refreshes.
+- Awesome Repos: removed side sponsor rail reservations from awesome-list detail pages to keep the repository list layout balanced.
 
 ### Changed
 - Awesome Repos landing pages no longer render a public navbar.

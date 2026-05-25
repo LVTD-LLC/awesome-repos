@@ -913,6 +913,53 @@ def repository_history_chart_data(
     ]
 
 
+def _awesome_list_history_point(captured_at, latest_by_repo: dict[int, dict]) -> dict:
+    commit_values = [
+        repo_state["commit_count"]
+        for repo_state in latest_by_repo.values()
+        if repo_state["commit_count"] is not None
+    ]
+    return {
+        "captured_at": captured_at.isoformat(),
+        "stars": sum(repo_state["stars"] for repo_state in latest_by_repo.values()),
+        "commit_count": sum(commit_values) if commit_values else None,
+    }
+
+
+def awesome_list_repository_history_chart_data(
+    awesome_list: AwesomeList,
+    *,
+    limit: int = 365,
+) -> list[dict[str, int | str | None]]:
+    snapshots = (
+        RepositorySnapshot.objects.filter(repository__awesome_items__awesome_list=awesome_list)
+        .order_by("captured_at", "id")
+        .values("repository_id", "captured_at", "stars", "commit_count")
+    )
+
+    latest_by_repo = {}
+    points = []
+    current_date = None
+    current_captured_at = None
+    for snapshot in snapshots:
+        captured_at = snapshot["captured_at"]
+        captured_date = captured_at.date()
+        if current_date is not None and captured_date != current_date:
+            points.append(_awesome_list_history_point(current_captured_at, latest_by_repo))
+
+        current_date = captured_date
+        current_captured_at = captured_at
+        latest_by_repo[snapshot["repository_id"]] = {
+            "stars": snapshot["stars"],
+            "commit_count": snapshot["commit_count"],
+        }
+
+    if current_date is not None:
+        points.append(_awesome_list_history_point(current_captured_at, latest_by_repo))
+
+    return points[-limit:]
+
+
 def sync_awesome_list(awesome_list: AwesomeList, limit: int | None = None) -> dict:
     full_name = awesome_list.repo_full_name or parse_github_repo_url(awesome_list.source_url)
     logger.info(

@@ -17,6 +17,7 @@ from apps.repos.models import AwesomeList, Repository
 from apps.repos.search_services import awesome_list_search_queryset
 from apps.repos.services import (
     awesome_list_directory_totals,
+    awesome_list_repository_history_chart_data,
     awesome_list_repository_queryset,
     repository_history_chart_data,
     repository_json_value_counts,
@@ -249,6 +250,9 @@ class AwesomeListDetailView(DetailView):
             archived_count=Count("id", filter=Q(is_archived=True)),
             latest_repo_push=Max("github_pushed_at"),
         )
+        context["list_repository_history_chart_data"] = (
+            awesome_list_repository_history_chart_data(self.object)
+        )
         context["language_counts"] = (
             all_list_repos.exclude(language="")
             .values("language")
@@ -256,4 +260,5 @@ class AwesomeListDetailView(DetailView):
             .order_by("-count", "language")[:12]
         )
         context["page_obj"] = Paginator(repos, 50).get_page(self.request.GET.get("page"))
+        context["hide_side_ad_rails"] = True
         return context
