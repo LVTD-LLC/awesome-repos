@@ -931,13 +931,32 @@ def awesome_list_repository_history_chart_data(
     *,
     limit: int = 365,
 ) -> list[dict[str, int | str | None]]:
+    if limit <= 0:
+        return []
+
+    cutoff = timezone.now() - timezone.timedelta(days=limit)
+    list_snapshots = RepositorySnapshot.objects.filter(
+        repository__awesome_items__awesome_list=awesome_list
+    )
+    seed_snapshots = (
+        list_snapshots.filter(captured_at__lt=cutoff)
+        .order_by("repository_id", "-captured_at", "-id")
+        .distinct("repository_id")
+        .values("repository_id", "stars", "commit_count")
+    )
     snapshots = (
-        RepositorySnapshot.objects.filter(repository__awesome_items__awesome_list=awesome_list)
+        list_snapshots.filter(captured_at__gte=cutoff)
         .order_by("captured_at", "id")
         .values("repository_id", "captured_at", "stars", "commit_count")
     )
 
-    latest_by_repo = {}
+    latest_by_repo = {
+        snapshot["repository_id"]: {
+            "stars": snapshot["stars"],
+            "commit_count": snapshot["commit_count"],
+        }
+        for snapshot in seed_snapshots
+    }
     points = []
     current_date = None
     current_captured_at = None

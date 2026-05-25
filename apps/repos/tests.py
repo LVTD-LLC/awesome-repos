@@ -2600,8 +2600,56 @@ def test_awesome_list_repository_history_chart_data_aggregates_list_snapshots():
 
     assert [point["stars"] for point in chart_data] == [15, 17, 20]
     assert [point["commit_count"] for point in chart_data] == [100, 120, 200]
-    limited_chart_data = awesome_list_repository_history_chart_data(awesome_list, limit=2)
-    assert [point["stars"] for point in limited_chart_data] == [17, 20]
+    windowed_chart_data = awesome_list_repository_history_chart_data(awesome_list, limit=3)
+    assert [point["stars"] for point in windowed_chart_data] == [17, 20]
+
+
+@pytest.mark.django_db
+def test_awesome_list_repository_history_chart_data_seeds_from_before_window():
+    awesome_list = AwesomeList.objects.create(
+        name="Awesome Django",
+        slug="awesome-django",
+        source_url="https://github.com/wsvincent/awesome-django",
+    )
+    repo = Repository.objects.create(
+        full_name="django/django",
+        owner="django",
+        name="django",
+        url="https://github.com/django/django",
+    )
+    second_repo = Repository.objects.create(
+        full_name="django/channels",
+        owner="django",
+        name="channels",
+        url="https://github.com/django/channels",
+    )
+    AwesomeListItem.objects.create(awesome_list=awesome_list, repository=repo)
+    AwesomeListItem.objects.create(awesome_list=awesome_list, repository=second_repo)
+    now = timezone.now()
+
+    RepositorySnapshot.objects.create(
+        repository=repo,
+        captured_at=now - timedelta(days=30),
+        stars=10,
+        commit_count=100,
+    )
+    RepositorySnapshot.objects.create(
+        repository=second_repo,
+        captured_at=now - timedelta(days=30),
+        stars=5,
+        commit_count=50,
+    )
+    RepositorySnapshot.objects.create(
+        repository=repo,
+        captured_at=now - timedelta(days=1),
+        stars=12,
+        commit_count=120,
+    )
+
+    chart_data = awesome_list_repository_history_chart_data(awesome_list, limit=7)
+
+    assert [point["stars"] for point in chart_data] == [17]
+    assert [point["commit_count"] for point in chart_data] == [170]
 
 
 @pytest.mark.django_db
