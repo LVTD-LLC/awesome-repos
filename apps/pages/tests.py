@@ -12,6 +12,16 @@ from django.urls import reverse
 pytestmark = pytest.mark.django_db
 
 
+def assert_standard_ad_layout(content):
+    assert "data-page-ad-shell" in content
+    assert "data-page-content" in content
+    assert 'data-ad-rail="left"' in content
+    assert 'data-ad-rail="right"' in content
+    assert content.count('data-ad-slot="global-left-') == 4
+    assert content.count('data-ad-slot="global-right-') == 4
+    assert content.count("data-ad-slot=") == 8
+
+
 def mark_password_reauthenticated(client, username):
     session = client.session
     session["account_authentication_methods"] = [
@@ -198,6 +208,27 @@ def test_landing_page_does_not_show_sign_in_or_sign_up_buttons(client):
     assert "Browse awesome lists" in content
     assert "Sign In" not in content
     assert "Start for Free" not in content
+
+
+def test_public_pages_use_standard_ad_layout(client):
+    response = client.get(reverse("repos:search"))
+
+    assert response.status_code == 200
+    assert_standard_ad_layout(response.content.decode())
+
+
+def test_app_pages_use_standard_ad_layout(client):
+    user = get_user_model().objects.create_user(
+        username="layoutuser",
+        email="layoutuser@example.com",
+        password="strong-test-pass-123",
+    )
+    client.force_login(user)
+
+    response = client.get(reverse("home"))
+
+    assert response.status_code == 200
+    assert_standard_ad_layout(response.content.decode())
 
 
 def test_settings_requires_email_confirmation_before_passkey_setup(client):
