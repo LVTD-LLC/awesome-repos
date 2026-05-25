@@ -1,3 +1,5 @@
+import re
+
 import pytest
 from django.contrib.auth import get_user_model
 from django.test import override_settings
@@ -192,6 +194,38 @@ def test_admin_panel_bounds_recent_awesome_lists_height(
     assert response.status_code == 200
     assert "Recent awesome lists" in content
     assert "max-h-96 space-y-4 overflow-y-auto pr-2" in content
+
+
+@pytest.mark.django_db
+def test_admin_panel_nav_links_to_repository_and_list_pages(
+    client,
+    monkeypatch,
+    sync_state_transitions,
+):
+    user = get_user_model().objects.create_superuser(
+        username="admin",
+        email="admin@example.com",
+        password="password123",
+    )
+    client.force_login(user)
+    monkeypatch.setattr(
+        "apps.core.views.github_rate_limit_status",
+        lambda: {
+            "ok": False,
+            "error": "",
+        },
+    )
+
+    response = client.get(reverse("admin_panel"))
+    content = response.content.decode()
+
+    assert response.status_code == 200
+    repos_link = rf'<a href="{re.escape(reverse("repos:search"))}"[^>]*>\s*Repos\s*</a>'
+    lists_link = rf'<a href="{re.escape(reverse("repos:list"))}"[^>]*>\s*Lists\s*</a>'
+    assert re.search(repos_link, content)
+    assert re.search(lists_link, content)
+    assert not re.search(r"<a\b[^>]*>\s*Dashboard\s*</a>", content)
+    assert not re.search(r"<a\b[^>]*>\s*Settings\s*</a>", content)
 
 
 @override_settings(SITE_URL="http://example.com")
