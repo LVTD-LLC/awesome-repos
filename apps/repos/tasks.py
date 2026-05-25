@@ -8,12 +8,9 @@ from django_q.tasks import async_task
 from apps.repos.models import AwesomeList, Repository
 from apps.repos.services import (
     add_repository_to_awesome_list,
-    discover_missing_awesome_list_repositories,
     github_rate_limit_remaining,
     github_rate_limit_status,
     is_github_rate_limit_error,
-    sync_awesome_list,
-    upsert_repository_from_github,
 )
 from awesome_repos.utils import get_awesome_repos_logger
 
@@ -87,7 +84,7 @@ def sync_awesome_list_task(awesome_list_id: int, limit: int | None = None):
             awesome_list_slug=awesome_list.slug,
             limit=limit,
         )
-        result = sync_awesome_list(awesome_list, limit=limit)
+        result = awesome_list.sync_from_source(limit=limit)
         logger.info(
             "awesome_list_scan_task_finished",
             awesome_list_id=awesome_list_id,
@@ -163,7 +160,7 @@ def enqueue_missing_repositories_for_awesome_list_task(
             limit=limit,
             daily_limit=resolved_daily_limit,
         )
-        result = discover_missing_awesome_list_repositories(awesome_list, limit=limit)
+        result = awesome_list.discover_missing_repositories_from_source(limit=limit)
         task_ids = []
         budget_exhausted = False
         for repo_full_name in result["missing"]:
@@ -244,15 +241,16 @@ def refresh_repository_task(
     repository_id: int,
     full_name: str,
     *,
-    include_readme: bool = True,
+    include_readme: bool | None = None,
 ):
+    # Keep include_readme in the signature so older queued jobs still deserialize.
     logger.info(
         "repository_refresh_task_started",
         repository_id=repository_id,
         repository_full_name=full_name,
     )
     try:
-        refreshed = upsert_repository_from_github(full_name, include_readme=include_readme)
+        refreshed = Repository.sync_from_source(full_name)
         logger.info(
             "repository_refresh_task_finished",
             requested_repository_id=repository_id,
@@ -289,9 +287,11 @@ def refresh_repository_task(
 def refresh_repositories_task(
     limit: int | None = None,
     *,
-    include_readme: bool = False,
+    include_readme: bool | None = None,
     min_rate_limit_remaining: int | None = None,
 ):
+    # Scheduled repository refreshes should always use the model's full sync path.
+    include_readme = True
     total_repositories = Repository.objects.count()
     refresh_limit = (
         limit if limit is not None else daily_repository_refresh_limit(total_repositories)
@@ -324,7 +324,6 @@ def refresh_repositories_task(
             "apps.repos.tasks.refresh_repository_task",
             repository_id,
             full_name,
-            include_readme=include_readme,
             group="Refresh repositories",
         )
         queued.append(

@@ -27,7 +27,7 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Awesome Repos search filters now expose semantic relevance mode for repository queries.
 - Awesome Repos: record repository metadata snapshots on every GitHub refresh and show tracked star growth in repository search/detail pages.
 - Awesome Repos: record default-branch commit counts during repository refreshes and show commit growth in repository history.
-- Awesome Repos: added a daily budgeted repository metadata refresh that walks the oldest-synced repositories first and skips README refreshes by default.
+- Awesome Repos: added a daily budgeted repository refresh that walks the oldest-synced repositories first and uses the same full-source sync path as manual repository rescans.
 - Awesome Repos: store each ingested repository README alongside the GitHub API metadata.
 - Awesome Repos: detect AI development config files during repository sync and add an AI dev signals filter to repository search.
 - Awesome Repos: generate repository discovery tags from descriptions and READMEs, and add filters for generated tags and GitHub topics.

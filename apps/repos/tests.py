@@ -1800,14 +1800,13 @@ def test_refresh_repository_task_updates_single_repository(monkeypatch):
     )
     refreshed = []
 
-    def fake_upsert_repository_from_github(full_name, *, include_readme=True):
-        assert include_readme is True
+    def fake_sync_from_source(full_name):
         refreshed.append(full_name)
         return repository
 
     monkeypatch.setattr(
-        "apps.repos.tasks.upsert_repository_from_github",
-        fake_upsert_repository_from_github,
+        "apps.repos.tasks.Repository.sync_from_source",
+        staticmethod(fake_sync_from_source),
     )
 
     result = refresh_repository_task(repository.id, repository.full_name)
@@ -1874,13 +1873,13 @@ def test_refresh_repository_task_logs_and_reraises_failures(monkeypatch):
 
     dummy_logger = DummyLogger()
 
-    def fake_upsert_repository_from_github(full_name, *, include_readme=True):
+    def fake_sync_from_source(full_name):
         raise RuntimeError(f"could not refresh {full_name}")
 
     monkeypatch.setattr("apps.repos.tasks.logger", dummy_logger)
     monkeypatch.setattr(
-        "apps.repos.tasks.upsert_repository_from_github",
-        fake_upsert_repository_from_github,
+        "apps.repos.tasks.Repository.sync_from_source",
+        staticmethod(fake_sync_from_source),
     )
 
     with pytest.raises(RuntimeError, match="could not refresh django/django"):
@@ -1910,7 +1909,7 @@ def test_daily_repository_refresh_limit_uses_target_days_and_cap(settings):
 
 
 @pytest.mark.django_db
-def test_refresh_repositories_task_refreshes_oldest_metadata_only(monkeypatch):
+def test_refresh_repositories_task_refreshes_oldest_repositories(monkeypatch):
     stale = Repository.objects.create(
         full_name="owner/stale",
         owner="owner",
@@ -1943,7 +1942,7 @@ def test_refresh_repositories_task_refreshes_oldest_metadata_only(monkeypatch):
             "apps.repos.tasks.refresh_repository_task",
             stale.id,
             "owner/stale",
-            {"include_readme": False, "group": "Refresh repositories"},
+            {"group": "Refresh repositories"},
             f"task-{stale.id}",
         )
     ]
@@ -1951,7 +1950,7 @@ def test_refresh_repositories_task_refreshes_oldest_metadata_only(monkeypatch):
         "queued": 1,
         "limit": 1,
         "total_repositories": 2,
-        "include_readme": False,
+        "include_readme": True,
         "rate_limit_remaining": None,
         "repositories": [
             {
@@ -1995,14 +1994,17 @@ def test_refresh_repository_task_stops_on_rate_limit_error(monkeypatch):
         url="https://github.com/owner/stale",
     )
 
-    def fail_upsert(full_name, *, include_readme=True):
+    def fail_sync_from_source(full_name):
         raise GitHubAPIError(
             "403 Forbidden | rate_limit_remaining=0",
             status_code=403,
             rate_limit_remaining="0",
         )
 
-    monkeypatch.setattr("apps.repos.tasks.upsert_repository_from_github", fail_upsert)
+    monkeypatch.setattr(
+        "apps.repos.tasks.Repository.sync_from_source",
+        staticmethod(fail_sync_from_source),
+    )
 
     result = refresh_repository_task(repository.id, repository.full_name)
 
@@ -3340,7 +3342,7 @@ def test_superuser_can_queue_repository_rescan_from_detail(
         (
             "apps.repos.tasks.refresh_repository_task",
             (repo.id, repo.full_name),
-            {"include_readme": True, "group": "Refresh repositories"},
+            {"group": "Refresh repositories"},
         )
     ]
     assert "Queued a rescan for django/django." in response.content.decode()

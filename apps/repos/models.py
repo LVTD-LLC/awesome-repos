@@ -47,6 +47,16 @@ class AwesomeList(BaseModel):
     def get_absolute_url(self):
         return reverse("repos:list_detail", args=[self.slug])
 
+    def sync_from_source(self, limit: int | None = None) -> dict:
+        from apps.repos.services import sync_awesome_list
+
+        return sync_awesome_list(self, limit=limit)
+
+    def discover_missing_repositories_from_source(self, limit: int | None = None) -> dict:
+        from apps.repos.services import discover_missing_awesome_list_repositories
+
+        return discover_missing_awesome_list_repositories(self, limit=limit)
+
 
 class AwesomeListRequest(BaseModel):
     class Status(models.TextChoices):
@@ -136,6 +146,15 @@ class Repository(BaseModel):
 
     def get_absolute_url(self):
         return reverse("repos:repo_detail", kwargs={"owner": self.owner, "name": self.name})
+
+    @classmethod
+    def sync_from_source(cls, full_name: str) -> Repository:
+        from apps.repos.services import upsert_repository_from_github
+
+        return upsert_repository_from_github(full_name)
+
+    def refresh_from_source(self) -> Repository:
+        return self.sync_from_source(self.full_name)
 
 
 class RepositorySnapshot(BaseModel):
