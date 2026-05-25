@@ -360,7 +360,7 @@ def test_superuser_api_can_create_lists_and_queue_refreshes(client, django_user_
         (
             "apps.repos.tasks.refresh_repository_task",
             (repo.id, repo.full_name),
-            {"include_readme": True, "group": "Refresh repositories"},
+            {"group": "Refresh repositories"},
         ),
     ]
 

@@ -1119,7 +1119,7 @@ def refresh_repositories(
     queryset=None,
     limit: int | None = None,
     *,
-    include_readme: bool = False,
+    include_readme: bool = True,
 ) -> dict:
     queryset = queryset or Repository.objects.all()
     if limit:

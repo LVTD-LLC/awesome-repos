@@ -83,7 +83,6 @@ def queue_repository_rescan(request, owner: str, name: str):
             "apps.repos.tasks.refresh_repository_task",
             repository.id,
             repository.full_name,
-            include_readme=True,
             group=REPOSITORY_REFRESH_TASK_GROUP,
         )
     )
