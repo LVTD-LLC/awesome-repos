@@ -103,9 +103,10 @@ AI_DEVELOPMENT_PATH_PREFIX_SIGNALS = (
     (".github/instructions/", "GitHub Copilot", "copilot_path_instructions"),
     (".windsurf/rules/", "Windsurf", "windsurf_workspace_rules"),
 )
-AWESOME_LIST_DERIVED_META_KEYS = {"commits_count"}
+AWESOME_LIST_DERIVED_META_KEYS = {"commits_count", "first_commit_at"}
 REPOSITORY_JSON_FILTER_FIELDS = {"topics", "generated_tags"}
 MAX_UPDATED_DAYS_FILTER = 36500
+MAX_AGE_YEARS_FILTER = 100
 
 
 class GitHubAPIError(RuntimeError):
@@ -289,12 +290,25 @@ def _last_page_from_link_header(link_header: str) -> int | None:
     return None
 
 
-def fetch_github_commit_count(full_name: str, default_branch: str) -> int:
-    if not default_branch:
-        raise ValueError("Cannot fetch commit count without a default branch.")
+def _commit_datetime(commit: dict) -> datetime | None:
+    commit_data = commit.get("commit") or {}
+    date_value = (
+        (commit_data.get("author") or {}).get("date")
+        or (commit_data.get("committer") or {}).get("date")
+    )
+    return dt(date_value)
 
-    query = urlencode({"sha": default_branch, "per_page": 1})
-    url = f"https://api.github.com/repos/{full_name}/commits?{query}"
+
+def _fetch_github_commits_page(
+    full_name: str,
+    default_branch: str,
+    *,
+    page: int | None = None,
+) -> tuple[list[dict], str]:
+    query_params = {"sha": default_branch, "per_page": 1}
+    if page is not None:
+        query_params["page"] = page
+    url = f"https://api.github.com/repos/{full_name}/commits?{urlencode(query_params)}"
     request = Request(url, headers=github_headers())
     try:
         with urlopen(request, timeout=30) as response:
@@ -304,13 +318,42 @@ def fetch_github_commit_count(full_name: str, default_branch: str) -> int:
     except HTTPError as exc:
         _capture_github_rate_limit_headers(exc.headers)
         if exc.code == 409:
-            return 0
+            return [], ""
         raise RuntimeError(_github_error_message(url, exc)) from exc
 
+    return (commits if isinstance(commits, list) else []), link_header
+
+
+def fetch_github_commit_count_and_first_commit_at(
+    full_name: str,
+    default_branch: str,
+) -> tuple[int, datetime | None]:
+    if not default_branch:
+        raise ValueError("Cannot fetch commit count without a default branch.")
+
+    commits, link_header = _fetch_github_commits_page(full_name, default_branch)
+    last_page = _last_page_from_link_header(link_header)
+    if last_page is not None:
+        first_commit_page = commits
+        if last_page > 1:
+            first_commit_page, _link_header = _fetch_github_commits_page(
+                full_name,
+                default_branch,
+                page=last_page,
+            )
+        return last_page, _commit_datetime(first_commit_page[0]) if first_commit_page else None
+    return len(commits), _commit_datetime(commits[0]) if commits else None
+
+
+def fetch_github_commit_count(full_name: str, default_branch: str) -> int:
+    if not default_branch:
+        raise ValueError("Cannot fetch commit count without a default branch.")
+
+    commits, link_header = _fetch_github_commits_page(full_name, default_branch)
     last_page = _last_page_from_link_header(link_header)
     if last_page is not None:
         return last_page
-    return len(commits) if isinstance(commits, list) else 0
+    return len(commits)
 
 
 def github_rate_limit_status() -> dict:
@@ -399,7 +442,12 @@ def fetch_awesome_readme(full_name: str) -> tuple[str, dict]:
     raise RuntimeError(f"Could not fetch README for {full_name}: {last_error}")
 
 
-def attach_awesome_list_commit_count(full_name: str, meta: dict) -> None:
+def attach_awesome_list_commit_count(
+    full_name: str,
+    meta: dict,
+    *,
+    existing_first_commit_at=None,
+) -> None:
     default_branch = meta.get("default_branch") or ""
     if not default_branch:
         logger.warning(
@@ -410,10 +458,20 @@ def attach_awesome_list_commit_count(full_name: str, meta: dict) -> None:
         return
 
     try:
-        meta["commits_count"] = fetch_github_commit_count(full_name, default_branch)
+        first_commit_at = None
+        if existing_first_commit_at is not None:
+            commit_count = fetch_github_commit_count(full_name, default_branch)
+        else:
+            commit_count, first_commit_at = fetch_github_commit_count_and_first_commit_at(
+                full_name,
+                default_branch,
+            )
+        meta["commits_count"] = commit_count
+        if first_commit_at is not None:
+            meta["first_commit_at"] = first_commit_at
     except Exception as exc:  # noqa: BLE001 - commit count is useful but optional
         logger.warning(
-            "awesome_list_commit_count_fetch_failed",
+            "awesome_list_commit_activity_fetch_failed",
             repo_full_name=full_name,
             error=str(exc),
             exc_info=True,
@@ -577,9 +635,13 @@ def fetch_repository_ai_development_signals(
     return detect_ai_development_signals(tree_items)
 
 
-def dt(value: str | None):
+def dt(value: str | datetime | None):
     if not value:
         return None
+    if isinstance(value, datetime):
+        if timezone.is_naive(value):
+            return timezone.make_aware(value)
+        return value
     parsed = parse_datetime(value)
     if parsed and timezone.is_naive(parsed):
         return timezone.make_aware(parsed)
@@ -625,6 +687,9 @@ def update_awesome_list_metadata(
     if meta.get("commits_count") is not None:
         awesome_list.commits_count = meta["commits_count"]
         update_fields.append("commits_count")
+    if meta.get("first_commit_at") is not None:
+        awesome_list.first_commit_at = dt(meta.get("first_commit_at"))
+        update_fields.append("first_commit_at")
     awesome_list.readme_repository_count = readme_repository_count
     awesome_list.default_branch = meta.get("default_branch") or ""
     awesome_list.is_archived = bool(meta.get("archived"))
@@ -668,6 +733,7 @@ def record_repository_snapshot(
         github_created_at=repository.github_created_at,
         github_updated_at=repository.github_updated_at,
         github_pushed_at=repository.github_pushed_at,
+        first_commit_at=repository.first_commit_at,
     )
 
 
@@ -679,6 +745,7 @@ def _upsert_repository_metadata(
     readme_data: dict | None = None,
     ai_development_signals: list[dict] | None = None,
     commit_count: int | None = None,
+    first_commit_at: datetime | None = None,
 ) -> Repository:
     full_name = data["full_name"]
     license_data = data.get("license") or {}
@@ -730,6 +797,8 @@ def _upsert_repository_metadata(
     }
     if commit_count is not None:
         defaults["commit_count"] = commit_count
+    if first_commit_at is not None:
+        defaults["first_commit_at"] = dt(first_commit_at)
 
     repo, _ = Repository.objects.update_or_create(
         full_name=full_name,
@@ -742,6 +811,11 @@ def _upsert_repository_metadata(
 def upsert_repository_from_github(full_name: str, *, include_readme: bool = True) -> Repository:
     data = fetch_json(f"https://api.github.com/repos/{full_name}")
     default_branch = data.get("default_branch") or ""
+    existing_first_commit_at = (
+        Repository.objects.filter(full_name=data["full_name"])
+        .values_list("first_commit_at", flat=True)
+        .first()
+    )
     readme_data = None
     if include_readme:
         try:
@@ -774,11 +848,18 @@ def upsert_repository_from_github(full_name: str, *, include_readme: bool = True
             exc_info=True,
         )
         ai_development_signals = None
+    first_commit_at = None
     try:
-        commit_count = fetch_github_commit_count(data["full_name"], default_branch)
+        if existing_first_commit_at is not None:
+            commit_count = fetch_github_commit_count(data["full_name"], default_branch)
+        else:
+            commit_count, first_commit_at = fetch_github_commit_count_and_first_commit_at(
+                data["full_name"],
+                default_branch,
+            )
     except Exception as exc:  # noqa: BLE001 - commit counts are useful but optional
         logger.warning(
-            "repository_commit_count_fetch_failed",
+            "repository_commit_activity_fetch_failed",
             repo_full_name=data["full_name"],
             default_branch=default_branch,
             error=str(exc),
@@ -792,6 +873,7 @@ def upsert_repository_from_github(full_name: str, *, include_readme: bool = True
         readme_data=readme_data,
         ai_development_signals=ai_development_signals,
         commit_count=commit_count,
+        first_commit_at=first_commit_at,
     )
     if repository_tagging_configured() and (include_readme or not repo.generated_tags):
         sync_repository_tags(repo, repo.readme)
@@ -990,7 +1072,11 @@ def sync_awesome_list(awesome_list: AwesomeList, limit: int | None = None) -> di
         limit=limit,
     )
     markdown, meta = fetch_awesome_readme(full_name)
-    attach_awesome_list_commit_count(full_name, meta)
+    attach_awesome_list_commit_count(
+        full_name,
+        meta,
+        existing_first_commit_at=awesome_list.first_commit_at,
+    )
     discovered_repo_names = extract_github_repos(markdown)
     scanned_at = timezone.now()
     repo_names = discovered_repo_names
@@ -1305,6 +1391,17 @@ def _positive_int_param(params, name: str) -> int | None:
     return parsed
 
 
+def minimum_age_cutoff(params, name: str = "min_age_years"):
+    years = _positive_int_param(params, name)
+    if not years or years > MAX_AGE_YEARS_FILTER:
+        return None
+    cutoff = timezone.now().replace(microsecond=0)
+    try:
+        return cutoff.replace(year=cutoff.year - years)
+    except ValueError:
+        return cutoff.replace(year=cutoff.year - years, day=28)
+
+
 def _apply_list_repository_keyword_filter(qs, params):
     q = (params.get("q") or "").strip()
     if q:
@@ -1344,6 +1441,10 @@ def _apply_list_repository_state_filters(qs, params):
         cutoff = timezone.now() - timezone.timedelta(days=updated_days)
         qs = qs.filter(github_pushed_at__gte=cutoff)
 
+    age_cutoff = minimum_age_cutoff(params)
+    if age_cutoff:
+        qs = qs.filter(first_commit_at__lte=age_cutoff)
+
     archived = params.get("archived")
     if archived == "yes":
         qs = qs.filter(is_archived=True)
@@ -1365,6 +1466,7 @@ def _order_list_repositories(qs, params):
         "forks": "-forks",
         "recent": models.F("github_pushed_at").desc(nulls_last=True),
         "created": models.F("github_created_at").desc(nulls_last=True),
+        "oldest": models.F("first_commit_at").asc(nulls_last=True),
         "commits": models.F("commit_count").desc(nulls_last=True),
         "awesome": models.F("awesome_count").desc(nulls_last=True),
         "least_awesome": models.F("awesome_count").asc(nulls_last=True),
@@ -1444,9 +1546,9 @@ def _apply_repository_taxonomy_filters(qs, params):
 
 
 def _apply_repository_state_filters(qs, params):
-    min_stars = params.get("min_stars")
-    if min_stars:
-        qs = qs.filter(stars__gte=int(min_stars))
+    min_stars = _positive_int_param(params, "min_stars")
+    if min_stars is not None:
+        qs = qs.filter(stars__gte=min_stars)
     archived = params.get("archived")
     if archived == "yes":
         qs = qs.filter(is_archived=True)
@@ -1457,10 +1559,13 @@ def _apply_repository_state_filters(qs, params):
         qs = qs.filter(uses_ai_for_development=True)
     elif ai_development == "no":
         qs = qs.filter(uses_ai_for_development=False)
-    updated_days = params.get("updated_days")
-    if updated_days:
-        cutoff = timezone.now() - timezone.timedelta(days=int(updated_days))
+    updated_days = _positive_int_param(params, "updated_days")
+    if updated_days and updated_days <= MAX_UPDATED_DAYS_FILTER:
+        cutoff = timezone.now() - timezone.timedelta(days=updated_days)
         qs = qs.filter(github_pushed_at__gte=cutoff)
+    age_cutoff = minimum_age_cutoff(params)
+    if age_cutoff:
+        qs = qs.filter(first_commit_at__lte=age_cutoff)
     return qs
 
 
@@ -1517,6 +1622,7 @@ def repository_search_queryset(params):
         "stars": "-stars",
         "recent": "-github_pushed_at",
         "created": "-github_created_at",
+        "oldest": models.F("first_commit_at").asc(nulls_last=True),
         "commits": models.F("commit_count").desc(nulls_last=True),
         "awesome": "-awesome_count",
         "name": "full_name",

@@ -28,6 +28,7 @@ class AwesomeList(BaseModel):
     github_created_at = models.DateTimeField(null=True, blank=True)
     github_updated_at = models.DateTimeField(null=True, blank=True)
     github_pushed_at = models.DateTimeField(null=True, blank=True)
+    first_commit_at = models.DateTimeField(null=True, blank=True)
     is_active = models.BooleanField(default=True)
     last_scanned_at = models.DateTimeField(null=True, blank=True)
     last_error = models.TextField(blank=True, default="")
@@ -38,6 +39,7 @@ class AwesomeList(BaseModel):
         indexes = [
             models.Index(fields=["-stars"]),
             models.Index(fields=["-github_pushed_at"]),
+            models.Index(fields=["first_commit_at"]),
             models.Index(fields=["-last_scanned_at"]),
         ]
 
@@ -110,6 +112,7 @@ class Repository(BaseModel):
     github_created_at = models.DateTimeField(null=True, blank=True)
     github_updated_at = models.DateTimeField(null=True, blank=True)
     github_pushed_at = models.DateTimeField(null=True, blank=True)
+    first_commit_at = models.DateTimeField(null=True, blank=True)
     last_synced_at = models.DateTimeField(null=True, blank=True)
     readme = models.TextField(blank=True, default="")
     readme_path = models.CharField(max_length=255, blank=True, default="")
@@ -130,6 +133,7 @@ class Repository(BaseModel):
         indexes = [
             models.Index(fields=["-stars"]),
             models.Index(fields=["-github_pushed_at"]),
+            models.Index(fields=["first_commit_at"]),
             models.Index(fields=["is_archived"]),
             models.Index(fields=["language"]),
             models.Index(fields=["uses_ai_for_development"]),
@@ -175,6 +179,7 @@ class RepositorySnapshot(BaseModel):
     github_created_at = models.DateTimeField(null=True, blank=True)
     github_updated_at = models.DateTimeField(null=True, blank=True)
     github_pushed_at = models.DateTimeField(null=True, blank=True)
+    first_commit_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ["-captured_at", "-id"]

@@ -58,7 +58,7 @@
         Search every repository hiding inside awesome lists.
       </h1>
       <p class="mt-5 max-w-3xl text-lg leading-8 text-gray-600 dark:text-gray-300">
-        Discover projects curated by awesome-list maintainers, then narrow them by stars, freshness, archive status, language, topics, generated tags, and source list.
+        Discover projects curated by awesome-list maintainers, then narrow them by stars, age, freshness, archive status, language, topics, generated tags, and source list.
       </p>
 
       <div class="mt-8 flex flex-col gap-3 lg:flex-row">
@@ -136,7 +136,7 @@
         {{ page_obj.paginator.count|intcomma }} repo{{ page_obj.paginator.count|pluralize }} shown
       </div>
       <div class="mt-2 flex flex-wrap gap-2 text-xs text-gray-600 dark:text-gray-300">
-        {% if request.GET.q or request.GET.mode or request.GET.list or request.GET.language or request.GET.topic or request.GET.generated_tag or request.GET.min_stars or request.GET.updated_days or request.GET.archived or request.GET.ai_development or request.GET.sort %}
+        {% if request.GET.q or request.GET.mode or request.GET.list or request.GET.language or request.GET.topic or request.GET.generated_tag or request.GET.min_stars or request.GET.updated_days or request.GET.min_age_years or request.GET.archived or request.GET.ai_development or request.GET.sort %}
           {% if request.GET.q %}<span class="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-900">Search: {{ request.GET.q }}</span>{% endif %}
           {% if request.GET.mode %}<span class="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-900">Mode: {{ request.GET.mode }}</span>{% endif %}
           {% if request.GET.list %}<span class="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-900">List: {{ request.GET.list }}</span>{% endif %}
@@ -145,6 +145,7 @@
           {% if request.GET.generated_tag %}<span class="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-900">Tag: {{ request.GET.generated_tag }}</span>{% endif %}
           {% if request.GET.min_stars %}<span class="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-900">Min stars: {{ request.GET.min_stars }}</span>{% endif %}
           {% if request.GET.updated_days %}<span class="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-900">Updated: {{ request.GET.updated_days }} days</span>{% endif %}
+          {% if request.GET.min_age_years %}<span class="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-900">Age: {{ request.GET.min_age_years }}+ years</span>{% endif %}
           {% if request.GET.archived %}<span class="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-900">Archived: {{ request.GET.archived }}</span>{% endif %}
           {% if request.GET.ai_development %}<span class="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-900">AI dev: {{ request.GET.ai_development }}</span>{% endif %}
           {% if request.GET.sort %}<span class="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-900">Sort: {{ request.GET.sort }}</span>{% endif %}
@@ -300,6 +301,18 @@
           </div>
 
           <div>
+            <label for="repo-filter-min-age-years" class="block text-sm font-semibold text-gray-800 dark:text-gray-200">Repository age</label>
+            <select id="repo-filter-min-age-years" name="min_age_years" class="mt-2 block w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100">
+              <option value="">Any age</option>
+              <option value="1" {% if request.GET.min_age_years == "1" %}selected{% endif %}>1+ years old</option>
+              <option value="3" {% if request.GET.min_age_years == "3" %}selected{% endif %}>3+ years old</option>
+              <option value="5" {% if request.GET.min_age_years == "5" %}selected{% endif %}>5+ years old</option>
+              <option value="10" {% if request.GET.min_age_years == "10" %}selected{% endif %}>10+ years old</option>
+            </select>
+            <p class="mt-2 text-xs leading-5 text-gray-500 dark:text-gray-400">Age filters use known first-commit dates and exclude repositories that have not synced that data yet.</p>
+          </div>
+
+          <div>
             <label for="repo-filter-archived" class="block text-sm font-semibold text-gray-800 dark:text-gray-200">Archive status</label>
             <select id="repo-filter-archived" name="archived" class="mt-2 block w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100">
               <option value="">Archived or active</option>
@@ -323,6 +336,7 @@
               <option value="stars" {% if request.GET.sort == "stars" or not request.GET.sort %}selected{% endif %}>Sort by stars</option>
               <option value="recent" {% if request.GET.sort == "recent" %}selected{% endif %}>Recently updated</option>
               <option value="created" {% if request.GET.sort == "created" %}selected{% endif %}>Recently created</option>
+              <option value="oldest" {% if request.GET.sort == "oldest" %}selected{% endif %}>Oldest first commit</option>
               <option value="commits" {% if request.GET.sort == "commits" %}selected{% endif %}>Most commits</option>
               <option value="awesome" {% if request.GET.sort == "awesome" %}selected{% endif %}>Most awesome-list mentions</option>
               <option value="name" {% if request.GET.sort == "name" %}selected{% endif %}>Name</option>
@@ -364,6 +378,7 @@
               {% if repo.uses_ai_for_development %}<span class="rounded-full bg-green-100 px-3 py-1 text-green-800 dark:bg-green-900/40 dark:text-green-200">AI dev signals</span>{% endif %}
               <span class="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-800">{{ repo.awesome_count }} awesome list{{ repo.awesome_count|pluralize }}</span>
               {% if repo.commit_count != None %}<span class="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-800">{{ repo.commit_count }} commits</span>{% endif %}
+              {% if repo.first_commit_at %}<span class="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-800">first commit {{ repo.first_commit_at|date:"Y-m-d" }}</span>{% endif %}
               {% if repo.snapshot_count %}<span class="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-800">{{ repo.snapshot_count }} history point{{ repo.snapshot_count|pluralize }}</span>{% endif %}
               {% if repo.github_pushed_at %}<span class="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-800">updated {{ repo.github_pushed_at|date:"Y-m-d" }}</span>{% endif %}
             </div>

@@ -74,6 +74,7 @@ class AwesomeListSummaryOut(Schema):
     github_created_at: datetime | None
     github_updated_at: datetime | None
     github_pushed_at: datetime | None
+    first_commit_at: datetime | None
     last_scanned_at: datetime | None
     last_error: str
 
@@ -114,6 +115,7 @@ class RepositorySnapshotOut(Schema):
     commit_count: int | None
     open_issues: int
     watchers: int
+    first_commit_at: datetime | None
 
 
 class RepositoryHistoryPointOut(Schema):
@@ -166,6 +168,7 @@ class RepositorySummaryOut(Schema):
     github_created_at: datetime | None
     github_updated_at: datetime | None
     github_pushed_at: datetime | None
+    first_commit_at: datetime | None
     last_synced_at: datetime | None
     awesome_lists: list[AwesomeListReferenceOut]
 

@@ -104,6 +104,7 @@
         <h2 class="text-lg font-bold">Metadata</h2>
         <ul class="mt-3 space-y-2 text-gray-600 dark:text-gray-300">
           <li>Created: {{ repository.github_created_at|date:"Y-m-d"|default:"—" }}</li>
+          <li>First commit: {{ repository.first_commit_at|date:"Y-m-d"|default:"—" }}</li>
           <li>Last pushed: {{ repository.github_pushed_at|date:"Y-m-d"|default:"—" }}</li>
           <li>Archived: {{ repository.is_archived|yesno:"yes,no" }}</li>
           <li>AI dev signals: {{ repository.uses_ai_for_development|yesno:"yes,no" }}</li>
