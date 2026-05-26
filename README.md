@@ -72,7 +72,7 @@ This project keeps Django apps inside the `/apps` directory. This is both for hu
 Authenticated API keys can read account and catalog data from the API:
 
 - `GET /api/user` returns safe account/profile details for the authenticated API key.
-- `GET /api/repositories` searches indexed repositories. Useful query parameters include `q`, `language`, `list`, `topic`, `generated_tag`, `min_stars`, `updated_days`, `min_age_years`, `archived`, `ai_development`, `sort`, `page`, and `page_size`.
+- `GET /api/repositories` searches indexed repositories. Useful query parameters include `q`, `language`, `list`, `topic`, `generated_tag`, `min_stars`, `updated_days`, `min_age_years`, `archived`, `ai_development`, `sort`, `page`, and `page_size`. Age filters use known first-commit dates and exclude rows that have not synced that data yet.
 - `GET /api/repositories/{owner}/{name}` returns stored metadata, list membership, growth history, README content, and similar repositories for one indexed repository.
 - `GET /api/awesome-lists` searches active awesome lists by name, source repository, description, topics, and `min_age_years`.
 - `GET /api/awesome-lists/{slug}` returns stored metadata and aggregate repository stats for one active awesome list.

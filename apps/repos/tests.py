@@ -45,6 +45,7 @@ from apps.repos.services import (
     fetch_repository_readme_data,
     fetch_repository_tree_items,
     github_rate_limit_status,
+    minimum_age_cutoff,
     parse_github_repo_url,
     refresh_repositories,
     repository_history_chart_data,
@@ -662,7 +663,8 @@ def test_fetch_github_commit_count_and_first_commit_at_uses_oldest_page(monkeypa
         if "page=456" in request.full_url:
             return DummyResponse(
                 body=(
-                    b'[{"commit": {"committer": {"date": "2008-04-10T12:00:00Z"}}}]'
+                    b'[{"commit": {"author": {"date": "2007-04-10T12:00:00Z"}, '
+                    b'"committer": {"date": "2008-04-10T12:00:00Z"}}}]'
                 ),
                 headers={},
             )
@@ -686,8 +688,25 @@ def test_fetch_github_commit_count_and_first_commit_at_uses_oldest_page(monkeypa
     )
 
     assert commit_count == 456
-    assert first_commit_at == datetime(2008, 4, 10, 12, tzinfo=UTC)
+    assert first_commit_at == datetime(2007, 4, 10, 12, tzinfo=UTC)
     assert any("page=456" in url for url in requested_urls)
+
+
+def test_minimum_age_cutoff_uses_calendar_years(monkeypatch):
+    monkeypatch.setattr(
+        "apps.repos.services.timezone.now",
+        lambda: datetime(2024, 2, 29, 12, 30, 15, 123456, tzinfo=UTC),
+    )
+
+    assert minimum_age_cutoff({"min_age_years": "1"}) == datetime(
+        2023,
+        2,
+        28,
+        12,
+        30,
+        15,
+        tzinfo=UTC,
+    )
 
 
 def test_fetch_github_commit_count_counts_single_unpaginated_page(monkeypatch):

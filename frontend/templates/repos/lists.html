@@ -56,13 +56,16 @@
         <option value="scanned" {% if request.GET.sort == "scanned" %}selected{% endif %}>Recently scanned</option>
         <option value="name" {% if request.GET.sort == "name" %}selected{% endif %}>Name</option>
       </select>
-      <select name="min_age_years" class="rounded-xl border border-gray-300 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-950">
-        <option value="">Any age</option>
-        <option value="1" {% if request.GET.min_age_years == "1" %}selected{% endif %}>1+ years old</option>
-        <option value="3" {% if request.GET.min_age_years == "3" %}selected{% endif %}>3+ years old</option>
-        <option value="5" {% if request.GET.min_age_years == "5" %}selected{% endif %}>5+ years old</option>
-        <option value="10" {% if request.GET.min_age_years == "10" %}selected{% endif %}>10+ years old</option>
-      </select>
+      <div>
+        <select name="min_age_years" class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-950">
+          <option value="">Any age</option>
+          <option value="1" {% if request.GET.min_age_years == "1" %}selected{% endif %}>1+ years old</option>
+          <option value="3" {% if request.GET.min_age_years == "3" %}selected{% endif %}>3+ years old</option>
+          <option value="5" {% if request.GET.min_age_years == "5" %}selected{% endif %}>5+ years old</option>
+          <option value="10" {% if request.GET.min_age_years == "10" %}selected{% endif %}>10+ years old</option>
+        </select>
+        <p class="mt-2 text-xs leading-5 text-gray-500 dark:text-gray-400">Uses known first-commit dates only.</p>
+      </div>
       <button class="rounded-xl bg-green-600 px-5 py-3 font-semibold text-white hover:bg-green-700">Apply</button>
     </div>
   </form>

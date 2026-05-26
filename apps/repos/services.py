@@ -293,8 +293,8 @@ def _last_page_from_link_header(link_header: str) -> int | None:
 def _commit_datetime(commit: dict) -> datetime | None:
     commit_data = commit.get("commit") or {}
     date_value = (
-        (commit_data.get("committer") or {}).get("date")
-        or (commit_data.get("author") or {}).get("date")
+        (commit_data.get("author") or {}).get("date")
+        or (commit_data.get("committer") or {}).get("date")
     )
     return dt(date_value)
 
@@ -1371,7 +1371,11 @@ def minimum_age_cutoff(params, name: str = "min_age_years"):
     years = _positive_int_param(params, name)
     if not years or years > MAX_AGE_YEARS_FILTER:
         return None
-    return timezone.now() - timezone.timedelta(days=years * 365)
+    cutoff = timezone.now().replace(microsecond=0)
+    try:
+        return cutoff.replace(year=cutoff.year - years)
+    except ValueError:
+        return cutoff.replace(year=cutoff.year - years, day=28)
 
 
 def _apply_list_repository_keyword_filter(qs, params):
