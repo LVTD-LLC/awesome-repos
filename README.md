@@ -87,6 +87,8 @@ uv run python manage.py backfill_first_commit_dates --limit 100
 uv run python manage.py backfill_first_commit_dates --kind repositories --dry-run
 ```
 
+First-commit discovery may require an extra GitHub commit-page request. Normal refreshes only perform that lookup for rows missing `first_commit_at`; once a row is backfilled, refreshes use the cheaper count-only request.
+
 ### MCP endpoint
 
 Awesome Repos exposes a Streamable HTTP MCP endpoint at `/mcp` so users can connect
