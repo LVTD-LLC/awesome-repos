@@ -9,6 +9,7 @@ from apps.repos.models import AwesomeList, Repository, RepositorySnapshot
 from apps.repos.services import (
     awesome_list_directory_totals,
     awesome_list_repository_queryset,
+    minimum_age_cutoff,
     repository_history_chart_data,
     repository_json_value_counts,
     repository_performance_summary,
@@ -62,6 +63,10 @@ def awesome_list_search_queryset(params):
             | Q(topics__icontains=q)
         )
 
+    age_cutoff = minimum_age_cutoff(params)
+    if age_cutoff:
+        qs = qs.filter(first_commit_at__lte=age_cutoff)
+
     sort = params.get("sort") or "stars"
     sort_map = {
         "stars": "-stars",
@@ -69,6 +74,7 @@ def awesome_list_search_queryset(params):
         "indexed": "-indexed_repo_count",
         "commits": F("commits_count").desc(nulls_last=True),
         "recent": F("github_pushed_at").desc(nulls_last=True),
+        "oldest": F("first_commit_at").asc(nulls_last=True),
         "scanned": F("last_scanned_at").desc(nulls_last=True),
         "name": "name",
     }
@@ -115,6 +121,7 @@ def serialize_awesome_list_summary(awesome_list: AwesomeList) -> dict:
         "github_created_at": awesome_list.github_created_at,
         "github_updated_at": awesome_list.github_updated_at,
         "github_pushed_at": awesome_list.github_pushed_at,
+        "first_commit_at": awesome_list.first_commit_at,
         "last_scanned_at": awesome_list.last_scanned_at,
         "last_error": awesome_list.last_error,
     }
@@ -155,6 +162,7 @@ def serialize_repository_summary(repository: Repository) -> dict:
         "github_created_at": repository.github_created_at,
         "github_updated_at": repository.github_updated_at,
         "github_pushed_at": repository.github_pushed_at,
+        "first_commit_at": repository.first_commit_at,
         "last_synced_at": repository.last_synced_at,
         "awesome_lists": [
             serialize_awesome_list_reference(item.awesome_list)
@@ -174,6 +182,7 @@ def serialize_repository_snapshot(snapshot: RepositorySnapshot | None) -> dict |
         "commit_count": snapshot.commit_count,
         "open_issues": snapshot.open_issues,
         "watchers": snapshot.watchers,
+        "first_commit_at": snapshot.first_commit_at,
     }
 
 
@@ -243,6 +252,7 @@ def search_repositories_payload(
     generated_tag: str = "",
     min_stars: int | None = None,
     updated_days: int | None = None,
+    min_age_years: int | None = None,
     archived: str = "",
     ai_development: str = "",
     sort: str = "stars",
@@ -258,6 +268,7 @@ def search_repositories_payload(
         generated_tag=generated_tag,
         min_stars=min_stars,
         updated_days=updated_days,
+        min_age_years=min_age_years,
         archived=archived,
         ai_development=ai_development,
         sort=sort,
@@ -298,11 +309,12 @@ def get_repository_detail_payload(
 def search_awesome_lists_payload(
     *,
     q: str = "",
+    min_age_years: int | None = None,
     sort: str = "stars",
     page: int = 1,
     page_size: int = DEFAULT_API_PAGE_SIZE,
 ) -> dict:
-    params = normalized_query_params(q=q, sort=sort)
+    params = normalized_query_params(q=q, min_age_years=min_age_years, sort=sort)
     page_data = paginate_queryset(
         awesome_list_search_queryset(params),
         page=page,
@@ -354,6 +366,7 @@ def search_awesome_list_repositories_payload(
     generated_tag: str = "",
     min_stars: int | None = None,
     updated_days: int | None = None,
+    min_age_years: int | None = None,
     archived: str = "",
     ai_development: str = "",
     sort: str = "stars",
@@ -368,6 +381,7 @@ def search_awesome_list_repositories_payload(
         generated_tag=generated_tag,
         min_stars=min_stars,
         updated_days=updated_days,
+        min_age_years=min_age_years,
         archived=archived,
         ai_development=ai_development,
         sort=sort,

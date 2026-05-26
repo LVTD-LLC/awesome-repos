@@ -228,6 +228,7 @@ class AwesomeListDetailView(DetailView):
             "generated_tag",
             "min_stars",
             "updated_days",
+            "min_age_years",
             "archived",
             "ai_development",
         )

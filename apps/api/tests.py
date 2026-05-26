@@ -108,6 +108,7 @@ def test_repository_search_api_uses_existing_filters(client, profile):
         source_url="https://github.com/wsvincent/awesome-django",
         repo_full_name="wsvincent/awesome-django",
         stars=1200,
+        first_commit_at=timezone.now() - timedelta(days=365 * 12),
     )
     django_repo = Repository.objects.create(
         full_name="django/django",
@@ -117,6 +118,7 @@ def test_repository_search_api_uses_existing_filters(client, profile):
         description="Python web framework",
         language="Python",
         stars=90000,
+        first_commit_at=timezone.now() - timedelta(days=365 * 12),
         topics=["django", "web"],
         generated_tags=["web-framework"],
     )
@@ -138,6 +140,7 @@ def test_repository_search_api_uses_existing_filters(client, profile):
             "q": "framework",
             "language": "Python",
             "min_stars": "100",
+            "min_age_years": "10",
             "topic": "django",
             "sort": "stars",
         },
@@ -148,6 +151,7 @@ def test_repository_search_api_uses_existing_filters(client, profile):
     payload = response.json()
     assert payload["pagination"]["count"] == 1
     assert payload["results"][0]["full_name"] == "django/django"
+    assert payload["results"][0]["first_commit_at"] is not None
     assert payload["results"][0]["awesome_count"] == 1
     assert payload["results"][0]["awesome_lists"][0]["slug"] == "awesome-django"
 
@@ -212,6 +216,7 @@ def test_awesome_list_api_search_detail_and_repository_filters(client, profile):
         topics=["django", "awesome-list"],
         stars=1200,
         readme_repository_count=20,
+        first_commit_at=timezone.now() - timedelta(days=365 * 12),
         last_scanned_at=timezone.now(),
     )
     AwesomeList.objects.create(
@@ -229,6 +234,7 @@ def test_awesome_list_api_search_detail_and_repository_filters(client, profile):
         language="Python",
         stars=90000,
         forks=32000,
+        first_commit_at=timezone.now() - timedelta(days=365 * 12),
     )
     node_repo = Repository.objects.create(
         full_name="expressjs/express",
@@ -239,13 +245,14 @@ def test_awesome_list_api_search_detail_and_repository_filters(client, profile):
         language="JavaScript",
         stars=65000,
         forks=12000,
+        first_commit_at=timezone.now() - timedelta(days=365 * 2),
     )
     AwesomeListItem.objects.create(awesome_list=awesome_list, repository=django_repo)
     AwesomeListItem.objects.create(awesome_list=awesome_list, repository=node_repo)
 
     search_response = client.get(
         "/api/awesome-lists",
-        {"q": "django"},
+        {"q": "django", "min_age_years": "10", "sort": "oldest"},
         **_api_key_header(profile),
     )
 
@@ -254,6 +261,7 @@ def test_awesome_list_api_search_detail_and_repository_filters(client, profile):
     assert search_payload["pagination"]["count"] == 1
     assert search_payload["totals"]["total_lists"] == 1
     assert search_payload["results"][0]["indexed_repo_count"] == 2
+    assert search_payload["results"][0]["first_commit_at"] is not None
 
     detail_response = client.get(
         "/api/awesome-lists/awesome-django",
@@ -271,7 +279,7 @@ def test_awesome_list_api_search_detail_and_repository_filters(client, profile):
 
     repos_response = client.get(
         "/api/awesome-lists/awesome-django/repositories",
-        {"language": "Python"},
+        {"language": "Python", "min_age_years": "10"},
         **_api_key_header(profile),
     )
 

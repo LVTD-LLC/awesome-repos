@@ -66,11 +66,12 @@ def register_tools(server: FastMCP) -> None:  # noqa: C901
         ] = "",
         min_stars: Annotated[int | None, Field(ge=0)] = None,
         updated_days: Annotated[int | None, Field(ge=1)] = None,
+        min_age_years: Annotated[int | None, Field(ge=1)] = None,
         archived: Annotated[str, Field(description="'yes', 'no', or blank.")] = "",
         ai_development: Annotated[str, Field(description="'yes', 'no', or blank.")] = "",
         sort: Annotated[
             str,
-            Field(description="Sort by stars, recent, created, commits, awesome, or name."),
+            Field(description="Sort by stars, recent, created, oldest, commits, awesome, or name."),
         ] = "stars",
         page: Annotated[int, Field(ge=1)] = 1,
         page_size: Annotated[int, Field(ge=1, le=100)] = 30,
@@ -86,6 +87,7 @@ def register_tools(server: FastMCP) -> None:  # noqa: C901
                 generated_tag=generated_tag,
                 min_stars=min_stars,
                 updated_days=updated_days,
+                min_age_years=min_age_years,
                 archived=archived,
                 ai_development=ai_development,
                 sort=sort,
@@ -148,9 +150,14 @@ def register_tools(server: FastMCP) -> None:  # noqa: C901
             str,
             Field(description="Search query for list name, repo name, topic, or description."),
         ] = "",
+        min_age_years: Annotated[int | None, Field(ge=1)] = None,
         sort: Annotated[
             str,
-            Field(description="Sort by stars, repos, indexed, commits, recent, scanned, or name."),
+            Field(
+                description=(
+                    "Sort by stars, repos, indexed, commits, recent, oldest, scanned, or name."
+                ),
+            ),
         ] = "stars",
         page: Annotated[int, Field(ge=1)] = 1,
         page_size: Annotated[int, Field(ge=1, le=100)] = 30,
@@ -159,6 +166,7 @@ def register_tools(server: FastMCP) -> None:  # noqa: C901
         return _run_read_only_tool(
             lambda: search_awesome_lists_payload(
                 q=q,
+                min_age_years=min_age_years,
                 sort=sort,
                 page=page,
                 page_size=page_size,
@@ -204,11 +212,12 @@ def register_tools(server: FastMCP) -> None:  # noqa: C901
         ] = "",
         min_stars: Annotated[int | None, Field(ge=0)] = None,
         updated_days: Annotated[int | None, Field(ge=1)] = None,
+        min_age_years: Annotated[int | None, Field(ge=1)] = None,
         archived: Annotated[str, Field(description="'yes', 'no', or blank.")] = "",
         ai_development: Annotated[str, Field(description="'yes', 'no', or blank.")] = "",
         sort: Annotated[
             str,
-            Field(description="Sort by stars, recent, created, commits, awesome, or name."),
+            Field(description="Sort by stars, recent, created, oldest, commits, awesome, or name."),
         ] = "stars",
         page: Annotated[int, Field(ge=1)] = 1,
         page_size: Annotated[int, Field(ge=1, le=100)] = 50,
@@ -227,6 +236,7 @@ def register_tools(server: FastMCP) -> None:  # noqa: C901
                     generated_tag=generated_tag,
                     min_stars=min_stars,
                     updated_days=updated_days,
+                    min_age_years=min_age_years,
                     archived=archived,
                     ai_development=ai_development,
                     sort=sort,

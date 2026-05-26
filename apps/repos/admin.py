@@ -32,6 +32,7 @@ class AwesomeListAdmin(admin.ModelAdmin):
         "stars",
         "readme_repository_count",
         "commits_count",
+        "first_commit_at",
         "is_active",
         "last_scanned_at",
         "item_count",
@@ -53,6 +54,7 @@ class AwesomeListAdmin(admin.ModelAdmin):
         "github_created_at",
         "github_updated_at",
         "github_pushed_at",
+        "first_commit_at",
         "raw",
     )
     actions = [queue_scan]
@@ -82,6 +84,7 @@ class RepositoryAdmin(admin.ModelAdmin):
         "full_name",
         "stars",
         "commit_count",
+        "first_commit_at",
         "language",
         "generated_tags",
         "is_archived",
@@ -145,6 +148,7 @@ class RepositorySnapshotAdmin(admin.ModelAdmin):
         "github_created_at",
         "github_updated_at",
         "github_pushed_at",
+        "first_commit_at",
     )
     date_hierarchy = "captured_at"
 

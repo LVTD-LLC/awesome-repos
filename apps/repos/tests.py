@@ -1,6 +1,6 @@
 import base64
 import re
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from io import StringIO
 from types import SimpleNamespace
 
@@ -39,6 +39,7 @@ from apps.repos.services import (
     discover_missing_awesome_list_repositories,
     extract_github_repos,
     fetch_github_commit_count,
+    fetch_github_commit_count_and_first_commit_at,
     fetch_json,
     fetch_repository_readme,
     fetch_repository_readme_data,
@@ -76,6 +77,10 @@ LOC_MEM_CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocM
 def disable_repository_tagging(settings, monkeypatch):
     settings.REPOSITORY_TAGGING_ENABLED = False
     monkeypatch.setattr("apps.repos.services.fetch_github_commit_count", lambda *args: 123)
+    monkeypatch.setattr(
+        "apps.repos.services.fetch_github_commit_count_and_first_commit_at",
+        lambda *args: (123, datetime(2005, 7, 13, tzinfo=UTC)),
+    )
 
 
 @pytest.mark.parametrize(
@@ -260,7 +265,10 @@ def test_sync_awesome_list_stores_list_activity_metadata(monkeypatch):
         "apps.repos.services.fetch_awesome_readme",
         lambda full_name: (markdown, github_awesome_list_payload(full_name)),
     )
-    monkeypatch.setattr("apps.repos.services.fetch_github_commit_count", lambda *args: 350)
+    monkeypatch.setattr(
+        "apps.repos.services.fetch_github_commit_count_and_first_commit_at",
+        lambda *args: (350, datetime(2015, 1, 2, tzinfo=UTC)),
+    )
 
     def fake_upsert(full_name):
         owner, name = full_name.split("/", 1)
@@ -286,11 +294,13 @@ def test_sync_awesome_list_stores_list_activity_metadata(monkeypatch):
     assert awesome_list.watchers == 25
     assert awesome_list.open_issues == 7
     assert awesome_list.commits_count == 350
+    assert awesome_list.first_commit_at == datetime(2015, 1, 2, tzinfo=UTC)
     assert awesome_list.readme_repository_count == 2
     assert awesome_list.default_branch == "main"
     assert awesome_list.github_pushed_at is not None
     assert awesome_list.last_error == ""
     assert "commits_count" not in awesome_list.raw
+    assert "first_commit_at" not in awesome_list.raw
     assert awesome_list.items.count() == 1
 
 
@@ -302,8 +312,10 @@ def test_update_awesome_list_metadata_preserves_missing_commit_count():
         source_url="https://github.com/wsvincent/awesome-django",
         repo_full_name="wsvincent/awesome-django",
         commits_count=350,
+        first_commit_at=datetime(2015, 1, 2, tzinfo=UTC),
     )
     awesome_list.commits_count = None
+    awesome_list.first_commit_at = None
 
     update_awesome_list_metadata(
         awesome_list,
@@ -322,6 +334,7 @@ def test_update_awesome_list_metadata_preserves_missing_commit_count():
 
     awesome_list.refresh_from_db()
     assert awesome_list.commits_count == 350
+    assert awesome_list.first_commit_at == datetime(2015, 1, 2, tzinfo=UTC)
     assert awesome_list.readme_repository_count == 42
 
 
@@ -460,10 +473,12 @@ def test_upsert_repository_from_github_records_snapshot(monkeypatch):
     assert repo.forks == 32000
     assert repo.watchers == 1200
     assert repo.commit_count == 123
+    assert repo.first_commit_at == datetime(2005, 7, 13, tzinfo=UTC)
     assert snapshot.stars == repo.stars
     assert snapshot.forks == repo.forks
     assert snapshot.watchers == repo.watchers
     assert snapshot.commit_count == repo.commit_count
+    assert snapshot.first_commit_at == repo.first_commit_at
     assert snapshot.captured_at == repo.last_synced_at
 
 
@@ -589,6 +604,10 @@ def test_fetch_repository_tree_items_rejects_truncated_github_trees(monkeypatch)
 
 
 def test_fetch_github_commit_count_uses_last_link_page(monkeypatch):
+    monkeypatch.setattr(
+        "apps.repos.services.fetch_github_commit_count_and_first_commit_at",
+        fetch_github_commit_count_and_first_commit_at,
+    )
     captured = {}
 
     class DummyResponse:
@@ -621,7 +640,62 @@ def test_fetch_github_commit_count_uses_last_link_page(monkeypatch):
     assert "per_page=1" in captured["url"]
 
 
+def test_fetch_github_commit_count_and_first_commit_at_uses_oldest_page(monkeypatch):
+    requested_urls = []
+
+    class DummyResponse:
+        def __init__(self, *, body: bytes, headers: dict):
+            self._body = body
+            self.headers = headers
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self):
+            return self._body
+
+    def fake_urlopen(request, timeout=30):
+        requested_urls.append(request.full_url)
+        if "page=456" in request.full_url:
+            return DummyResponse(
+                body=(
+                    b'[{"commit": {"committer": {"date": "2008-04-10T12:00:00Z"}}}]'
+                ),
+                headers={},
+            )
+        return DummyResponse(
+            body=b'[{"commit": {"committer": {"date": "2026-05-20T12:00:00Z"}}}]',
+            headers={
+                "Link": (
+                    "<https://api.github.com/repositories/1/commits?sha=main&per_page=1&page=2>;"
+                    ' rel="next", '
+                    "<https://api.github.com/repositories/1/commits?sha=main&per_page=1&page=456>;"
+                    ' rel="last"'
+                )
+            },
+        )
+
+    monkeypatch.setattr("apps.repos.services.urlopen", fake_urlopen)
+
+    commit_count, first_commit_at = fetch_github_commit_count_and_first_commit_at(
+        "owner/repo",
+        "main",
+    )
+
+    assert commit_count == 456
+    assert first_commit_at == datetime(2008, 4, 10, 12, tzinfo=UTC)
+    assert any("page=456" in url for url in requested_urls)
+
+
 def test_fetch_github_commit_count_counts_single_unpaginated_page(monkeypatch):
+    monkeypatch.setattr(
+        "apps.repos.services.fetch_github_commit_count_and_first_commit_at",
+        fetch_github_commit_count_and_first_commit_at,
+    )
+
     class DummyResponse:
         headers = {}
 
@@ -639,7 +713,12 @@ def test_fetch_github_commit_count_counts_single_unpaginated_page(monkeypatch):
     assert fetch_github_commit_count("owner/repo", "main") == 1
 
 
-def test_fetch_github_commit_count_requires_default_branch():
+def test_fetch_github_commit_count_requires_default_branch(monkeypatch):
+    monkeypatch.setattr(
+        "apps.repos.services.fetch_github_commit_count_and_first_commit_at",
+        fetch_github_commit_count_and_first_commit_at,
+    )
+
     with pytest.raises(ValueError, match="default branch"):
         fetch_github_commit_count("owner/repo", "")
 
@@ -647,29 +726,37 @@ def test_fetch_github_commit_count_requires_default_branch():
 def test_attach_awesome_list_commit_count_is_explicit_about_commit_fetch(monkeypatch):
     calls = []
 
-    def fake_fetch_commit_count(full_name, default_branch):
+    def fake_fetch_commit_activity(full_name, default_branch):
         calls.append((full_name, default_branch))
-        return 456
+        return 456, datetime(2008, 4, 10, tzinfo=UTC)
 
-    monkeypatch.setattr("apps.repos.services.fetch_github_commit_count", fake_fetch_commit_count)
+    monkeypatch.setattr(
+        "apps.repos.services.fetch_github_commit_count_and_first_commit_at",
+        fake_fetch_commit_activity,
+    )
     meta = {"default_branch": "trunk"}
 
     attach_awesome_list_commit_count("owner/repo", meta)
 
     assert calls == [("owner/repo", "trunk")]
     assert meta["commits_count"] == 456
+    assert meta["first_commit_at"] == datetime(2008, 4, 10, tzinfo=UTC)
 
 
 def test_attach_awesome_list_commit_count_skips_missing_default_branch(monkeypatch):
-    def fail_fetch_commit_count(full_name, default_branch):
+    def fail_fetch_commit_activity(full_name, default_branch):
         raise AssertionError("commit count should not be fetched without a default branch")
 
-    monkeypatch.setattr("apps.repos.services.fetch_github_commit_count", fail_fetch_commit_count)
+    monkeypatch.setattr(
+        "apps.repos.services.fetch_github_commit_count_and_first_commit_at",
+        fail_fetch_commit_activity,
+    )
     meta = {}
 
     attach_awesome_list_commit_count("owner/repo", meta)
 
     assert "commits_count" not in meta
+    assert "first_commit_at" not in meta
 
 
 @pytest.mark.django_db
@@ -826,6 +913,7 @@ def test_upsert_repository_from_github_preserves_commit_count_when_fetch_fails(
         name="django",
         url="https://github.com/django/django",
         commit_count=42,
+        first_commit_at=datetime(2005, 7, 13, tzinfo=UTC),
     )
     monkeypatch.setattr(
         "apps.repos.services.fetch_json",
@@ -833,17 +921,22 @@ def test_upsert_repository_from_github_preserves_commit_count_when_fetch_fails(
     )
     stub_repository_readme(monkeypatch)
 
-    def fail_commit_count(full_name, default_branch):
-        raise RuntimeError("commit count failed")
+    def fail_commit_activity(full_name, default_branch):
+        raise RuntimeError("commit activity failed")
 
-    monkeypatch.setattr("apps.repos.services.fetch_github_commit_count", fail_commit_count)
+    monkeypatch.setattr(
+        "apps.repos.services.fetch_github_commit_count_and_first_commit_at",
+        fail_commit_activity,
+    )
 
     repo = upsert_repository_from_github(repo.full_name)
     snapshot = RepositorySnapshot.objects.get(repository=repo)
 
     assert repo.stars == 15
     assert repo.commit_count == 42
+    assert repo.first_commit_at == datetime(2005, 7, 13, tzinfo=UTC)
     assert snapshot.commit_count == 42
+    assert snapshot.first_commit_at == datetime(2005, 7, 13, tzinfo=UTC)
 
 
 @pytest.mark.django_db
@@ -2051,6 +2144,7 @@ def test_repository_search_filters_and_sorts():
         language="Python",
         stars=50,
         commit_count=20,
+        first_commit_at=timezone.now() - timedelta(days=500),
         github_pushed_at=timezone.now(),
         uses_ai_for_development=True,
         ai_development_signals=[
@@ -2071,6 +2165,7 @@ def test_repository_search_filters_and_sorts():
         language="JavaScript",
         stars=100,
         commit_count=40,
+        first_commit_at=timezone.now() - timedelta(days=365 * 12),
         github_pushed_at=timezone.now() - timedelta(days=500),
     )
     unsynced = Repository.objects.create(
@@ -2096,6 +2191,12 @@ def test_repository_search_filters_and_sorts():
 
     qs = repository_search_queryset({"ai_development": "yes"})
     assert list(qs) == [recent]
+
+    qs = repository_search_queryset({"min_age_years": "10"})
+    assert list(qs) == [old]
+
+    qs = repository_search_queryset({"sort": "oldest"})
+    assert list(qs) == [old, recent, unsynced]
 
     qs = repository_search_queryset({"sort": "commits"})
     assert list(qs) == [old, recent, unsynced]
@@ -2816,6 +2917,7 @@ def test_awesome_list_list_page_renders_activity_metrics(client):
         open_issues=7,
         commits_count=350,
         readme_repository_count=42,
+        first_commit_at=timezone.now() - timedelta(days=365 * 12),
         github_pushed_at=timezone.now(),
         last_scanned_at=timezone.now(),
     )
@@ -2829,6 +2931,13 @@ def test_awesome_list_list_page_renders_activity_metrics(client):
     )
     AwesomeListItem.objects.create(awesome_list=awesome_list, repository=repo)
     AwesomeList.objects.create(
+        name="Young List",
+        slug="young-list",
+        source_url="https://github.com/example/young-list",
+        first_commit_at=timezone.now() - timedelta(days=365 * 2),
+        stars=50,
+    )
+    AwesomeList.objects.create(
         name="Inactive List",
         slug="inactive-list",
         source_url="https://github.com/example/inactive-list",
@@ -2837,10 +2946,12 @@ def test_awesome_list_list_page_renders_activity_metrics(client):
         readme_repository_count=500,
     )
 
-    response = client.get(reverse("repos:list"))
+    response = client.get(reverse("repos:list"), {"min_age_years": "10", "sort": "oldest"})
 
     assert response.status_code == 200
     assert b"Awesome Django" in response.content
+    assert b"first commit" in response.content
+    assert b"Young List" not in response.content
     assert b"Inactive List" not in response.content
     assert b"wsvincent/awesome-django" in response.content
     assert b"README repos" in response.content
@@ -3022,6 +3133,7 @@ def test_awesome_list_detail_page_filters_repositories(client):
         generated_tags=["web-framework"],
         stars=80000,
         commit_count=90000,
+        first_commit_at=timezone.now() - timedelta(days=365 * 12),
         github_pushed_at=timezone.now(),
         uses_ai_for_development=True,
     )
@@ -3036,6 +3148,7 @@ def test_awesome_list_detail_page_filters_repositories(client):
         generated_tags=["server-runtime"],
         stars=110000,
         commit_count=120000,
+        first_commit_at=timezone.now() - timedelta(days=365 * 2),
         github_pushed_at=timezone.now() - timedelta(days=500),
         is_archived=True,
     )
@@ -3051,6 +3164,7 @@ def test_awesome_list_detail_page_filters_repositories(client):
             "generated_tag": "web-framework",
             "min_stars": "50",
             "updated_days": "30",
+            "min_age_years": "10",
             "archived": "no",
             "ai_development": "yes",
             "sort": "commits",
@@ -3061,6 +3175,7 @@ def test_awesome_list_detail_page_filters_repositories(client):
     content = response.content.decode()
     assert "django/django" in content
     assert "nodejs/node" not in content
+    assert "first commit" in content
     assert "django (1)" in content
     assert "web-framework (1)" in content
     assert response.context["filters_applied"] is True

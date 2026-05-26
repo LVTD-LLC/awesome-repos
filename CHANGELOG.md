@@ -43,6 +43,7 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Awesome Repos: repository topic badges now link to the matching topic-filtered search results.
 - Awesome Repos: added aggregate stars and commits history charts to awesome-list detail pages when repository snapshots exist.
 - Awesome Repos: expanded desktop side sponsor rails to ten placements, including one open "Get sponsored" slot.
+- Awesome Repos: store first-commit dates for awesome lists and repositories, show them in search/detail pages, and add age filters.
 
 ### Changed
 - Awesome Repos: replaced placeholder side-rail sponsor slots with equal-height ads for LVTD projects and attribution-tagged outbound links.

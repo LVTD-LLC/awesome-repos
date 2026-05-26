@@ -145,6 +145,7 @@ def search_repositories(
     generated_tag: str = "",
     min_stars: int | None = None,
     updated_days: int | None = None,
+    min_age_years: int | None = None,
     archived: str = "",
     ai_development: str = "",
     sort: str = "stars",
@@ -161,6 +162,7 @@ def search_repositories(
         generated_tag=generated_tag,
         min_stars=min_stars,
         updated_days=updated_days,
+        min_age_years=min_age_years,
         archived=archived,
         ai_development=ai_development,
         sort=sort,
@@ -189,12 +191,19 @@ def get_repository(request: HttpRequest, owner: str, name: str):
 def search_awesome_lists(
     request: HttpRequest,
     q: str = "",
+    min_age_years: int | None = None,
     sort: str = "stars",
     page: int = 1,
     page_size: int = AWESOME_LIST_SEARCH_PAGE_SIZE,
 ):
     """Search active awesome lists with the same search and sort controls as the UI."""
-    return search_awesome_lists_payload(q=q, sort=sort, page=page, page_size=page_size)
+    return search_awesome_lists_payload(
+        q=q,
+        min_age_years=min_age_years,
+        sort=sort,
+        page=page,
+        page_size=page_size,
+    )
 
 
 @api.post(
@@ -264,6 +273,7 @@ def search_awesome_list_repositories(
     generated_tag: str = "",
     min_stars: int | None = None,
     updated_days: int | None = None,
+    min_age_years: int | None = None,
     archived: str = "",
     ai_development: str = "",
     sort: str = "stars",
@@ -279,6 +289,7 @@ def search_awesome_list_repositories(
         generated_tag=generated_tag,
         min_stars=min_stars,
         updated_days=updated_days,
+        min_age_years=min_age_years,
         archived=archived,
         ai_development=ai_development,
         sort=sort,

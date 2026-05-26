@@ -148,6 +148,7 @@
               <option value="forks" {% if request.GET.sort == "forks" %}selected{% endif %}>Most forks</option>
               <option value="recent" {% if request.GET.sort == "recent" %}selected{% endif %}>Recently updated</option>
               <option value="created" {% if request.GET.sort == "created" %}selected{% endif %}>Recently created</option>
+              <option value="oldest" {% if request.GET.sort == "oldest" %}selected{% endif %}>Oldest first commit</option>
               <option value="commits" {% if request.GET.sort == "commits" %}selected{% endif %}>Most commits</option>
               <option value="awesome" {% if request.GET.sort == "awesome" %}selected{% endif %}>Most list mentions</option>
               <option value="least_awesome" {% if request.GET.sort == "least_awesome" %}selected{% endif %}>Fewest list mentions</option>
@@ -209,6 +210,17 @@
           </div>
 
           <div>
+            <label for="list-repo-min-age-years" class="block text-sm font-semibold text-gray-800 dark:text-gray-200">Repository age</label>
+            <select id="list-repo-min-age-years" name="min_age_years" class="mt-2 block w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100">
+              <option value="">Any age</option>
+              <option value="1" {% if request.GET.min_age_years == "1" %}selected{% endif %}>1+ years old</option>
+              <option value="3" {% if request.GET.min_age_years == "3" %}selected{% endif %}>3+ years old</option>
+              <option value="5" {% if request.GET.min_age_years == "5" %}selected{% endif %}>5+ years old</option>
+              <option value="10" {% if request.GET.min_age_years == "10" %}selected{% endif %}>10+ years old</option>
+            </select>
+          </div>
+
+          <div>
             <label for="list-repo-archived" class="block text-sm font-semibold text-gray-800 dark:text-gray-200">Archive status</label>
             <select id="list-repo-archived" name="archived" class="mt-2 block w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100">
               <option value="">Archived or active</option>
@@ -246,6 +258,7 @@
                   {% for tag in repo.generated_tags|slice:":4" %}<span class="rounded-full bg-green-50 px-3 py-1 text-green-700 dark:bg-green-950 dark:text-green-200">{{ tag }}</span>{% endfor %}
                   {% if repo.github_pushed_at %}<span class="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-800">pushed {{ repo.github_pushed_at|date:"Y-m-d" }}</span>{% endif %}
                   {% if repo.commit_count != None %}<span class="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-800">{{ repo.commit_count|intcomma }} commits</span>{% endif %}
+                  {% if repo.first_commit_at %}<span class="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-800">first commit {{ repo.first_commit_at|date:"Y-m-d" }}</span>{% endif %}
                   <span class="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-800">{{ repo.awesome_count }} list mention{{ repo.awesome_count|pluralize }}</span>
                   {% if repo.is_archived %}<span class="rounded-full bg-yellow-100 px-3 py-1 text-yellow-800">archived</span>{% endif %}
                   {% if repo.uses_ai_for_development %}<span class="rounded-full bg-green-100 px-3 py-1 text-green-800 dark:bg-green-900/40 dark:text-green-200">AI dev signals</span>{% endif %}
@@ -280,6 +293,7 @@
           <div class="flex justify-between gap-4"><dt class="text-gray-500 dark:text-gray-400">Last pushed</dt><dd class="font-medium">{{ awesome_list.github_pushed_at|date:"Y-m-d"|default:"-" }}</dd></div>
           <div class="flex justify-between gap-4"><dt class="text-gray-500 dark:text-gray-400">GitHub updated</dt><dd class="font-medium">{{ awesome_list.github_updated_at|date:"Y-m-d"|default:"-" }}</dd></div>
           <div class="flex justify-between gap-4"><dt class="text-gray-500 dark:text-gray-400">Created</dt><dd class="font-medium">{{ awesome_list.github_created_at|date:"Y-m-d"|default:"-" }}</dd></div>
+          <div class="flex justify-between gap-4"><dt class="text-gray-500 dark:text-gray-400">First commit</dt><dd class="font-medium">{{ awesome_list.first_commit_at|date:"Y-m-d"|default:"-" }}</dd></div>
           <div class="flex justify-between gap-4"><dt class="text-gray-500 dark:text-gray-400">Last scanned</dt><dd class="font-medium">{{ awesome_list.last_scanned_at|date:"Y-m-d H:i"|default:"-" }}</dd></div>
           <div class="flex justify-between gap-4"><dt class="text-gray-500 dark:text-gray-400">Watchers</dt><dd class="font-medium">{{ awesome_list.watchers|intcomma }}</dd></div>
         </dl>
