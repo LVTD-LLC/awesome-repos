@@ -986,6 +986,10 @@ def test_upsert_repository_from_github_preserves_commit_count_when_fetch_fails(
         "apps.repos.services.fetch_github_commit_count_and_first_commit_at",
         fail_commit_activity,
     )
+    monkeypatch.setattr(
+        "apps.repos.services.fetch_github_commit_count",
+        fail_commit_activity,
+    )
 
     repo = upsert_repository_from_github(repo.full_name)
     snapshot = RepositorySnapshot.objects.get(repository=repo)
@@ -995,6 +999,39 @@ def test_upsert_repository_from_github_preserves_commit_count_when_fetch_fails(
     assert repo.first_commit_at == datetime(2005, 7, 13, tzinfo=UTC)
     assert snapshot.commit_count == 42
     assert snapshot.first_commit_at == datetime(2005, 7, 13, tzinfo=UTC)
+
+
+@pytest.mark.django_db
+def test_upsert_repository_from_github_uses_single_commit_count_call_when_first_commit_exists(
+    monkeypatch,
+):
+    repo = Repository.objects.create(
+        full_name="django/django",
+        owner="django",
+        name="django",
+        url="https://github.com/django/django",
+        commit_count=42,
+        first_commit_at=datetime(2005, 7, 13, tzinfo=UTC),
+    )
+    monkeypatch.setattr(
+        "apps.repos.services.fetch_json",
+        lambda url: github_repo_payload(stars=15, forks=4, watchers=2),
+    )
+    stub_repository_readme(monkeypatch)
+
+    def fail_commit_activity(full_name, default_branch):
+        raise AssertionError("first commit date should not be refetched")
+
+    monkeypatch.setattr(
+        "apps.repos.services.fetch_github_commit_count_and_first_commit_at",
+        fail_commit_activity,
+    )
+    monkeypatch.setattr("apps.repos.services.fetch_github_commit_count", lambda *args: 43)
+
+    repo = upsert_repository_from_github(repo.full_name)
+
+    assert repo.commit_count == 43
+    assert repo.first_commit_at == datetime(2005, 7, 13, tzinfo=UTC)
 
 
 @pytest.mark.django_db

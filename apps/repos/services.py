@@ -346,11 +346,14 @@ def fetch_github_commit_count_and_first_commit_at(
 
 
 def fetch_github_commit_count(full_name: str, default_branch: str) -> int:
-    commit_count, _first_commit_at = fetch_github_commit_count_and_first_commit_at(
-        full_name,
-        default_branch,
-    )
-    return commit_count
+    if not default_branch:
+        raise ValueError("Cannot fetch commit count without a default branch.")
+
+    commits, link_header = _fetch_github_commits_page(full_name, default_branch)
+    last_page = _last_page_from_link_header(link_header)
+    if last_page is not None:
+        return last_page
+    return len(commits)
 
 
 def github_rate_limit_status() -> dict:
@@ -439,7 +442,12 @@ def fetch_awesome_readme(full_name: str) -> tuple[str, dict]:
     raise RuntimeError(f"Could not fetch README for {full_name}: {last_error}")
 
 
-def attach_awesome_list_commit_count(full_name: str, meta: dict) -> None:
+def attach_awesome_list_commit_count(
+    full_name: str,
+    meta: dict,
+    *,
+    existing_first_commit_at=None,
+) -> None:
     default_branch = meta.get("default_branch") or ""
     if not default_branch:
         logger.warning(
@@ -450,10 +458,14 @@ def attach_awesome_list_commit_count(full_name: str, meta: dict) -> None:
         return
 
     try:
-        commit_count, first_commit_at = fetch_github_commit_count_and_first_commit_at(
-            full_name,
-            default_branch,
-        )
+        first_commit_at = None
+        if existing_first_commit_at is not None:
+            commit_count = fetch_github_commit_count(full_name, default_branch)
+        else:
+            commit_count, first_commit_at = fetch_github_commit_count_and_first_commit_at(
+                full_name,
+                default_branch,
+            )
         meta["commits_count"] = commit_count
         if first_commit_at is not None:
             meta["first_commit_at"] = first_commit_at
@@ -799,6 +811,11 @@ def _upsert_repository_metadata(
 def upsert_repository_from_github(full_name: str, *, include_readme: bool = True) -> Repository:
     data = fetch_json(f"https://api.github.com/repos/{full_name}")
     default_branch = data.get("default_branch") or ""
+    existing_first_commit_at = (
+        Repository.objects.filter(full_name=data["full_name"])
+        .values_list("first_commit_at", flat=True)
+        .first()
+    )
     readme_data = None
     if include_readme:
         try:
@@ -833,10 +850,13 @@ def upsert_repository_from_github(full_name: str, *, include_readme: bool = True
         ai_development_signals = None
     first_commit_at = None
     try:
-        commit_count, first_commit_at = fetch_github_commit_count_and_first_commit_at(
-            data["full_name"],
-            default_branch,
-        )
+        if existing_first_commit_at is not None:
+            commit_count = fetch_github_commit_count(data["full_name"], default_branch)
+        else:
+            commit_count, first_commit_at = fetch_github_commit_count_and_first_commit_at(
+                data["full_name"],
+                default_branch,
+            )
     except Exception as exc:  # noqa: BLE001 - commit counts are useful but optional
         logger.warning(
             "repository_commit_activity_fetch_failed",
@@ -1052,7 +1072,11 @@ def sync_awesome_list(awesome_list: AwesomeList, limit: int | None = None) -> di
         limit=limit,
     )
     markdown, meta = fetch_awesome_readme(full_name)
-    attach_awesome_list_commit_count(full_name, meta)
+    attach_awesome_list_commit_count(
+        full_name,
+        meta,
+        existing_first_commit_at=awesome_list.first_commit_at,
+    )
     discovered_repo_names = extract_github_repos(markdown)
     scanned_at = timezone.now()
     repo_names = discovered_repo_names
