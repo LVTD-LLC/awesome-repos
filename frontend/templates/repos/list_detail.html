@@ -1,17 +1,10 @@
 {% extends "base_landing.html" %}
-{% load humanize static %}
+{% load humanize %}
 
 {% block meta %}
 <title>{{ awesome_list.name }} · Awesome Repos</title>
 <meta name="description" content="Activity and repository data for {{ awesome_list.name }}." />
 {% endblock meta %}
-
-{% block extra_head %}
-  {% if list_repository_history_chart_data %}
-    <script defer src="{% static 'vendors/js/d3.min.js' %}"></script>
-    <script type="module" src="{% static 'js/modules/repository-history-charts.js' %}"></script>
-  {% endif %}
-{% endblock extra_head %}
 
 {% block content %}
 <section class="mx-auto max-w-7xl py-12">
@@ -60,7 +53,7 @@
 
   <dl class="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
     <div class="rounded-2xl border border-gray-200 p-4 dark:border-gray-800">
-      <dt class="text-sm text-gray-500 dark:text-gray-400">Stars</dt>
+      <dt class="text-sm text-gray-500 dark:text-gray-400">List stars</dt>
       <dd class="mt-1 text-2xl font-bold">{{ awesome_list.stars|intcomma }}</dd>
     </div>
     <div class="rounded-2xl border border-gray-200 p-4 dark:border-gray-800">
@@ -72,7 +65,7 @@
       <dd class="mt-1 text-2xl font-bold">{{ awesome_list.indexed_repo_count|intcomma }}</dd>
     </div>
     <div class="rounded-2xl border border-gray-200 p-4 dark:border-gray-800">
-      <dt class="text-sm text-gray-500 dark:text-gray-400">Commits</dt>
+      <dt class="text-sm text-gray-500 dark:text-gray-400">List commits</dt>
       <dd class="mt-1 text-2xl font-bold">{% if awesome_list.commits_count is not None %}{{ awesome_list.commits_count|intcomma }}{% else %}-{% endif %}</dd>
     </div>
     <div class="rounded-2xl border border-gray-200 p-4 dark:border-gray-800">
@@ -84,36 +77,6 @@
       <dd class="mt-1 text-2xl font-bold">{{ awesome_list.open_issues|intcomma }}</dd>
     </div>
   </dl>
-
-  {% if list_repository_history_chart_data %}
-    {{ list_repository_history_chart_data|json_script:"list-repository-history-data" }}
-    <div class="mt-8">
-      <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h2 class="text-2xl font-bold text-gray-950 dark:text-white">Tracked repository growth</h2>
-          <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            {{ list_repository_history_chart_data|length }} capture day{{ list_repository_history_chart_data|length|pluralize }} aggregated from saved repository snapshots.
-          </p>
-        </div>
-      </div>
-      <div class="mt-5 grid gap-4 lg:grid-cols-2">
-        <section class="rounded-2xl border border-gray-200 p-4 dark:border-gray-800" data-repository-history-chart data-history-source="list-repository-history-data" data-metric="stars" data-label="Stars">
-          <div class="flex items-baseline justify-between gap-3">
-            <h3 class="text-sm font-semibold text-gray-950 dark:text-white">Stars history</h3>
-            <span class="text-xs font-medium text-gray-500 dark:text-gray-400">Indexed repos total</span>
-          </div>
-          <div class="mt-4 h-64 w-full" data-chart-plot></div>
-        </section>
-        <section class="rounded-2xl border border-gray-200 p-4 dark:border-gray-800" data-repository-history-chart data-history-source="list-repository-history-data" data-metric="commit_count" data-label="Commits">
-          <div class="flex items-baseline justify-between gap-3">
-            <h3 class="text-sm font-semibold text-gray-950 dark:text-white">Commits history</h3>
-            <span class="text-xs font-medium text-gray-500 dark:text-gray-400">Known default-branch commits</span>
-          </div>
-          <div class="mt-4 h-64 w-full" data-chart-plot></div>
-        </section>
-      </div>
-    </div>
-  {% endif %}
 
   <div class="mt-8 grid gap-6 lg:grid-cols-3">
     <section class="lg:col-span-2">

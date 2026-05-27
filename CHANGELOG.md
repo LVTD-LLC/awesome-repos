@@ -41,12 +41,12 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Awesome Repos: added an authenticated Streamable HTTP MCP endpoint at `/mcp` for AI agents to search repositories and awesome lists.
 - Awesome Repos: added a public awesome-list request form with an admin-reviewable request queue.
 - Awesome Repos: repository topic badges now link to the matching topic-filtered search results.
-- Awesome Repos: added aggregate stars and commits history charts to awesome-list detail pages when repository snapshots exist.
 - Awesome Repos: expanded desktop side sponsor rails to ten placements, including one open "Get sponsored" slot.
 - Awesome Repos: store first-commit dates for awesome lists and repositories, show them in search/detail pages, and add age filters.
 - Awesome Repos: added a management command to backfill first-commit dates for existing awesome-list and repository rows.
 
 ### Changed
+- Awesome Repos: awesome-list detail pages now show list-level GitHub stars and commits instead of aggregate repository growth charts.
 - Awesome Repos: replaced placeholder side-rail sponsor slots with equal-height ads for LVTD projects and attribution-tagged outbound links.
 - Awesome Repos: standardized page width around global side ad rails with five sponsor slots on each side.
 - Awesome Repos: repository search is now the root landing page, with `/repos/` permanently redirecting to `/` and a prominent link to the `/lists/` awesome-list directory.

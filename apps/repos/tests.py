@@ -3155,31 +3155,23 @@ def test_awesome_list_detail_page_renders_activity_metrics(client):
         github_pushed_at=timezone.now(),
     )
     AwesomeListItem.objects.create(awesome_list=awesome_list, repository=repo)
-    RepositorySnapshot.objects.create(
-        repository=repo,
-        captured_at=timezone.now() - timedelta(days=1),
-        stars=80000,
-        commit_count=90000,
-    )
 
     response = client.get(reverse("repos:list_detail", kwargs={"slug": "awesome-django"}))
 
     assert response.status_code == 200
     assert b"Awesome Django" in response.content
     assert b"README repos" in response.content
-    assert b"Commits" in response.content
+    assert b"List stars" in response.content
+    assert b"List commits" in response.content
     assert b"django/django" in response.content
     assert b"Python" in response.content
     assert b"1,200" in response.content
+    assert b"350" in response.content
     assert b"80,000" in response.content
-    assert b"Tracked repository growth" in response.content
-    assert b"/static/vendors/js/d3.min.js" in response.content
-    assert b"/static/js/modules/repository-history-charts.js" in response.content
-    assert b"list-repository-history-data" in response.content
-    assert b"data-metric=\"stars\"" in response.content
-    assert b"data-metric=\"commit_count\"" in response.content
-    assert b'"stars": 80000' in response.content
-    assert b'"commit_count": 90000' in response.content
+    assert b"Tracked repository growth" not in response.content
+    assert b"/static/vendors/js/d3.min.js" not in response.content
+    assert b"/static/js/modules/repository-history-charts.js" not in response.content
+    assert b"list-repository-history-data" not in response.content
     assert b'data-ad-rail="left"' not in response.content
     assert b'data-ad-rail="right"' not in response.content
 
