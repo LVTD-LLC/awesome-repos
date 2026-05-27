@@ -3177,7 +3177,7 @@ def test_awesome_list_detail_page_renders_activity_metrics(client):
 
 
 @pytest.mark.django_db
-def test_awesome_list_detail_page_skips_history_chart_without_snapshot_data(client):
+def test_awesome_list_detail_page_does_not_render_aggregate_history_chart(client):
     awesome_list = AwesomeList.objects.create(
         name="Awesome Django",
         slug="awesome-django",
@@ -3191,6 +3191,12 @@ def test_awesome_list_detail_page_skips_history_chart_without_snapshot_data(clie
         stars=80000,
     )
     AwesomeListItem.objects.create(awesome_list=awesome_list, repository=repo)
+    RepositorySnapshot.objects.create(
+        repository=repo,
+        captured_at=timezone.now() - timedelta(days=1),
+        stars=79000,
+        commit_count=89000,
+    )
 
     response = client.get(reverse("repos:list_detail", kwargs={"slug": awesome_list.slug}))
 
