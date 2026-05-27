@@ -161,6 +161,9 @@ class RepositorySummaryOut(Schema):
     is_disabled: bool
     is_fork: bool
     uses_ai_for_development: bool
+    is_awesome_list_candidate: bool
+    awesome_list_detected_repo_count: int
+    awesome_list_detection_reasons: list[str]
     awesome_count: int
     snapshot_count: int | None
     stars_since_first: int | None

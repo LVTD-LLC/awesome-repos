@@ -44,6 +44,7 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Awesome Repos: expanded desktop side sponsor rails to ten placements, including one open "Get sponsored" slot.
 - Awesome Repos: store first-commit dates for awesome lists and repositories, show them in search/detail pages, and add age filters.
 - Awesome Repos: added a management command to backfill first-commit dates for existing awesome-list and repository rows.
+- Awesome Repos: detect awesome-list repositories during repository sync and hide them from normal repository browse/search surfaces.
 
 ### Changed
 - Awesome Repos: awesome-list detail pages now show list-level GitHub stars and commits instead of aggregate repository growth charts.

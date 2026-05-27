@@ -15,6 +15,7 @@ from apps.repos.services import (
     repository_performance_summary,
     repository_search_queryset,
     similar_repositories_for_repository,
+    visible_repository_queryset,
 )
 
 DEFAULT_API_PAGE_SIZE = 30
@@ -155,6 +156,9 @@ def serialize_repository_summary(repository: Repository) -> dict:
         "is_disabled": repository.is_disabled,
         "is_fork": repository.is_fork,
         "uses_ai_for_development": repository.uses_ai_for_development,
+        "is_awesome_list_candidate": repository.is_awesome_list_candidate,
+        "awesome_list_detected_repo_count": repository.awesome_list_detected_repo_count,
+        "awesome_list_detection_reasons": repository.awesome_list_detection_reasons,
         "awesome_count": awesome_count,
         "snapshot_count": getattr(repository, "snapshot_count", None),
         "stars_since_first": getattr(repository, "stars_since_first", None),
@@ -334,7 +338,8 @@ def get_awesome_list_detail_payload(*, slug: str) -> dict:
         ),
         slug=slug,
     )
-    repos = Repository.objects.filter(awesome_items__awesome_list=awesome_list)
+    repos = visible_repository_queryset().filter(awesome_items__awesome_list=awesome_list)
+    awesome_list.indexed_repo_count = repos.count()
     repo_stats = repos.aggregate(
         total_stars=Sum("stars"),
         total_forks=Sum("forks"),
@@ -399,7 +404,7 @@ def search_awesome_list_repositories_payload(
 
 def get_awesome_list_repository_options_payload(*, slug: str) -> dict:
     awesome_list = get_object_or_404(AwesomeList.objects.filter(is_active=True), slug=slug)
-    repos = Repository.objects.filter(awesome_items__awesome_list=awesome_list)
+    repos = visible_repository_queryset().filter(awesome_items__awesome_list=awesome_list)
     return {
         "languages": list(
             repos.exclude(language="")

@@ -121,6 +121,9 @@ class Repository(BaseModel):
     readme_last_error = models.TextField(blank=True, default="")
     uses_ai_for_development = models.BooleanField(default=False)
     ai_development_signals = models.JSONField(default=list, blank=True)
+    is_awesome_list_candidate = models.BooleanField(default=False)
+    awesome_list_detected_repo_count = models.PositiveIntegerField(default=0)
+    awesome_list_detection_reasons = models.JSONField(default=list, blank=True)
     generated_tags = models.JSONField(default=list, blank=True)
     generated_tags_model = models.CharField(max_length=255, blank=True, default="")
     generated_tags_source_hash = models.CharField(max_length=64, blank=True, default="")
@@ -137,6 +140,7 @@ class Repository(BaseModel):
             models.Index(fields=["is_archived"]),
             models.Index(fields=["language"]),
             models.Index(fields=["uses_ai_for_development"]),
+            models.Index(fields=["is_awesome_list_candidate"], name="repo_is_awesome_list_idx"),
             GinIndex(fields=["topics"], name="repo_topics_gin_idx"),
             GinIndex(fields=["generated_tags"], name="repo_gen_tags_gin_idx"),
         ]
