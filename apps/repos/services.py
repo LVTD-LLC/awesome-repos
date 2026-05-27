@@ -6,6 +6,7 @@ import json
 import os
 import re
 import time
+from collections.abc import Collection
 from datetime import UTC, datetime
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode, urlparse
@@ -434,14 +435,29 @@ def active_awesome_list_source_repository_names():
     )
 
 
+def active_awesome_list_source_repository_name_set() -> set[str]:
+    return {
+        full_name.casefold()
+        for full_name in AwesomeList.objects.filter(is_active=True)
+        .exclude(repo_full_name="")
+        .values_list("repo_full_name", flat=True)
+    }
+
+
 def visible_repository_queryset():
     return Repository.objects.exclude(is_awesome_list_candidate=True).exclude(
         full_name__in=active_awesome_list_source_repository_names()
     )
 
 
-def detect_awesome_list_candidate(data: dict, readme_text: str = "") -> dict:
+def detect_awesome_list_candidate(
+    data: dict,
+    readme_text: str = "",
+    *,
+    active_source_full_names: Collection[str] = (),
+) -> dict:
     full_name = data.get("full_name") or ""
+    normalized_full_name = full_name.casefold()
     repo_name = data.get("name") or full_name.rsplit("/", 1)[-1]
     repo_name = repo_name.lower()
     description = data.get("description") or ""
@@ -454,13 +470,7 @@ def detect_awesome_list_candidate(data: dict, readme_text: str = "") -> dict:
     has_awesome_description = bool(AWESOME_LIST_DESCRIPTION_RE.search(description))
 
     reasons = []
-    if (
-        full_name
-        and AwesomeList.objects.filter(
-            is_active=True,
-            repo_full_name__iexact=full_name,
-        ).exists()
-    ):
+    if normalized_full_name and normalized_full_name in active_source_full_names:
         reasons.append("tracked_awesome_list_source")
     if topics & AWESOME_LIST_TOPIC_MARKERS:
         reasons.append("github_topic_awesome_list")
@@ -810,6 +820,7 @@ def _upsert_repository_metadata(
     ai_development_signals: list[dict] | None = None,
     commit_count: int | None = None,
     first_commit_at: datetime | None = None,
+    active_source_full_names: Collection[str] = (),
 ) -> Repository:
     full_name = data["full_name"]
     license_data = data.get("license") or {}
@@ -821,7 +832,11 @@ def _upsert_repository_metadata(
             or ""
         )
     detection_readme = readme_data["readme"] if readme_data and readme_data["ok"] else stored_readme
-    awesome_list_detection = detect_awesome_list_candidate(data, detection_readme)
+    awesome_list_detection = detect_awesome_list_candidate(
+        data,
+        detection_readme,
+        active_source_full_names=active_source_full_names,
+    )
     readme_defaults = {}
     if readme_data and readme_data["ok"]:
         readme_defaults = {
@@ -883,8 +898,15 @@ def _upsert_repository_metadata(
     return repo
 
 
-def upsert_repository_from_github(full_name: str, *, include_readme: bool = True) -> Repository:
+def upsert_repository_from_github(
+    full_name: str,
+    *,
+    include_readme: bool = True,
+    active_source_full_names: Collection[str] | None = None,
+) -> Repository:
     data = fetch_json(f"https://api.github.com/repos/{full_name}")
+    if active_source_full_names is None:
+        active_source_full_names = active_awesome_list_source_repository_name_set()
     default_branch = data.get("default_branch") or ""
     existing_first_commit_at = (
         Repository.objects.filter(full_name=data["full_name"])
@@ -949,6 +971,7 @@ def upsert_repository_from_github(full_name: str, *, include_readme: bool = True
         ai_development_signals=ai_development_signals,
         commit_count=commit_count,
         first_commit_at=first_commit_at,
+        active_source_full_names=active_source_full_names,
     )
     if repository_tagging_configured() and (include_readme or not repo.generated_tags):
         sync_repository_tags(repo, repo.readme)
@@ -1194,9 +1217,13 @@ def sync_awesome_list(awesome_list: AwesomeList, limit: int | None = None) -> di
     created_links = 0
     synced = 0
     failures = []
+    active_source_full_names = active_awesome_list_source_repository_name_set()
     for repo_name in repo_names:
         try:
-            repo = upsert_repository_from_github(repo_name)
+            repo = upsert_repository_from_github(
+                repo_name,
+                active_source_full_names=active_source_full_names,
+            )
             _, created = AwesomeListItem.objects.get_or_create(
                 awesome_list=awesome_list,
                 repository=repo,
@@ -1353,9 +1380,14 @@ def refresh_repositories(
         queryset = queryset[:limit]
     synced = 0
     failures = []
+    active_source_full_names = active_awesome_list_source_repository_name_set()
     for repo in queryset:
         try:
-            upsert_repository_from_github(repo.full_name, include_readme=include_readme)
+            upsert_repository_from_github(
+                repo.full_name,
+                include_readme=include_readme,
+                active_source_full_names=active_source_full_names,
+            )
             synced += 1
         except Exception as exc:  # noqa: BLE001
             failures.append({"repo": repo.full_name, "error": str(exc)})

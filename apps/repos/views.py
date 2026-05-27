@@ -118,7 +118,7 @@ class RepositorySearchView(ListView):
         visible_repositories = visible_repository_queryset()
         context["awesome_lists"] = (
             AwesomeList.objects.filter(is_active=True)
-            .annotate(repo_count=Count("items"))
+            .annotate(repo_count=visible_awesome_list_item_count())
             .order_by("name")
         )
         context["languages"] = (

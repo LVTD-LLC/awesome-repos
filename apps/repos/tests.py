@@ -32,6 +32,7 @@ from apps.repos.models import (
 )
 from apps.repos.services import (
     GitHubAPIError,
+    active_awesome_list_source_repository_name_set,
     add_repository_to_awesome_list,
     attach_awesome_list_commit_count,
     awesome_list_repository_history_chart_data,
@@ -140,10 +141,34 @@ def test_detect_awesome_list_candidate_marks_tracked_source_repo():
     result = detect_awesome_list_candidate(
         github_repo_payload(full_name="wsvincent/awesome-django"),
         "",
+        active_source_full_names=active_awesome_list_source_repository_name_set(),
     )
 
     assert result["is_candidate"] is True
     assert result["detected_repo_count"] == 0
+    assert result["reasons"] == ["tracked_awesome_list_source"]
+
+
+@pytest.mark.django_db
+def test_detect_awesome_list_candidate_uses_preloaded_sources_without_queries(
+    django_assert_num_queries,
+):
+    AwesomeList.objects.create(
+        name="Awesome Django",
+        slug="awesome-django",
+        source_url="https://github.com/wsvincent/awesome-django",
+        repo_full_name="wsvincent/awesome-django",
+    )
+    active_source_full_names = active_awesome_list_source_repository_name_set()
+
+    with django_assert_num_queries(0):
+        result = detect_awesome_list_candidate(
+            github_repo_payload(full_name="wsvincent/awesome-django"),
+            "",
+            active_source_full_names=active_source_full_names,
+        )
+
+    assert result["is_candidate"] is True
     assert result["reasons"] == ["tracked_awesome_list_source"]
 
 
@@ -310,7 +335,7 @@ def test_sync_awesome_list_stores_list_activity_metadata(monkeypatch):
         lambda *args: (350, datetime(2015, 1, 2, tzinfo=UTC)),
     )
 
-    def fake_upsert(full_name):
+    def fake_upsert(full_name, *, active_source_full_names=None):
         owner, name = full_name.split("/", 1)
         return Repository.objects.create(
             full_name=full_name,
@@ -2185,8 +2210,13 @@ def test_refresh_repositories_defaults_to_full_sync(monkeypatch):
     )
     refreshed = []
 
-    def fake_upsert_repository_from_github(full_name, *, include_readme=True):
-        refreshed.append((full_name, include_readme))
+    def fake_upsert_repository_from_github(
+        full_name,
+        *,
+        include_readme=True,
+        active_source_full_names=None,
+    ):
+        refreshed.append((full_name, include_readme, active_source_full_names))
         return repository
 
     monkeypatch.setattr(
@@ -2197,7 +2227,7 @@ def test_refresh_repositories_defaults_to_full_sync(monkeypatch):
     result = refresh_repositories()
 
     assert result == {"synced": 1, "failure_count": 0, "failures": []}
-    assert refreshed == [("owner/project", True)]
+    assert refreshed == [("owner/project", True, set())]
 
 
 @pytest.mark.django_db
@@ -3002,7 +3032,7 @@ def test_search_page_renders(client):
         source_url="https://github.com/example/inactive-list",
         is_active=False,
     )
-    Repository.objects.create(
+    repo = Repository.objects.create(
         full_name="django/django",
         owner="django",
         name="django",
@@ -3013,6 +3043,15 @@ def test_search_page_renders(client):
         generated_tags=["web-framework"],
         stars=80000,
     )
+    hidden_repo = Repository.objects.create(
+        full_name="wsvincent/awesome-django",
+        owner="wsvincent",
+        name="awesome-django",
+        url="https://github.com/wsvincent/awesome-django",
+        is_awesome_list_candidate=True,
+    )
+    AwesomeListItem.objects.create(awesome_list=active_list, repository=repo)
+    AwesomeListItem.objects.create(awesome_list=active_list, repository=hidden_repo)
     response = client.get(reverse("repos:search"), {"q": "framework"})
     content = response.content
     assert response.status_code == 200
@@ -3039,6 +3078,9 @@ def test_search_page_renders(client):
     assert b"mailto:hello@awesome_repos.app" not in content
     assert response.context["total_lists"] == 1
     assert list(response.context["awesome_lists"].values_list("id", flat=True)) == [active_list.id]
+    assert response.context["awesome_lists"][0].repo_count == 1
+    assert b"Awesome Django (1)" in content
+    assert b"Awesome Django (2)" not in content
     assert b"Inactive List" not in content
 
 
