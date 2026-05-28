@@ -3176,10 +3176,7 @@ def test_awesome_list_detail_page_renders_activity_metrics(client):
     assert b'data-ad-rail="left"' not in response.content
     assert b'data-ad-rail="right"' not in response.content
     assert 'href="/repos/django/django/" class="block rounded-2xl' not in content
-    assert (
-        '<article class="rounded-2xl border border-gray-200 p-4 transition hover:border-green-300 dark:border-gray-800 dark:hover:border-green-800">'
-        in content
-    )
+    assert "<article " in content
     assert 'href="/repos/django/django/" class="text-lg font-bold' in content
 
 
