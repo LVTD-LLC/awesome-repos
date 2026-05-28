@@ -59,6 +59,7 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Awesome Repos: moved the MCP endpoint into its own Django app and rebuilt it on FastMCP while keeping API and MCP search payloads on shared service functions.
 
 ### Fixed
+- Awesome Repos: fixed invalid nested links on awesome-list repository cards that created empty clickable containers.
 - Awesome Repos: loosened desktop side sponsor rail spacing so ad cards no longer crowd or overlap their copy.
 - Awesome Repos: repair repository migration graph ordering so production can migrate past the AI-development and activity merge branches.
 - Awesome Repos admin panel now bounds the Recent awesome lists card height so long list histories do not stretch the dashboard row.
