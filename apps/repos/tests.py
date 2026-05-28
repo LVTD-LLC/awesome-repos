@@ -3343,6 +3343,7 @@ def test_awesome_list_detail_page_renders_activity_metrics(client):
     response = client.get(reverse("repos:list_detail", kwargs={"slug": "awesome-django"}))
 
     assert response.status_code == 200
+    content = response.content.decode()
     assert b"Awesome Django" in response.content
     assert b"README repos" in response.content
     assert b"List stars" in response.content
@@ -3358,6 +3359,9 @@ def test_awesome_list_detail_page_renders_activity_metrics(client):
     assert b"list-repository-history-data" not in response.content
     assert b'data-ad-rail="left"' not in response.content
     assert b'data-ad-rail="right"' not in response.content
+    assert 'href="/repos/django/django/" class="block rounded-2xl' not in content
+    assert "<article " in content
+    assert 'href="/repos/django/django/" class="text-lg font-bold' in content
 
 
 @pytest.mark.django_db
