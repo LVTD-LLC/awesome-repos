@@ -5,8 +5,8 @@
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 1189 nodes · 2383 edges · 116 communities (81 shown, 35 thin omitted)
-- Extraction: 85% EXTRACTED · 15% INFERRED · 0% AMBIGUOUS · INFERRED: 347 edges (avg confidence: 0.55)
+- 1099 nodes · 2292 edges · 98 communities (66 shown, 32 thin omitted)
+- Extraction: 85% EXTRACTED · 15% INFERRED · 0% AMBIGUOUS · INFERRED: 345 edges (avg confidence: 0.55)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
@@ -61,10 +61,8 @@
 - [[_COMMUNITY_0008_schedule_daily_budgeted_r|0008_schedule_daily_budgeted_r]]
 - [[_COMMUNITY_0014_repository_awesome_list_d|0014_repository_awesome_list_d]]
 - [[_COMMUNITY_0003_schedule_monthly_reposito|0003_schedule_monthly_reposito]]
-- [[_COMMUNITY_Community 46|Community 46]]
 - [[_COMMUNITY_Apple Touch Icon|Apple Touch Icon]]
 - [[_COMMUNITY_DJANGO_SETTINGS_MODULE|DJANGO_SETTINGS_MODULE]]
-- [[_COMMUNITY_Community 50|Community 50]]
 - [[_COMMUNITY_CustomS3Boto3Storage|CustomS3Boto3Storage]]
 - [[_COMMUNITY_Email Confirmation Message|Email Confirmation Message]]
 - [[_COMMUNITY_0002_schedule_daily_missing_re|0002_schedule_daily_missing_re]]
@@ -94,22 +92,6 @@
 - [[_COMMUNITY_0013_awesomelist_first_commit_|0013_awesomelist_first_commit_]]
 - [[_COMMUNITY_copy-vendor-assets.mjs|copy-vendor-assets.mjs]]
 - [[_COMMUNITY_Chatwoot Widget Component|Chatwoot Widget Component]]
-- [[_COMMUNITY_Community 100|Community 100]]
-- [[_COMMUNITY_Community 101|Community 101]]
-- [[_COMMUNITY_Community 102|Community 102]]
-- [[_COMMUNITY_Community 103|Community 103]]
-- [[_COMMUNITY_Community 104|Community 104]]
-- [[_COMMUNITY_Community 105|Community 105]]
-- [[_COMMUNITY_Community 106|Community 106]]
-- [[_COMMUNITY_Community 107|Community 107]]
-- [[_COMMUNITY_Community 108|Community 108]]
-- [[_COMMUNITY_Community 109|Community 109]]
-- [[_COMMUNITY_Community 110|Community 110]]
-- [[_COMMUNITY_Community 111|Community 111]]
-- [[_COMMUNITY_Community 112|Community 112]]
-- [[_COMMUNITY_Community 113|Community 113]]
-- [[_COMMUNITY_Community 114|Community 114]]
-- [[_COMMUNITY_Community 115|Community 115]]
 
 ## God Nodes (most connected - your core abstractions)
 1. `Repository` - 84 edges
@@ -128,12 +110,12 @@
   render.yaml → .github/workflows/deploy.yml
 - `Local Docker Compose` --semantically_similar_to--> `Production Docker Compose`  [INFERRED] [semantically similar]
   docker-compose-local.yml → docker-compose-prod.yml
-- `_populate_user()` --calls--> `user()`  [INFERRED]
-  apps/core/tests/test_social_auth.py → conftest.py
 - `CustomAccountAdapter` --uses--> `EmailType`  [INFERRED]
   awesome_repos/adapters.py → apps/core/choices.py
 - `CustomSocialAccountAdapter` --uses--> `EmailType`  [INFERRED]
   awesome_repos/adapters.py → apps/core/choices.py
+- `test_confirmation_mail_failures_do_not_bubble_to_signup()` --calls--> `CustomAccountAdapter`  [EXTRACTED]
+  apps/core/tests/test_email_delivery.py → awesome_repos/adapters.py
 
 ## Hyperedges (group relationships)
 - **Multi-target deployment topology** — render_awesome_repos_web, docker_compose_prod, deploy_caprover, deploy_ghcr_image [INFERRED 0.75]
@@ -150,27 +132,27 @@
 - **App-Based Pages** — pages_admin_panel, pages_home, pages_user_settings [EXTRACTED 1.00]
 - **Awesome Repos Brand Asset System** — brand_awesome_repos_mark, brand_awesome_repos_logo, brand_awesome_repos_social, brand_apple_touch_icon [INFERRED 0.85]
 
-## Communities (116 total, 35 thin omitted)
+## Communities (98 total, 32 thin omitted)
 
 ### Community 0 - "Test & Model Scaffolding"
 Cohesion: 0.07
-Nodes (45): SuperuserBearerAPIKeyAuth, PlaceholderApiTests, UserInfoApiUnitTests, bool, str, str, bool, int (+37 more)
+Nodes (41): bool, str, str, bool, int, str, int, str (+33 more)
 
 ### Community 1 - "API Schema (Ninja In/Out)"
-Cohesion: 0.06
-Nodes (65): AwesomeListCreateIn, AwesomeListDetailOut, AwesomeListDirectoryTotalsOut, AwesomeListMutationOut, AwesomeListReferenceOut, AwesomeListRepositoryStatsOut, AwesomeListSearchOut, AwesomeListSummaryOut (+57 more)
+Cohesion: 0.10
+Nodes (50): AwesomeListCreateIn, AwesomeListDetailOut, AwesomeListDirectoryTotalsOut, AwesomeListMutationOut, AwesomeListReferenceOut, AwesomeListRepositoryStatsOut, AwesomeListSearchOut, AwesomeListSummaryOut (+42 more)
 
 ### Community 2 - "Admin Panel Views & URLs"
-Cohesion: 0.17
-Nodes (10): awesome_repos URL Configuration  The `urlpatterns` list routes URLs to views. Fo, AccountSignupByPasskeyView, AccountSignupView, LandingPageView, PrivacyPolicyView, SignupTrackingMixin, TermsOfServiceView, SignupByPasskeyView (+2 more)
+Cohesion: 0.08
+Nodes (19): awesome_repos URL Configuration  The `urlpatterns` list routes URLs to views. Fo, AdminPanelView, delete_account(), HomeView, Permanently delete the current user and all related data.      Safety: requires, UserSettingsView, LoginRequiredMixin, AccountSignupByPasskeyView (+11 more)
 
 ### Community 3 - "Awesome List Detail Tests"
 Cohesion: 0.04
-Nodes (22): repository_search_queryset(), test_awesome_list_directory_totals_aggregates_in_one_query(), test_awesome_list_request_admin_clears_reviewed_at_when_reset_to_pending(), test_detect_ai_development_signals_identifies_common_agent_files(), test_discover_missing_awesome_list_repositories_skips_existing_repos(), test_extract_github_repos_dedupes_and_skips_non_repo_paths(), test_fetch_json_uses_github_token(), test_fetch_repository_readme_data_decodes_github_contents_metadata() (+14 more)
+Nodes (20): repository_search_queryset(), github_awesome_list_payload(), test_awesome_list_directory_totals_aggregates_in_one_query(), test_awesome_list_form_derives_name_and_unique_slug_from_url(), test_awesome_list_request_admin_clears_reviewed_at_when_reset_to_pending(), test_detect_ai_development_signals_identifies_common_agent_files(), test_extract_github_repos_dedupes_and_skips_non_repo_paths(), test_fetch_json_uses_github_token() (+12 more)
 
 ### Community 4 - "API Authentication"
-Cohesion: 0.08
-Nodes (28): AccessToken, APIKeyHeaderAuth, BearerAPIKeyAuth, Authentication via Django session, _require_superuser(), SessionAuth, SuperuserAPIKeyHeaderAuth, _api_key_header() (+20 more)
+Cohesion: 0.07
+Nodes (37): AccessToken, APIKeyHeaderAuth, BearerAPIKeyAuth, Authentication via Django session, _require_superuser(), SessionAuth, SuperuserAPIKeyHeaderAuth, SuperuserBearerAPIKeyAuth (+29 more)
 
 ### Community 5 - "AI Repo Tagging Agent"
 Cohesion: 0.11
@@ -181,32 +163,32 @@ Cohesion: 0.11
 Nodes (22): Any, bool, HttpRequest, int, str, ASGIApp, bytes, Event (+14 more)
 
 ### Community 7 - "Repository Sync Tasks"
-Cohesion: 0.12
-Nodes (32): bool, int, str, github_rate_limit_remaining(), github_rate_limit_status(), add_missing_repository_to_awesome_list_task(), _available_repository_refresh_limit(), _daily_missing_repository_budget_key() (+24 more)
+Cohesion: 0.13
+Nodes (30): bool, int, str, github_rate_limit_remaining(), add_missing_repository_to_awesome_list_task(), _available_repository_refresh_limit(), _daily_missing_repository_budget_key(), _daily_missing_repository_limit() (+22 more)
 
 ### Community 8 - "Email & Ad Layout Tests"
 Cohesion: 0.08
 Nodes (8): assert_standard_ad_layout(), mark_password_reauthenticated(), test_app_pages_use_standard_ad_layout(), test_public_pages_use_standard_ad_layout(), test_recovery_codes_generate_page_uses_app_styling_and_creates_codes(), test_recovery_codes_page_can_require_save_confirmation(), test_recovery_codes_page_uses_app_styling(), test_webauthn_add_page_loads_styled_form_and_scripts()
 
 ### Community 9 - "Frontend Dependencies"
-Cohesion: 0.12
-Nodes (16): author, bugs, url, description, keywords, license, name, version (+8 more)
+Cohesion: 0.06
+Nodes (30): author, bugs, url, dependencies, alpinejs, d3, htmx.org, description (+22 more)
 
 ### Community 10 - "Frontend JS Utilities"
 Cohesion: 0.11
 Nodes (14): copyText(), initCopyButtons(), copyCode(), initDocsEnhancements(), buildMessageElement(), createMessagesContainer(), initMessages(), showMessage() (+6 more)
 
 ### Community 11 - "Repository Embeddings"
-Cohesion: 0.16
-Nodes (25): bool, Repository, str, BaseCommand, Command, EmbedInputType, build_repository_embedding_payload(), build_repository_embedding_text() (+17 more)
+Cohesion: 0.15
+Nodes (27): bool, Repository, str, BaseCommand, Command, EmbedInputType, build_repository_embedding_payload(), build_repository_embedding_text() (+19 more)
 
 ### Community 12 - "Repo & List Templates"
 Cohesion: 0.09
 Nodes (25): Allauth WebAuthn JS Integration, Side Ad Rail Component, MFA Base Manage Template, Block: mfa_content, MFA Passkeys Index, Recovery Codes Base Template, Recovery Codes Generate, Recovery Codes Index (+17 more)
 
 ### Community 13 - "GitHub Fetch Services"
-Cohesion: 0.13
-Nodes (43): int, str, _append_ai_development_signal(), _apply_list_repository_state_filters(), _apply_repository_filters(), _apply_repository_keyword_search(), _apply_repository_semantic_search(), _apply_repository_state_filters() (+35 more)
+Cohesion: 0.16
+Nodes (31): str, _append_ai_development_signal(), _apply_list_repository_state_filters(), _apply_repository_filters(), _apply_repository_keyword_search(), _apply_repository_semantic_search(), _apply_repository_state_filters(), _apply_repository_taxonomy_filters() (+23 more)
 
 ### Community 14 - "Auth Page Templates"
 Cohesion: 0.22
@@ -218,7 +200,7 @@ Nodes (25): AGENTS.md agent contract, Awesome-list README ingestion, Awesome Rep
 
 ### Community 16 - "FastMCP Tools"
 Cohesion: 0.06
-Nodes (60): Any, FastMCP, int, str, int, Repository, str, str (+52 more)
+Nodes (56): Any, FastMCP, int, str, int, str, str, DetailView (+48 more)
 
 ### Community 17 - "Repository Upsert Tests"
 Cohesion: 0.14
@@ -241,20 +223,20 @@ Cohesion: 0.13
 Nodes (11): CustomAccountAdapter, CustomSocialAccountAdapter, Custom adapter to track email confirmations and welcome emails., Allow operators to pause new registrations without affecting existing users., Override to track email confirmation sends.          Args:             request:, Custom adapter to automatically generate usernames from email addresses     duri, Mirror email signup gating for social-account auto-signups., Automatically set username from email address before user creation.         Uses (+3 more)
 
 ### Community 22 - "API Key Hashing"
-Cohesion: 0.24
+Cohesion: 0.25
 Nodes (14): bool, str, generate_api_key(), get_api_key_prefix(), hash_api_key(), _hash_api_key_with_salt(), Generate an API key with a public lookup prefix and high-entropy secret., Return the public key prefix used for indexed lookup before hash verification. (+6 more)
 
 ### Community 23 - "Logging & Settings"
-Cohesion: 0.18
-Nodes (10): before_send(), CustomLoggingIntegration, build_redis_url(), extract_from_record(), str, Django settings for awesome_repos project.  Generated by 'django-admin startproj, Extract thread name and add them to the event dict., LoggingIntegration (+2 more)
+Cohesion: 0.06
+Nodes (24): scrubbing_callback(), before_send(), CustomLoggingIntegration, build_github_provider_config(), build_redis_url(), extract_from_record(), Django settings for awesome_repos project.  Generated by 'django-admin startproj, Build the allauth config for the GitHub social provider.      Kept as a function (+16 more)
 
 ### Community 24 - "Account Forms"
 Cohesion: 0.20
 Nodes (8): CustomLoginForm, CustomSignUpForm, Meta, ProfileUpdateForm, DivErrorList, ErrorList, LoginForm, SignupForm
 
 ### Community 27 - "datetime"
-Cohesion: 0.17
-Nodes (12): datetime, attach_awesome_list_commit_count(), fetch_github_commit_count(), disable_repository_tagging(), test_attach_awesome_list_commit_count_is_explicit_about_commit_fetch(), test_attach_awesome_list_commit_count_skips_missing_default_branch(), test_backfill_first_commit_dates_command_updates_existing_rows(), test_fetch_github_commit_count_and_first_commit_at_uses_oldest_page() (+4 more)
+Cohesion: 0.18
+Nodes (15): datetime, attach_awesome_list_commit_count(), _commit_datetime(), dt(), fetch_github_commit_count(), fetch_github_commit_count_and_first_commit_at(), _last_page_from_link_header(), disable_repository_tagging() (+7 more)
 
 ### Community 28 - "repository-history-charts.js"
 Cohesion: 0.23
@@ -269,28 +251,28 @@ Cohesion: 0.22
 Nodes (4): ReferrerBannerAdmin, Adds referrer banner to context. Priority order:     1. Exact match on ref or ut, referrer_banner(), ReferrerBanner
 
 ### Community 31 - "sync_awesome_repos.py"
-Cohesion: 0.16
-Nodes (9): Command, parse_github_repo_url(), refresh_repositories(), sync_awesome_list(), github_awesome_list_payload(), test_parse_github_repo_url(), test_refresh_repositories_defaults_to_full_sync(), test_sync_awesome_list_marks_empty_scan_as_error() (+1 more)
+Cohesion: 0.13
+Nodes (14): AwesomeList, Command, add_repository_to_awesome_list(), discover_missing_awesome_list_repositories(), parse_github_repo_url(), refresh_repositories(), sync_awesome_list(), update_awesome_list_metadata() (+6 more)
 
 ### Community 32 - "_get_api_key_from_headers()"
-Cohesion: 0.17
-Nodes (10): _get_api_key_from_headers(), HttpRequest, str, int, str, get_awesome_repos_logger(), This will add a `awesome_repos` prefix to logger for easy configuration., track_event() (+2 more)
+Cohesion: 0.20
+Nodes (5): _get_api_key_from_headers(), HttpRequest, str, get_awesome_repos_logger(), This will add a `awesome_repos` prefix to logger for easy configuration.
+
+### Community 33 - "context_processors.py"
+Cohesion: 0.20
+Nodes (4): available_social_providers(), chatwoot_settings(), Checks which social authentication providers are available.     Returns a list o, test_chatwoot_context_processor_exposes_widget_settings()
 
 ### Community 34 - "int"
-Cohesion: 0.33
-Nodes (6): AwesomeList, add_repository_to_awesome_list(), awesome_list_repository_history_chart_data(), test_add_repository_to_awesome_list_skips_existing_repo_refresh(), test_awesome_list_repository_history_chart_data_aggregates_list_snapshots(), test_awesome_list_repository_history_chart_data_seeds_from_before_window()
+Cohesion: 0.17
+Nodes (17): int, Repository, _awesome_list_history_point(), awesome_list_repository_history_chart_data(), _format_delta(), _optional_delta(), record_repository_snapshot(), repository_history_chart_data() (+9 more)
 
 ### Community 35 - "test_signup_gating.py"
 Cohesion: 0.33
 Nodes (8): _account_adapter(), _social_account_adapter(), test_account_signup_adapter_can_pause_new_signups(), test_account_signup_adapter_defaults_open_for_signups(), test_account_signup_adapter_defaults_open_when_setting_is_absent(), test_social_signup_adapter_defaults_open_for_signups(), test_social_signup_adapter_defaults_open_when_setting_is_absent(), test_social_signup_adapter_uses_same_signup_gate()
 
-### Community 36 - "test_signals.py"
-Cohesion: 0.11
-Nodes (18): AI-assisted development, API endpoints, Authentication, CI (optional), Custom Deployment on Caprover, Deployment, Docker Compose, Fly.io (+10 more)
-
 ### Community 37 - "admin.py"
-Cohesion: 0.20
-Nodes (6): EmailType, ProfileStates, EmailSent, Meta, Profile, ProfileStateTransition
+Cohesion: 0.42
+Nodes (5): EmailType, ProfileStates, EmailSent, Meta, ProfileStateTransition
 
 ### Community 38 - "copyAppJs()"
 Cohesion: 0.28
@@ -301,8 +283,8 @@ Cohesion: 0.29
 Nodes (4): Identify items that will be in the Sitemap          Returns:             List: u, Get location for each item in the Sitemap          Args:             item (str):, Generate Sitemap for the site, StaticViewSitemap
 
 ### Community 42 - "tasks.py"
-Cohesion: 0.18
-Nodes (10): Added, Added, Changed, Changed, Changelog, Fixed, Fixed, Removed (+2 more)
+Cohesion: 0.60
+Nodes (5): int, str, track_event(), track_state_change(), try_create_posthog_alias()
 
 ### Community 43 - "0008_schedule_daily_budgeted_r"
 Cohesion: 0.47
@@ -316,96 +298,36 @@ Nodes (5): backfill_awesome_list_candidates(), detect_awesome_list_candidate(), 
 Cohesion: 0.50
 Nodes (3): create_monthly_repository_refresh_schedule(), Migration, next_monthly_run()
 
-### Community 46 - "Community 46"
-Cohesion: 0.20
-Nodes (9): Awesome Repos Design System, Colors, Components, Do's and Don'ts, Elevation & Depth, Layout, Overview, Shapes (+1 more)
-
 ### Community 47 - "Apple Touch Icon"
 Cohesion: 0.70
 Nodes (5): Apple Touch Icon, Awesome Repos Logo (Wordmark), Awesome Repos Mark, Awesome Repos Social Card, Awesome Repos Brand Identity
 
 ### Community 49 - "DJANGO_SETTINGS_MODULE"
-Cohesion: 0.47
-Nodes (5): DJANGO_SETTINGS_MODULE, PROJECT_NAME, wait_for_database(), entrypoint.sh script, entrypoint.sh script
-
-### Community 50 - "Community 50"
-Cohesion: 0.25
-Nodes (7): Agent Contract, Agent Guidance, AGENTS.md - Awesome Repos, Commands, Implementation Rules, Project Map, Workflow
+Cohesion: 0.50
+Nodes (4): DJANGO_SETTINGS_MODULE, PROJECT_NAME, wait_for_database(), entrypoint.sh script
 
 ### Community 52 - "Email Confirmation Message"
 Cohesion: 0.50
 Nodes (4): Email Confirmation Message, Signup Email Confirmation Message, Signup Email Confirmation Subject, Email Confirmation Subject
 
-### Community 56 - "main()"
-Cohesion: 0.40
-Nodes (4): main(), Run administrative tasks., main(), Run administrative tasks.
-
 ### Community 58 - "Pre-commit config"
 Cohesion: 0.67
 Nodes (3): Pre-commit config, djLint pre-commit hook, Ruff pre-commit hook
 
-### Community 100 - "Community 100"
-Cohesion: 0.32
-Nodes (5): available_social_providers(), Checks which social authentication providers are available.     Returns a list o, Tests for GitHub social signup wiring.  Covers the three pieces that make the "S, _social_account_adapter(), TestAvailableSocialProvidersContext
-
-### Community 101 - "Community 101"
-Cohesion: 0.32
-Nodes (5): build_github_provider_config(), Build the allauth config for the GitHub social provider.      Kept as a function, Assert against the real settings.py config builder so a regression in     the sc, user:email scope is required to read private GitHub emails at signup., TestGithubProviderConfig
-
-### Community 102 - "Community 102"
-Cohesion: 0.36
-Nodes (4): user(), _populate_user(), Run the social adapter the way allauth does mid-signup.      allauth hands the a, TestSocialUsernamePopulation
-
-### Community 103 - "Community 103"
-Cohesion: 0.29
-Nodes (7): scripts, build, build:css, build:js, build:vendor, lint, watch
-
-### Community 104 - "Community 104"
-Cohesion: 0.29
-Nodes (7): scripts, build, build:css, build:js, build:vendor, lint, watch
-
-### Community 105 - "Community 105"
-Cohesion: 0.33
-Nodes (6): devDependencies, eslint, tailwindcss, @tailwindcss/cli, @tailwindcss/forms, @tailwindcss/typography
-
-### Community 106 - "Community 106"
-Cohesion: 0.33
-Nodes (6): devDependencies, eslint, tailwindcss, @tailwindcss/cli, @tailwindcss/forms, @tailwindcss/typography
-
-### Community 108 - "Community 108"
-Cohesion: 0.50
-Nodes (3): Frontend, Frontend Rules, Scripts
-
-### Community 109 - "Community 109"
-Cohesion: 0.50
-Nodes (4): dependencies, alpinejs, d3, htmx.org
-
-### Community 110 - "Community 110"
-Cohesion: 0.50
-Nodes (4): dependencies, alpinejs, d3, htmx.org
-
-### Community 112 - "Community 112"
-Cohesion: 0.67
-Nodes (3): repository, type, url
-
-### Community 113 - "Community 113"
-Cohesion: 0.67
-Nodes (3): repository, type, url
-
 ## Knowledge Gaps
-- **173 isolated node(s):** `name`, `version`, `description`, `build`, `build:css` (+168 more)
+- **110 isolated node(s):** `str`, `name`, `version`, `description`, `build` (+105 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **35 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **32 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `get_awesome_repos_logger()` connect `_get_api_key_from_headers()` to `API Schema (Ninja In/Out)`, `context_processors.py`, `Admin Panel Views & URLs`, `API Authentication`, `admin.py`, `AI Repo Tagging Agent`, `Repository Sync Tasks`, `Repository Embeddings`, `GitHub Fetch Services`, `Email Delivery Utils`, `Allauth Adapters`?**
-  _High betweenness centrality (0.111) - this node is a cross-community bridge._
-- **Why does `AwesomeList` connect `Test & Model Scaffolding` to `API Schema (Ninja In/Out)`, `int`, `Awesome List Detail Tests`, `API Authentication`, `Repository Sync Tasks`, `GitHub Fetch Services`, `FastMCP Tools`, `Search Serializers`, `datetime`, `sync_awesome_repos.py`?**
-  _High betweenness centrality (0.081) - this node is a cross-community bridge._
-- **Why does `Repository` connect `Test & Model Scaffolding` to `API Schema (Ninja In/Out)`, `int`, `Awesome List Detail Tests`, `API Authentication`, `AI Repo Tagging Agent`, `Repository Sync Tasks`, `Repository Embeddings`, `GitHub Fetch Services`, `FastMCP Tools`, `datetime`?**
-  _High betweenness centrality (0.076) - this node is a cross-community bridge._
+- **Why does `AwesomeList` connect `Test & Model Scaffolding` to `API Schema (Ninja In/Out)`, `Admin Panel Views & URLs`, `int`, `API Authentication`, `Awesome List Detail Tests`, `Repository Sync Tasks`, `GitHub Fetch Services`, `FastMCP Tools`, `Search Serializers`, `datetime`, `sync_awesome_repos.py`?**
+  _High betweenness centrality (0.090) - this node is a cross-community bridge._
+- **Why does `get_awesome_repos_logger()` connect `_get_api_key_from_headers()` to `API Schema (Ninja In/Out)`, `context_processors.py`, `Admin Panel Views & URLs`, `API Authentication`, `admin.py`, `AI Repo Tagging Agent`, `Repository Sync Tasks`, `tasks.py`, `Repository Embeddings`, `GitHub Fetch Services`, `Email Delivery Utils`, `Allauth Adapters`?**
+  _High betweenness centrality (0.087) - this node is a cross-community bridge._
+- **Why does `Repository` connect `Test & Model Scaffolding` to `API Schema (Ninja In/Out)`, `int`, `Awesome List Detail Tests`, `API Authentication`, `AI Repo Tagging Agent`, `Repository Sync Tasks`, `Repository Embeddings`, `GitHub Fetch Services`, `FastMCP Tools`, `datetime`, `sync_awesome_repos.py`?**
+  _High betweenness centrality (0.072) - this node is a cross-community bridge._
 - **Are the 64 inferred relationships involving `Repository` (e.g. with `Agent` and `PlaceholderApiTests`) actually correct?**
   _`Repository` has 64 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 55 inferred relationships involving `AwesomeList` (e.g. with `PlaceholderApiTests` and `UserInfoApiUnitTests`) actually correct?**
