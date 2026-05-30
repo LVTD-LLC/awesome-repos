@@ -53,66 +53,36 @@ def mark_password_reauthenticated(client, username):
     session.save()
 
 
-def test_login_page_shows_passkey_option(client):
+def test_login_page_is_github_only(client, settings):
+    settings.SOCIALACCOUNT_PROVIDERS = {"github": {"APP": {"client_id": "x", "secret": "y"}}}
+
     response = client.get(reverse("account_login"))
     assert response.status_code == 200
 
     content = response.content.decode()
-    assert "Sign in with a passkey" in content
-    assert "Access is invite-only right now." in content
-    assert 'id="mfa_login"' in content
-    assert "window.webauthnJSON.get(requestOptions)" in content
-    assert "X-Requested-With" in content
-    assert "allauth.webauthn.forms.loginForm" not in content
+    assert "Continue with GitHub" in content
+    assert "/accounts/github/login/" in content
+    # Email/password and passkey login are gone.
+    assert 'type="password"' not in content
+    assert "Sign in with a passkey" not in content
 
 
-def test_signup_page_shows_passkey_signup_option(client):
+def test_signup_page_is_github_only(client, settings):
+    settings.SOCIALACCOUNT_PROVIDERS = {"github": {"APP": {"client_id": "x", "secret": "y"}}}
+
     response = client.get(reverse("account_signup"))
     assert response.status_code == 200
 
     content = response.content.decode()
-    assert "Username" not in content
-    assert "Confirm Password" not in content
-    assert "Cofirm Password" not in content
-    assert "Sign up using a passkey" in content
-    assert reverse("account_signup_by_passkey") in content
+    assert "Sign up with GitHub" in content
+    assert "/accounts/github/login/" in content
+    # Email/password and passkey signup are gone.
+    assert 'type="password"' not in content
+    assert "Sign up using a passkey" not in content
 
 
-def test_passkey_signup_page_uses_app_styling(client):
-    response = client.get(reverse("account_signup_by_passkey"))
-    assert response.status_code == 200
-
-    content = response.content.decode()
-    assert "Create your account with a passkey" in content
-    assert "Password" not in content
-    assert "Continue with passkey" in content
-    assert "Menu:" not in content
-
-
-def test_login_page_uses_email_instead_of_username(client):
-    response = client.get(reverse("account_login"))
-    assert response.status_code == 200
-
-    content = response.content.decode()
-    assert 'placeholder="Email"' in content
-    assert 'type="email"' in content
-    assert 'placeholder="Username"' not in content
-
-
-def test_signup_redirects_to_email_code_verification(
-    client, monkeypatch, settings
-):
-    sent_confirmations = []
-
-    def fake_send_confirmation_mail(self, request, emailconfirmation, signup):
-        sent_confirmations.append((emailconfirmation.email_address.email, signup))
-
-    monkeypatch.setattr(
-        "awesome_repos.adapters.CustomAccountAdapter.send_confirmation_mail",
-        fake_send_confirmation_mail,
-    )
+def test_email_signup_post_is_disabled(client, settings):
     settings.POSTHOG_API_KEY = ""
-    
 
     response = client.post(
         reverse("account_signup"),
@@ -122,80 +92,10 @@ def test_signup_redirects_to_email_code_verification(
         },
     )
 
+    # GitHub is the only signup path: the POST is rejected and no account is made.
     assert response.status_code == 302
-    assert response["Location"] == reverse("account_email_verification_sent")
-    user = get_user_model().objects.get(email="newuser@example.com")
-    assert user.username
-    assert sent_confirmations == [("newuser@example.com", True)]
-    verification = client.session["account_email_verification_code"]
-    assert verification["email"] == "newuser@example.com"
-    assert verification["code"]
-
-
-def test_email_verification_code_page_uses_app_styling(client, monkeypatch, settings):
-    def fake_send_confirmation_mail(self, request, emailconfirmation, signup):
-        pass
-
-    monkeypatch.setattr(
-        "awesome_repos.adapters.CustomAccountAdapter.send_confirmation_mail",
-        fake_send_confirmation_mail,
-    )
-    settings.POSTHOG_API_KEY = ""
-    
-
-    client.post(
-        reverse("account_signup"),
-        data={
-            "email": "codeuser@example.com",
-            "password1": "strong-test-pass-123",
-        },
-    )
-
-    response = client.get(reverse("account_email_verification_sent"))
-
-    assert response.status_code == 200
-    content = response.content.decode()
-    assert "Enter email verification code" in content
-    assert 'autocomplete="one-time-code"' in content
-    assert "Menu:" not in content
-
-
-def test_passkey_signup_verifies_email_then_shows_styled_passkey_creation(
-    client, monkeypatch, settings
-):
-    def fake_send_confirmation_mail(self, request, emailconfirmation, signup):
-        pass
-
-    monkeypatch.setattr(
-        "awesome_repos.adapters.CustomAccountAdapter.send_confirmation_mail",
-        fake_send_confirmation_mail,
-    )
-    settings.POSTHOG_API_KEY = ""
-    
-
-    signup_response = client.post(
-        reverse("account_signup_by_passkey"),
-        data={"email": "passkey-new@example.com"},
-    )
-    assert signup_response.status_code == 302
-    assert signup_response["Location"] == reverse("account_email_verification_sent")
-
-    code = client.session["account_email_verification_code"]["code"]
-    verify_response = client.post(
-        reverse("account_email_verification_sent"),
-        data={"code": code},
-    )
-
-    assert verify_response.status_code == 302
-    assert verify_response["Location"] == reverse("mfa_signup_webauthn")
-
-    form_response = client.get(reverse("mfa_signup_webauthn"))
-    assert form_response.status_code == 200
-    content = form_response.content.decode()
-    assert "Create your passkey" in content
-    assert 'id="mfa_webauthn_signup"' in content
-    assert "allauth.webauthn.forms.signupForm" in content
-    assert "Menu:" not in content
+    assert response["Location"] == reverse("account_signup")
+    assert not get_user_model().objects.filter(email="newuser@example.com").exists()
 
 
 def test_dashboard_does_not_show_email_confirmation_reminder(client):
@@ -219,7 +119,9 @@ def test_dashboard_does_not_show_email_confirmation_reminder(client):
     assert "Welcome to Awesome Repos" in content
 
 
-def test_landing_page_does_not_show_sign_in_or_sign_up_buttons(client):
+def test_landing_page_shows_github_button_for_anonymous_users(client, settings):
+    settings.SOCIALACCOUNT_PROVIDERS = {"github": {"APP": {"client_id": "x", "secret": "y"}}}
+
     response = client.get(reverse("repos:search"))
 
     assert response.status_code == 200
@@ -229,8 +131,25 @@ def test_landing_page_does_not_show_sign_in_or_sign_up_buttons(client):
     assert "brand/awesome-repos-social.png" in content
     assert "Search every repository hiding inside awesome lists." in content
     assert "Browse awesome lists" in content
-    assert "Sign In" not in content
+    # GitHub is the sole auth entry point; the old email-based buttons are gone.
+    assert "Continue with GitHub" in content
+    assert "/accounts/github/login/" in content
     assert "Start for Free" not in content
+
+
+def test_landing_page_hides_github_button_for_authenticated_users(client):
+    user = get_user_model().objects.create_user(
+        username="loggedin",
+        email="loggedin@example.com",
+        password="strong-test-pass-123",
+    )
+    client.force_login(user)
+
+    response = client.get(reverse("repos:search"))
+
+    assert response.status_code == 200
+    content = response.content.decode()
+    assert "Continue with GitHub" not in content
 
 
 def test_public_pages_use_standard_ad_layout(client):
@@ -605,10 +524,7 @@ def test_settings_resend_confirmation_uses_email_code(client, monkeypatch):
     assert len(sent_confirmations) == 1
     emailconfirmation, signup = sent_confirmations[0]
     assert signup is False
-    assert (
-        emailconfirmation.key
-        == client.session["account_email_verification_code"]["code"]
-    )
+    assert emailconfirmation.key == client.session["account_email_verification_code"]["code"]
     assert not EmailAddress.objects.get(user=user, email=user.email).verified
 
 

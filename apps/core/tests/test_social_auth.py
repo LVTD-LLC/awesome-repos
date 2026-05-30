@@ -126,4 +126,5 @@ class TestSocialButtonsRender:
     def test_signup_page_hides_button_without_provider(self, client):
         content = client.get(reverse("account_signup")).content.decode()
 
-        assert "Or continue with" not in content
+        assert "/accounts/github/login/" not in content
+        assert "isn't configured yet" in content

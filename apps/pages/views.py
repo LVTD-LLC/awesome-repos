@@ -1,10 +1,9 @@
 from allauth.account.views import SignupByPasskeyView, SignupView
-from django_q.tasks import async_task
 from django.conf import settings
 from django.contrib import messages
+from django.shortcuts import redirect
 from django.views.generic import TemplateView
-
-from apps.core.models import Profile
+from django_q.tasks import async_task
 
 from awesome_repos.utils import get_awesome_repos_logger
 
@@ -28,9 +27,6 @@ class LandingPageView(TemplateView):
                 source_function="LandingPageView - get_context_data",
                 group="Create Posthog Alias",
             )
-        
-
-        
 
         return context
 
@@ -63,7 +59,6 @@ class SignupTrackingMixin:
             source_function=f"{self.tracking_source_name} - form_valid",
             group="Track Event",
         )
-        
 
     def form_valid(self, form):
         response = super().form_valid(form)
@@ -72,18 +67,20 @@ class SignupTrackingMixin:
 
 
 class AccountSignupView(SignupTrackingMixin, SignupView):
-    # signup.html uses allauth's injected entrance context for passkey signup
-    # keys such as PASSKEY_SIGNUP_ENABLED and signup_by_passkey_url.
+    # Email/password signup is disabled — GitHub OAuth is the only signup path.
+    # The GET page still renders so it can show the "Sign up with GitHub" button,
+    # but any POST (e.g. a hand-crafted email/password submission) is rejected.
     template_name = "account/signup.html"
     tracking_source_name = "AccountSignupView"
+
+    def post(self, request, *args, **kwargs):
+        messages.info(request, "Please sign up with GitHub.")
+        return redirect("account_signup")
 
 
 class AccountSignupByPasskeyView(SignupTrackingMixin, SignupByPasskeyView):
     template_name = "account/signup_by_passkey.html"
     tracking_source_name = "AccountSignupByPasskeyView"
-
-
-
 
 
 class PrivacyPolicyView(TemplateView):
