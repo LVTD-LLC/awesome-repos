@@ -341,7 +341,7 @@ def build_github_provider_config(client_id, secret):
 GITHUB_CLIENT_ID = env("GITHUB_CLIENT_ID", default="")
 if GITHUB_CLIENT_ID != "":
     SOCIALACCOUNT_PROVIDERS["github"] = build_github_provider_config(
-        env("GITHUB_CLIENT_ID"),
+        GITHUB_CLIENT_ID,
         env("GITHUB_CLIENT_SECRET"),
     )
 
