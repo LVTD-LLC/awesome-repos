@@ -1,5 +1,5 @@
 <a
-  href="{% if href %}{{ href }}{% else %}mailto:rasul@lvtd.dev?subject=Sponsor%20Awesome%20Repos{% endif %}"
+  href="{% if href %}{{ href }}{% else %}mailto:rasul@lvtd.dev?subject=Sponsor%20Awesome{% endif %}"
   {% if href %}target="_blank" rel="noreferrer sponsored"{% endif %}
   class="group relative flex h-full min-h-0 flex-col items-center justify-center overflow-hidden rounded-lg border px-3 py-3 text-center transition focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-950 {% if is_empty %}border-dashed border-gray-300 bg-gray-50/70 hover:-translate-y-0.5 hover:border-green-400 hover:bg-green-50/70 hover:shadow-md dark:border-gray-800 dark:bg-gray-900/60 dark:hover:border-green-700 dark:hover:bg-green-950/30{% else %}side-ad-card {{ tone_class|default:'side-ad-card-blue' }} shadow-sm hover:-translate-y-0.5 hover:border-green-400 hover:bg-green-50/70 hover:shadow-md dark:hover:border-green-700 dark:hover:bg-green-950/30{% endif %}"
   data-ad-slot="{{ slot_id }}"

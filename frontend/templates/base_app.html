@@ -15,14 +15,14 @@
   <link rel="icon" type="image/svg+xml" href="{% static 'brand/awesome-repos-mark.svg' %}" />
 
   {% block meta %}
-  <title>Awesome Repos</title>
+  <title>Awesome</title>
   <meta name="description" content="Search and monitor GitHub repositories listed across awesome lists." />
   <meta name="keywords" content="django" />
   <meta name="robots" content="index, follow" />
   <link rel="canonical" href="https://{{ request.get_host }}/" />
 
   <meta property="og:type" content="website" />
-  <meta property="og:title" content="Awesome Repos" />
+  <meta property="og:title" content="Awesome" />
   <meta property="og:url" content="https://{{ request.get_host }}/" />
   <meta property="og:description" content="Search and monitor GitHub repositories listed across awesome lists." />
   <meta property="og:image" content="https://{{ request.get_host }}{% static 'brand/awesome-repos-social.png' %}" />
@@ -34,7 +34,7 @@
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:creator" content="@rasulkireev" />
   <meta name="twitter:site" content="@rasulkireev" />
-  <meta name="twitter:title" content="Awesome Repos" />
+  <meta name="twitter:title" content="Awesome" />
   <meta name="twitter:description" content="Search and monitor GitHub repositories listed across awesome lists." />
   <meta name="twitter:image" content="https://{{ request.get_host }}{% static 'brand/awesome-repos-social.png' %}" />
   {% endblock meta %}
@@ -103,9 +103,9 @@
 
           <!-- Logo and Navigation -->
           <div class="flex gap-6 items-center">
-            <a href="{% url 'home' %}" class="flex gap-2 items-center" aria-label="Awesome Repos home">
+            <a href="{% url 'home' %}" class="flex gap-2 items-center" aria-label="Awesome home">
               <img src="{% static 'brand/awesome-repos-mark.svg' %}" alt="" width="32" height="32" class="h-8 w-8" />
-              <span class="text-base font-semibold text-gray-900 dark:text-gray-100">Awesome Repos</span>
+              <span class="text-base font-semibold text-gray-900 dark:text-gray-100">Awesome</span>
             </a>
 
             <!-- Desktop Navigation -->
@@ -281,7 +281,7 @@
     {
       "@context": "https://schema.org",
       "@type": "WebSite",
-      "name": "Awesome Repos",
+      "name": "Awesome",
       "description": "Search and monitor GitHub repositories listed across awesome lists.",
       "thumbnailUrl": "https://{{ request.get_host }}{% static 'brand/awesome-repos-social.png' %}",
       "url": "https://{{ request.get_host }}/",

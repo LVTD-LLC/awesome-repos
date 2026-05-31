@@ -1,6 +1,6 @@
 {% extends "base_landing.html" %}
 {% load humanize static %}
-{% block meta %}<title>{{ repository.full_name }} · Awesome Repos</title>{% endblock meta %}
+{% block meta %}<title>{{ repository.full_name }} · Awesome</title>{% endblock meta %}
 {% block extra_head %}
   {% if performance.has_history %}
     <script defer src="{% static 'vendors/js/d3.min.js' %}"></script>
