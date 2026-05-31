@@ -23,6 +23,7 @@
         {% endif %}
       </div>
       <div class="flex flex-wrap gap-2 md:justify-end">
+        {% include "repos/_repository_like_button.html" with repository=repository %}
         {% if user.is_superuser %}
           <form method="post" action="{% url 'repos:repo_rescan' owner=repository.owner name=repository.name %}">
             {% csrf_token %}

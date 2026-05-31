@@ -30,6 +30,7 @@ from apps.repos.models import (
     AwesomeListItem,
     Repository,
     RepositoryEmbedding,
+    RepositoryLike,
     RepositorySnapshot,
 )
 from apps.repos.tags import (
@@ -447,6 +448,19 @@ def active_awesome_list_source_repository_name_set() -> set[str]:
 def visible_repository_queryset():
     return Repository.objects.exclude(is_awesome_list_candidate=True).exclude(
         full_name__in=active_awesome_list_source_repository_names()
+    )
+
+
+def with_repository_like_state(queryset, user):
+    if not user.is_authenticated:
+        return queryset
+    return queryset.annotate(
+        is_liked=models.Exists(
+            RepositoryLike.objects.filter(
+                repository=models.OuterRef("pk"),
+                user=user,
+            )
+        )
     )
 
 

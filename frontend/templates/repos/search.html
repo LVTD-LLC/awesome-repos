@@ -391,18 +391,21 @@
               {% if repo.github_pushed_at %}<span class="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-800">updated {{ repo.github_pushed_at|date:"Y-m-d" }}</span>{% endif %}
             </div>
           </div>
-          <div class="shrink-0 text-left md:text-right">
-            <div class="text-2xl font-bold">★ {{ repo.stars|intcomma }}</div>
-            {% if repo.commits_since_first != None and repo.snapshot_count > 1 %}
-              {% if repo.commits_since_first > 0 %}
-                <div class="text-sm font-semibold text-green-700 dark:text-green-400">+{{ repo.commits_since_first }} commits tracked</div>
-              {% elif repo.commits_since_first < 0 %}
-                <div class="text-sm font-semibold text-red-600 dark:text-red-400">{{ repo.commits_since_first }} commits tracked</div>
-              {% else %}
-                <div class="text-sm text-gray-500 dark:text-gray-400">0 commits tracked</div>
+          <div class="flex shrink-0 items-start justify-between gap-3 text-left md:flex-col md:items-end md:text-right">
+            {% include "repos/_repository_like_button.html" with repository=repo %}
+            <div>
+              <div class="text-2xl font-bold">★ {{ repo.stars|intcomma }}</div>
+              {% if repo.commits_since_first != None and repo.snapshot_count > 1 %}
+                {% if repo.commits_since_first > 0 %}
+                  <div class="text-sm font-semibold text-green-700 dark:text-green-400">+{{ repo.commits_since_first }} commits tracked</div>
+                {% elif repo.commits_since_first < 0 %}
+                  <div class="text-sm font-semibold text-red-600 dark:text-red-400">{{ repo.commits_since_first }} commits tracked</div>
+                {% else %}
+                  <div class="text-sm text-gray-500 dark:text-gray-400">0 commits tracked</div>
+                {% endif %}
               {% endif %}
-            {% endif %}
-            <a href="{{ repo.url }}" target="_blank" rel="noopener" class="text-sm font-semibold text-green-700 hover:underline">GitHub ↗</a>
+              <a href="{{ repo.url }}" target="_blank" rel="noopener" class="text-sm font-semibold text-green-700 hover:underline">GitHub ↗</a>
+            </div>
           </div>
         </div>
       </article>

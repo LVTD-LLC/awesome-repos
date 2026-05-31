@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib.postgres.indexes import GinIndex
 from django.db import models
 from django.urls import reverse
@@ -209,6 +210,35 @@ class AwesomeListItem(BaseModel):
 
     def __str__(self):
         return f"{self.repository.full_name} in {self.awesome_list.name}"
+
+
+class RepositoryLike(BaseModel):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="repository_likes",
+    )
+    repository = models.ForeignKey(
+        Repository,
+        on_delete=models.CASCADE,
+        related_name="likes",
+    )
+
+    class Meta:
+        ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "repository"],
+                name="unique_repository_like",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["user", "-created_at"]),
+            models.Index(fields=["repository", "-created_at"]),
+        ]
+
+    def __str__(self):
+        return f"{self.user} likes {self.repository.full_name}"
 
 
 class RepositoryEmbedding(BaseModel):

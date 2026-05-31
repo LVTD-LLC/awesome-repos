@@ -8,6 +8,7 @@ from apps.repos.models import (
     AwesomeListRequest,
     Repository,
     RepositoryEmbedding,
+    RepositoryLike,
     RepositorySnapshot,
 )
 
@@ -172,6 +173,14 @@ class RepositorySnapshotAdmin(admin.ModelAdmin):
 class AwesomeListItemAdmin(admin.ModelAdmin):
     list_display = ("awesome_list", "repository", "created_at")
     search_fields = ("awesome_list__name", "repository__full_name")
+
+
+@admin.register(RepositoryLike)
+class RepositoryLikeAdmin(admin.ModelAdmin):
+    list_display = ("user", "repository", "created_at")
+    search_fields = ("user__username", "user__email", "repository__full_name")
+    list_filter = ("created_at",)
+    readonly_fields = ("created_at", "updated_at")
 
 
 @admin.register(RepositoryEmbedding)
