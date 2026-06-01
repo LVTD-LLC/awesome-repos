@@ -27,7 +27,7 @@ def assert_standard_ad_layout(content):
     assert "Get sponsored" in content
     assert content.count("utm_source=awesome_repos") == 9
     assert content.count("utm_medium=side_ad") == 9
-    assert "mailto:hello@awesome_repos.app" not in content
+    assert "mailto:rasul@lvtd.dev?subject=Sponsor%20Awesome" in content
 
 
 def test_side_ad_slot_default_sponsor_email():
@@ -582,6 +582,6 @@ def test_settings_resend_confirmation_code_confirms_email(client, monkeypatch):
 
 
 def test_mailgun_sender_defaults_are_configurable():
-    assert settings.DEFAULT_FROM_EMAIL == "LVTD LLC from Awesome <hello@awesome_repos.app>"
-    assert settings.SERVER_EMAIL == "Awesome Errors <error@awesome_repos.app>"
-    assert settings.ANYMAIL["MAILGUN_SENDER_DOMAIN"] == "mg.awesome_repos.app"
+    assert settings.DEFAULT_FROM_EMAIL == "LVTD LLC from Awesome <rasul@lvtd.dev>"
+    assert settings.SERVER_EMAIL == "Awesome Errors <rasul@lvtd.dev>"
+    assert settings.ANYMAIL["MAILGUN_SENDER_DOMAIN"] == "awesome.lvtd.dev"

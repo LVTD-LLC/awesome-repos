@@ -353,15 +353,17 @@ if GITHUB_CLIENT_ID != "":
 MAILGUN_API_KEY = env("MAILGUN_API_KEY", default="")
 ANYMAIL = {
     "MAILGUN_API_KEY": MAILGUN_API_KEY,
-    "MAILGUN_SENDER_DOMAIN": env("MAILGUN_SENDER_DOMAIN", default="mg.awesome_repos.app"),
+    "MAILGUN_SENDER_DOMAIN": env("MAILGUN_SENDER_DOMAIN", default="awesome.lvtd.dev"),
 }
 DEFAULT_FROM_EMAIL = env(
     "DEFAULT_FROM_EMAIL",
-    default="LVTD LLC from Awesome <hello@awesome_repos.app>",
+    default="LVTD LLC from Awesome <rasul@lvtd.dev>",
 )
+# Keep the project contact address as the default; deployments can override this
+# for a dedicated alert inbox without changing the source default.
 SERVER_EMAIL = env(
     "SERVER_EMAIL",
-    default="Awesome Errors <error@awesome_repos.app>",
+    default="Awesome Errors <rasul@lvtd.dev>",
 )
 
 if DEBUG:

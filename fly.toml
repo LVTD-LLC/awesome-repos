@@ -18,7 +18,7 @@ console_command = "uv run --no-sync python manage.py shell"
   DEBUG = "False"
   ENVIRONMENT = "prod"
   PORT = "8080"
-  SITE_URL = "https://awesome-repos.fly.dev"
+  SITE_URL = "https://awesome.lvtd.dev"
   ALLOW_SIGNUPS = "True"
   REDIS_DB = "0"
 

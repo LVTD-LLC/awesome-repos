@@ -3207,7 +3207,7 @@ def test_search_page_renders(client):
     assert b"Get sponsored" in content
     assert content.count(b"utm_source=awesome_repos") == 9
     assert content.count(b"utm_medium=side_ad") == 9
-    assert b"mailto:hello@awesome_repos.app" not in content
+    assert b"mailto:rasul@lvtd.dev?subject=Sponsor%20Awesome" in content
     assert response.context["total_lists"] == 1
     assert list(response.context["awesome_lists"].values_list("id", flat=True)) == [active_list.id]
     assert response.context["awesome_lists"][0].repo_count == 1
