@@ -1,7 +1,7 @@
 from allauth.account.forms import LoginForm, SignupForm
 from django import forms
 
-from apps.core.models import Profile
+from apps.core.models import Profile, SponsorAdPurchase
 from apps.core.utils import DivErrorList
 
 
@@ -15,6 +15,40 @@ class CustomLoginForm(LoginForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.error_class = DivErrorList
+
+
+class SponsorAdDetailsForm(forms.ModelForm):
+    startup_name = forms.CharField(
+        max_length=120,
+        required=True,
+        widget=forms.TextInput(attrs={"placeholder": "Acme AI", "class": "app-input"}),
+    )
+    short_description = forms.CharField(
+        max_length=180,
+        required=True,
+        widget=forms.TextInput(
+            attrs={
+                "placeholder": "The fastest way to ship reliable agent workflows.",
+                "class": "app-input",
+                "maxlength": 180,
+            }
+        ),
+    )
+    logo = forms.ImageField(required=True)
+
+    class Meta:
+        model = SponsorAdPurchase
+        fields = ["logo", "startup_name", "short_description"]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["logo"].required = not bool(self.instance and self.instance.logo)
+
+    def clean_logo(self):
+        logo = self.cleaned_data.get("logo")
+        if logo and logo.size > 512 * 1024:
+            raise forms.ValidationError("Upload a small logo under 512KB.")
+        return logo
 
 
 class ProfileUpdateForm(forms.ModelForm):

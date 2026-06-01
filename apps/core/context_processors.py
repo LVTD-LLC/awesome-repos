@@ -1,11 +1,10 @@
-
-
 from allauth.mfa import app_settings as mfa_app_settings
 from allauth.socialaccount.models import SocialApp
 from django.conf import settings
+from django.core.cache import cache
 
 from apps.core.choices import ProfileStates
-
+from apps.core.models import SponsorAdPurchase
 from awesome_repos.utils import get_awesome_repos_logger
 
 logger = get_awesome_repos_logger(__name__)
@@ -30,6 +29,25 @@ def chatwoot_settings(request):
         "chatwoot_base_url": settings.CHATWOOT_BASE_URL.rstrip("/"),
         "chatwoot_website_token": settings.CHATWOOT_WEBSITE_TOKEN,
     }
+
+
+def active_sponsor_ad(request):
+    cache_key = "awesome:active_sponsor_ad"
+    cache_miss = object()
+    no_active_ad = "__awesome_no_active_sponsor_ad__"
+    sponsor_ad = cache.get(cache_key, cache_miss)
+    if sponsor_ad == no_active_ad:
+        return {"awesome_sponsor_ad": None}
+    if sponsor_ad is cache_miss:
+        sponsor_ad = (
+            SponsorAdPurchase.objects.filter(status=SponsorAdPurchase.Status.ACTIVE)
+            .exclude(startup_name="")
+            .order_by("-updated_at")
+            .first()
+        )
+        cached_value = sponsor_ad if sponsor_ad is not None else no_active_ad
+        cache.set(cache_key, cached_value, 60)
+    return {"awesome_sponsor_ad": sponsor_ad}
 
 
 def available_social_providers(request):

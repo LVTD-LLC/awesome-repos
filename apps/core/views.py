@@ -1,3 +1,4 @@
+import json
 from datetime import timedelta
 from urllib.parse import urlsplit, urlunsplit
 
@@ -11,16 +12,29 @@ from django.contrib.auth import logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth.models import User
+from django.core.cache import cache
+from django.core.mail import send_mail
 from django.db import transaction
-from django.db.models import Count
-from django.shortcuts import redirect
+from django.db.models import Count, Q
+from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseForbidden
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 from django.views.generic import TemplateView
 from django_q.tasks import async_task
 
-from apps.core.models import Profile
+from apps.core.forms import SponsorAdDetailsForm
+from apps.core.models import Profile, SponsorAdPurchase
+from apps.core.payments import (
+    StripeConfigurationError,
+    StripeRequestError,
+    create_ads_checkout_session,
+    retrieve_checkout_session,
+    stripe_configured,
+    verify_webhook_signature,
+)
 from apps.repos.forms import AwesomeListCreateForm
 from apps.repos.models import AwesomeList, RepositoryLike, UserStarredRepository
 from apps.repos.services import (
@@ -48,6 +62,166 @@ def build_absolute_public_url(path: str) -> str:
         base_url = urlunsplit(parsed).rstrip("/")
 
     return f"{base_url}/{path.lstrip('/')}"
+
+
+def _checkout_email_lines(purchase):
+    return [
+        "Someone just bought one month of ads on Awesome.",
+        "",
+        f"Buyer email: {purchase.buyer_email or 'Unknown'}",
+        f"Buyer name: {purchase.buyer_name or 'Unknown'}",
+        f"Amount: {purchase.amount_total / 100:.2f} {purchase.currency.upper()}",
+        f"Stripe checkout session: {purchase.stripe_checkout_session_id}",
+        f"Stripe payment intent: {purchase.stripe_payment_intent_id or 'Unknown'}",
+        f"Stripe customer: {purchase.stripe_customer_id or 'Unknown'}",
+        (
+            "Ad details form: "
+            f"{build_absolute_public_url(reverse('sponsor_success'))}"
+            f"?session_id={purchase.stripe_checkout_session_id}"
+        ),
+    ]
+
+
+def notify_sponsor_payment(purchase):
+    notification_time = timezone.now()
+    updated = SponsorAdPurchase.objects.filter(
+        Q(notification_sent_at__isnull=True),
+        id=purchase.id,
+    ).update(notification_sent_at=notification_time, updated_at=notification_time)
+    if not updated:
+        return
+
+    try:
+        send_mail(
+            subject="Awesome ad purchase paid",
+            message="\n".join(_checkout_email_lines(purchase)),
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[settings.AWESOME_ADS_NOTIFY_EMAIL],
+            fail_silently=False,
+        )
+    except Exception:
+        SponsorAdPurchase.objects.filter(id=purchase.id).update(notification_sent_at=None)
+        raise
+
+    purchase.notification_sent_at = notification_time
+
+
+def upsert_purchase_from_checkout_session(session):
+    purchase, _created = SponsorAdPurchase.objects.get_or_create(
+        stripe_checkout_session_id=session["id"]
+    )
+    purchase.mark_paid_from_checkout_session(session)
+    purchase.save()
+    return purchase
+
+
+@require_POST
+def sponsor_checkout(request):
+    if not stripe_configured():
+        messages.error(request, "Sponsor checkout is not configured yet.")
+        return redirect("repos:search")
+
+    success_url = (
+        build_absolute_public_url(reverse("sponsor_success")) + "?session_id={CHECKOUT_SESSION_ID}"
+    )
+    cancel_url = build_absolute_public_url(reverse("repos:search"))
+    try:
+        session = create_ads_checkout_session(
+            success_url=success_url,
+            cancel_url=cancel_url,
+            client_reference_id=str(request.user.id) if request.user.is_authenticated else "",
+        )
+    except (StripeConfigurationError, StripeRequestError) as exc:
+        logger.error("Sponsor checkout creation failed", error=str(exc), exc_info=True)
+        messages.error(request, "Could not start checkout. Please email rasul@lvtd.dev.")
+        return redirect("repos:search")
+
+    SponsorAdPurchase.objects.get_or_create(stripe_checkout_session_id=session["id"])
+    return redirect(session["url"])
+
+
+def sponsor_success(request):
+    session_id = request.GET.get("session_id") or request.POST.get("session_id")
+    if not session_id:
+        return HttpResponseBadRequest("Missing checkout session.")
+
+    purchase = get_object_or_404(SponsorAdPurchase, stripe_checkout_session_id=session_id)
+    if request.method == "GET" and stripe_configured():
+        try:
+            purchase = upsert_purchase_from_checkout_session(retrieve_checkout_session(session_id))
+            if purchase.status in {SponsorAdPurchase.Status.PAID, SponsorAdPurchase.Status.ACTIVE}:
+                try:
+                    notify_sponsor_payment(purchase)
+                except Exception as exc:
+                    logger.error(
+                        "Sponsor payment notification failed on success page",
+                        session_id=session_id,
+                        error=str(exc),
+                        exc_info=True,
+                    )
+        except (StripeConfigurationError, StripeRequestError) as exc:
+            logger.warning(
+                "Sponsor checkout session refresh failed",
+                session_id=session_id,
+                error=str(exc),
+            )
+
+    if purchase.status == SponsorAdPurchase.Status.CHECKOUT_STARTED:
+        return HttpResponseForbidden("Payment is not complete yet.")
+
+    if request.method == "POST":
+        form = SponsorAdDetailsForm(request.POST, request.FILES, instance=purchase)
+        if form.is_valid():
+            purchase = form.save(commit=False)
+            purchase.mark_details_submitted()
+            purchase.save()
+            cache.delete("awesome:active_sponsor_ad")
+            messages.success(request, "Thanks — your ad details are saved.")
+            return redirect("repos:search")
+    else:
+        form = SponsorAdDetailsForm(instance=purchase)
+
+    return render(
+        request,
+        "pages/sponsor-success.html",
+        {
+            "form": form,
+            "purchase": purchase,
+            "session_id": session_id,
+            "amount_dollars": purchase.amount_total / 100,
+        },
+    )
+
+
+@csrf_exempt
+@require_POST
+def stripe_webhook(request):
+    try:
+        signature_is_valid = verify_webhook_signature(
+            request.body,
+            request.headers.get("Stripe-Signature", ""),
+            settings.STRIPE_WEBHOOK_SECRET,
+        )
+    except StripeConfigurationError:
+        logger.error("Stripe webhook secret is not configured")
+        return HttpResponseBadRequest("Stripe webhook is not configured.")
+
+    if not signature_is_valid:
+        return HttpResponseForbidden("Invalid Stripe signature.")
+
+    try:
+        event = json.loads(request.body.decode("utf-8"))
+    except json.JSONDecodeError:
+        return HttpResponseBadRequest("Invalid JSON.")
+
+    if event.get("type") == "checkout.session.completed":
+        session = event.get("data", {}).get("object", {})
+        if session.get("metadata", {}).get("app") == "awesome":
+            purchase = upsert_purchase_from_checkout_session(session)
+            if purchase.status in {SponsorAdPurchase.Status.PAID, SponsorAdPurchase.Status.ACTIVE}:
+                notify_sponsor_payment(purchase)
+
+    return HttpResponse("ok")
 
 
 class HomeView(LoginRequiredMixin, TemplateView):

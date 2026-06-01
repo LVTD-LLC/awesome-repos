@@ -16,8 +16,15 @@
       {% include "components/side_ad_slot.html" with slot_id="global-right-2" position="Right rail 2" href="https://osig.app/?ref=awesome_repos&utm_source=awesome_repos&utm_medium=side_ad&utm_campaign=awesome_repos_rail&utm_content=osig" logo_url="https://osig.app/static/vendors/images/logo.914bb71cc3c5.png" eyebrow="OG images" headline="OSIG" body="Generate polished social preview images for your site for free." cta="Create image" tone_class="side-ad-card-green" only %}
       {% include "components/side_ad_slot.html" with slot_id="global-right-3" position="Right rail 3" href="https://gettjalerts.com/?ref=awesome_repos&utm_source=awesome_repos&utm_medium=side_ad&utm_campaign=awesome_repos_rail&utm_content=tech_job_alerts" logo_url="https://gettjalerts.com/static/vendors/images/logo.png" eyebrow="Jobs" headline="Tech Job Alerts" body="Personalized tech job alerts delivered straight to your inbox." cta="Create alert" tone_class="side-ad-card-purple" only %}
       {% include "components/side_ad_slot.html" with slot_id="global-right-4" position="Right rail 4" href="https://gettalentleads.com/?ref=awesome_repos&utm_source=awesome_repos&utm_medium=side_ad&utm_campaign=awesome_repos_rail&utm_content=talent_leads" logo_url="https://gettalentleads.com/static/vendors/images/logo-2.d5c63f79c610.png" eyebrow="Hiring" headline="TalentLeads" body="Search qualified candidates and reach out directly in minutes." cta="Find talent" tone_class="side-ad-card-orange" only %}
-      {% include "components/side_ad_slot.html" with slot_id="global-right-5" position="Right rail 5" headline="Your product here" body="Open sponsor slot for developer tools." cta="Get sponsored" is_empty=True only %}
+      {% if awesome_sponsor_ad %}
+        {% include "components/side_ad_slot.html" with slot_id="global-right-5" position="Right rail 5" href="/" logo_url=awesome_sponsor_ad.logo_url eyebrow="Sponsor" headline=awesome_sponsor_ad.startup_name body=awesome_sponsor_ad.short_description cta="Featured sponsor" tone_class="side-ad-card-sky" only %}
+      {% else %}
+        {% include "components/side_ad_slot.html" with slot_id="global-right-5" position="Right rail 5" headline="Your product here" body="Open sponsor slot for developer tools." cta="Get sponsored" is_empty=True only %}
+      {% endif %}
     {% endif %}
   </div>
 </aside>
+{% if side == "right" %}
+  {% include "components/sponsor_modal.html" %}
+{% endif %}
 {% endif %}

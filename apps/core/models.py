@@ -1,5 +1,6 @@
 from django.contrib.auth.models import User
 from django.db import models
+from django.utils import timezone
 from django_q.tasks import async_task
 
 from apps.core.base_models import BaseModel
@@ -93,6 +94,68 @@ class ProfileStateTransition(BaseModel):
     to_state = models.CharField(max_length=255, choices=ProfileStates.choices)
     backup_profile_id = models.IntegerField()
     metadata = models.JSONField(null=True, blank=True)
+
+
+class SponsorAdPurchase(BaseModel):
+    class Status(models.TextChoices):
+        CHECKOUT_STARTED = "checkout_started", "Checkout started"
+        PAID = "paid", "Paid"
+        ACTIVE = "active", "Active"
+
+    stripe_checkout_session_id = models.CharField(max_length=255, unique=True)
+    stripe_payment_intent_id = models.CharField(max_length=255, blank=True, default="")
+    stripe_customer_id = models.CharField(max_length=255, blank=True, default="")
+    amount_total = models.PositiveIntegerField(default=0)
+    currency = models.CharField(max_length=8, blank=True, default="usd")
+    buyer_email = models.EmailField(blank=True, default="")
+    buyer_name = models.CharField(max_length=255, blank=True, default="")
+    status = models.CharField(
+        max_length=32,
+        choices=Status.choices,
+        default=Status.CHECKOUT_STARTED,
+    )
+    notification_sent_at = models.DateTimeField(null=True, blank=True)
+    details_submitted_at = models.DateTimeField(null=True, blank=True)
+    logo = models.ImageField(upload_to="sponsor-ads/logos/", blank=True, null=True)
+    startup_name = models.CharField(max_length=120, blank=True, default="")
+    short_description = models.CharField(max_length=180, blank=True, default="")
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return self.startup_name or self.buyer_email or self.stripe_checkout_session_id
+
+    @property
+    def logo_url(self):
+        if self.logo:
+            return self.logo.url
+        return ""
+
+    def mark_paid_from_checkout_session(self, session):
+        customer = session.get("customer") or {}
+        customer_details = session.get("customer_details") or {}
+        payment_intent = session.get("payment_intent") or ""
+        if isinstance(payment_intent, dict):
+            self.stripe_payment_intent_id = payment_intent.get("id", "")
+        else:
+            self.stripe_payment_intent_id = payment_intent or ""
+        if isinstance(customer, dict):
+            self.stripe_customer_id = customer.get("id", "")
+        else:
+            self.stripe_customer_id = customer or ""
+        self.amount_total = session.get("amount_total") or self.amount_total
+        self.currency = session.get("currency") or self.currency
+        self.buyer_email = (
+            customer_details.get("email") or session.get("customer_email") or self.buyer_email
+        )
+        self.buyer_name = customer_details.get("name") or self.buyer_name
+        if session.get("payment_status") == "paid" and self.status == self.Status.CHECKOUT_STARTED:
+            self.status = self.Status.PAID
+
+    def mark_details_submitted(self):
+        self.status = self.Status.ACTIVE
+        self.details_submitted_at = timezone.now()
 
 
 class EmailSent(BaseModel):

@@ -28,7 +28,8 @@ def assert_standard_ad_layout(content):
     assert "Get sponsored" in content
     assert content.count("utm_source=awesome_repos") == 9
     assert content.count("utm_medium=side_ad") == 9
-    assert "mailto:rasul@lvtd.dev?subject=Sponsor%20Awesome" in content
+    assert "data-sponsor-modal-open" in content
+    assert 'action="/sponsor/checkout/"' in content
 
 
 def test_side_ad_slot_default_sponsor_email():

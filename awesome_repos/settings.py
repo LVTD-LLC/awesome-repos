@@ -153,6 +153,7 @@ TEMPLATES = [
                 "apps.core.context_processors.posthog_api_key",
                 "apps.core.context_processors.chatwoot_settings",
                 "apps.core.context_processors.available_social_providers",
+                "apps.core.context_processors.active_sponsor_ad",
                 "apps.pages.context_processors.referrer_banner",
             ],
         },
@@ -593,6 +594,13 @@ if SENTRY_DSN and ENVIRONMENT == "prod":
 POSTHOG_API_KEY = env("POSTHOG_API_KEY", default="")
 CHATWOOT_BASE_URL = env("CHATWOOT_BASE_URL", default="https://app.chatwoot.com").rstrip("/")
 CHATWOOT_WEBSITE_TOKEN = env("CHATWOOT_WEBSITE_TOKEN", default="")
+
+STRIPE_API_VERSION = env("STRIPE_API_VERSION", default="2024-06-20")
+STRIPE_SECRET_KEY = env("STRIPE_SECRET_KEY", default="")
+STRIPE_WEBHOOK_SECRET = env("STRIPE_WEBHOOK_SECRET", default="")
+STRIPE_CONTEXT = env("STRIPE_CONTEXT", default="")
+STRIPE_AWESOME_ADS_PRICE_ID = env("STRIPE_AWESOME_ADS_PRICE_ID", default="")
+AWESOME_ADS_NOTIFY_EMAIL = env("AWESOME_ADS_NOTIFY_EMAIL", default="rasul@lvtd.dev")
 
 
 SHELL_PLUS_IMPORTS = [
