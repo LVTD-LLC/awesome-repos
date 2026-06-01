@@ -284,6 +284,8 @@ SITE_ID = 1
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 
 LOGIN_REDIRECT_URL = "home"
+# GitHub OAuth is the only signup entry point. New accounts land on Settings so
+# starred-repository imports remain an explicit opt-in onboarding action.
 ACCOUNT_SIGNUP_REDIRECT_URL = "settings"
 ACCOUNT_LOGOUT_REDIRECT_URL = "repos:search"
 

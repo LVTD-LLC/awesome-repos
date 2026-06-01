@@ -130,6 +130,7 @@ def import_starred_repositories(request):
         )
         return redirect("settings")
 
+    was_import_enabled = profile.github_starred_repos_import_enabled
     profile.github_starred_repos_import_enabled = True
     profile.github_starred_repos_last_error = ""
     profile.save(
@@ -147,9 +148,14 @@ def import_starred_repositories(request):
             group="Import GitHub starred repositories",
         )
     )
+    success_message = (
+        "Queued your GitHub starred repository refresh."
+        if was_import_enabled
+        else "Enabled daily GitHub starred repository refresh and queued your first import."
+    )
     messages.success(
         request,
-        "Enabled daily GitHub starred repository refresh and queued your first import.",
+        success_message,
     )
     return redirect("settings")
 
