@@ -5018,6 +5018,91 @@ def test_repository_detail_page_skips_chart_data_without_history(client, monkeyp
 
 
 @pytest.mark.django_db
+def test_repository_detail_page_compacts_ai_development_signals(client):
+    repo = Repository.objects.create(
+        full_name="django/django",
+        owner="django",
+        name="django",
+        url="https://github.com/django/django",
+        uses_ai_for_development=True,
+        ai_development_signals=[
+            {
+                "path": ".agents",
+                "kind": "directory",
+                "tool": "Agent workspace",
+                "signal": "agent_directory",
+            },
+            {
+                "path": ".agents/skills/company-creator/SKILL.md",
+                "kind": "file",
+                "tool": "Agent workspace",
+                "signal": "agent_directory",
+            },
+            {
+                "path": ".agents/skills/doc-maintenance/references/audit-checklist.md",
+                "kind": "file",
+                "tool": "Agent workspace",
+                "signal": "agent_directory",
+            },
+            {
+                "path": ".github/copilot-instructions.md",
+                "kind": "file",
+                "tool": "GitHub Copilot",
+                "signal": "copilot_repo_instructions",
+            },
+            {
+                "path": "CLAUDE.md",
+                "kind": "file",
+                "tool": "Claude Code",
+                "signal": "claude_memory",
+            },
+            {
+                "path": ".cursor/rules/python.mdc",
+                "kind": "file",
+                "tool": "Cursor",
+                "signal": "cursor_project_rules",
+            },
+            {
+                "path": ".windsurfrules",
+                "kind": "file",
+                "tool": "Windsurf",
+                "signal": "windsurf_legacy_rules",
+            },
+        ],
+    )
+
+    response = client.get(
+        reverse("repos:repo_detail", kwargs={"owner": repo.owner, "name": repo.name})
+    )
+
+    assert response.status_code == 200
+    summary = response.context["ai_development_signal_summary"]
+    assert summary["total_count"] == 7
+    assert summary["file_count"] == 6
+    assert summary["directory_count"] == 1
+    assert [tool["name"] for tool in summary["visible_tools"]] == [
+        "Agent workspace",
+        "Claude Code",
+        "Cursor",
+        "GitHub Copilot",
+        "Windsurf",
+    ]
+    assert [signal["path"] for signal in summary["visible_signals"]] == [
+        ".agents",
+        ".cursor/rules/python.mdc",
+        ".github/copilot-instructions.md",
+        ".windsurfrules",
+        "CLAUDE.md",
+    ]
+    assert summary["hidden_signal_count"] == 2
+    assert b"AI agent config detected" in response.content
+    assert b"Key config paths" in response.content
+    assert b"2 more config paths detected." in response.content
+    assert b"Review config paths" in response.content
+    assert b"AI dev signals:" not in response.content
+
+
+@pytest.mark.django_db
 def test_repository_detail_page_shows_rescan_control_only_to_superusers(
     client,
     django_user_model,
