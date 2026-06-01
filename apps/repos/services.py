@@ -54,6 +54,16 @@ GITHUB_REPO_RE = re.compile(
     r"https?://github\.com/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)(?:[/#?][^\s)\]>'\"]*)?",
     re.IGNORECASE,
 )
+DESCRIPTION_URL_RE = re.compile(
+    r"(?:https?://|www\.)[^\s<>\[\]{}\"']+",
+    re.IGNORECASE,
+)
+SCHEMELESS_URL_RE = re.compile(
+    r"^[A-Za-z0-9.-]+\.[A-Za-z]{2,}(?:[/:?#].*)?$",
+    re.IGNORECASE,
+)
+DESCRIPTION_URL_TRAILING_PUNCTUATION = ".,;:!?)"
+REPOSITORY_HOMEPAGE_URL_MAX_LENGTH = Repository._meta.get_field("homepage_url").max_length
 SKIP_REPO_NAMES = {"stargazers", "network", "issues", "pulls", "pull", "wiki", "releases"}
 README_CANDIDATES = ("README.md", "readme.md", "README.markdown", "README.rst")
 AWESOME_LIST_MIN_REPOSITORY_LINKS = 3
@@ -530,6 +540,57 @@ def extract_github_repos(markdown: str) -> list[str]:
             continue
         repos.add(f"{owner}/{repo}")
     return sorted(repos, key=str.lower)
+
+
+def normalize_homepage_url(url: str | None) -> str:
+    value = str(url or "").strip().strip("<>")
+    if not value:
+        return ""
+    if value.lower().startswith(("http://", "https://")):
+        candidate = value
+    elif SCHEMELESS_URL_RE.match(value):
+        candidate = f"https://{value}"
+    else:
+        return ""
+
+    parsed = urlparse(candidate)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return ""
+    if len(candidate) > REPOSITORY_HOMEPAGE_URL_MAX_LENGTH:
+        return ""
+    return candidate
+
+
+def extract_homepage_url_from_description(description: str) -> str:
+    for match in DESCRIPTION_URL_RE.finditer(description or ""):
+        url = match.group(0).rstrip(DESCRIPTION_URL_TRAILING_PUNCTUATION)
+        normalized_url = normalize_homepage_url(url)
+        if normalized_url:
+            return normalized_url
+    return ""
+
+
+def is_same_repository_url_or_subpath(url: str, repository_url: str) -> bool:
+    parsed_url = urlparse(url)
+    parsed_repository_url = urlparse(repository_url)
+    if parsed_url.netloc.lower() != parsed_repository_url.netloc.lower():
+        return False
+
+    url_path = parsed_url.path.rstrip("/")
+    repository_path = parsed_repository_url.path.rstrip("/")
+    return url_path == repository_path or url_path.startswith(f"{repository_path}/")
+
+
+def repository_homepage_url(data: dict) -> str:
+    homepage_url = normalize_homepage_url(data.get("homepage"))
+    if homepage_url:
+        return homepage_url
+
+    description_url = extract_homepage_url_from_description(data.get("description") or "")
+    github_url = normalize_homepage_url(data.get("html_url"))
+    if description_url and not is_same_repository_url_or_subpath(description_url, github_url):
+        return description_url
+    return ""
 
 
 def fetch_user_starred_repositories(
@@ -1160,7 +1221,7 @@ def _upsert_repository_metadata(
         "name": data.get("name", full_name.split("/", 1)[1]),
         "url": data.get("html_url", f"https://github.com/{full_name}"),
         "description": data.get("description") or "",
-        "homepage_url": data.get("homepage") or "",
+        "homepage_url": repository_homepage_url(data),
         "language": data.get("language") or "",
         "license_name": license_data.get("spdx_id") or license_data.get("name") or "",
         "topics": data.get("topics") or [],

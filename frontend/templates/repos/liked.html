@@ -91,7 +91,12 @@
             {% include "repos/_repository_like_button.html" with repository=repo disable_hx=True %}
             <div class="text-right">
               <div class="font-semibold text-gray-950 dark:text-white">★ {{ repo.stars|intcomma }}</div>
-              <a href="{{ repo.url }}" target="_blank" rel="noopener" class="mt-1 inline-block text-sm font-semibold text-green-700 hover:underline dark:text-green-300">GitHub ↗</a>
+              <div class="mt-1 flex flex-wrap justify-end gap-x-3 gap-y-1">
+                {% if repo.homepage_url and repo.homepage_url != repo.url %}
+                  <a href="{{ repo.homepage_url }}" target="_blank" rel="noopener" class="text-sm font-semibold text-blue-700 hover:underline dark:text-blue-300">Website ↗</a>
+                {% endif %}
+                <a href="{{ repo.url }}" target="_blank" rel="noopener" class="text-sm font-semibold text-green-700 hover:underline dark:text-green-300">GitHub ↗</a>
+              </div>
             </div>
           </div>
         </div>
