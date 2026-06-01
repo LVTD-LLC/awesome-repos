@@ -1,5 +1,5 @@
 {% extends "base_landing.html" %}
-{% load humanize %}
+{% load humanize repo_stack_tags %}
 
 {% block meta %}
 <title>{{ awesome_list.name }} · Awesome</title>
@@ -239,7 +239,7 @@
                 <div class="mt-2 flex flex-wrap gap-2 text-xs text-gray-600 dark:text-gray-400">
                   {% if repo.language %}<span class="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-800">{{ repo.language }}</span>{% endif %}
                   {% for signal in repo.stack_signals|slice:":3" %}<span class="rounded-full bg-purple-50 px-3 py-1 text-purple-700 dark:bg-purple-950 dark:text-purple-200">{{ signal.label }}</span>{% endfor %}
-                  {% for manager in repo.package_managers|slice:":2" %}<span class="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-800">{{ manager }}</span>{% endfor %}
+                  {% for manager in repo.package_managers|slice:":2" %}<span class="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-800">{{ manager|package_manager_label }}</span>{% endfor %}
                   {% for topic in repo.topics|slice:":4" %}<span class="rounded-full bg-blue-50 px-3 py-1 text-blue-700 dark:bg-blue-950 dark:text-blue-200">#{{ topic }}</span>{% endfor %}
                   {% for tag in repo.generated_tags|slice:":4" %}<span class="rounded-full bg-green-50 px-3 py-1 text-green-700 dark:bg-green-950 dark:text-green-200">{{ tag }}</span>{% endfor %}
                   {% if repo.github_pushed_at %}<span class="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-800">pushed {{ repo.github_pushed_at|date:"Y-m-d" }}</span>{% endif %}

@@ -1,5 +1,5 @@
 {% extends "base_landing.html" %}
-{% load humanize static %}
+{% load humanize static repo_stack_tags %}
 {% block meta %}<title>{{ repository.full_name }} · Awesome</title>{% endblock meta %}
 {% block extra_head %}
   {% if performance.has_history %}
@@ -120,7 +120,7 @@
             {% if repository.package_managers %}
               <div class="mt-4 flex flex-wrap gap-2 text-xs">
                 {% for manager in repository.package_managers %}
-                  <span class="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-800">{{ manager }}</span>
+                  <span class="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-800">{{ manager|package_manager_label }}</span>
                 {% endfor %}
               </div>
             {% endif %}

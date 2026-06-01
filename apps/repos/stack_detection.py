@@ -1,13 +1,17 @@
 from __future__ import annotations
 
+import ast
+import configparser
 import json
 import re
+import textwrap
 import tomllib
-import xml.etree.ElementTree as ET
 from collections import defaultdict
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from typing import Any
+
+import defusedxml.ElementTree as ET
 
 MAX_STACK_FILE_BYTES = 384_000
 MAX_DEPENDENCY_FILES = 80
@@ -374,6 +378,8 @@ def classify_dependency_file(item: dict) -> dict | None:  # noqa: C901
             parser="poetry_lock",
         )
     if basename == "uv.lock":
+        # uv and PDM lock files expose package entries as TOML [[package]]
+        # records, which is the same shape we need from Poetry lock files.
         return _candidate(
             item,
             ecosystem="python",
@@ -382,6 +388,8 @@ def classify_dependency_file(item: dict) -> dict | None:  # noqa: C901
             parser="poetry_lock",
         )
     if basename == "pdm.lock":
+        # uv and PDM lock files expose package entries as TOML [[package]]
+        # records, which is the same shape we need from Poetry lock files.
         return _candidate(
             item,
             ecosystem="python",
@@ -757,8 +765,88 @@ def parse_poetry_lock(content: str) -> dict[str, list[str]]:
     return _dependency_result(_dependency_names(dependencies, "python"))
 
 
+PYTHON_SETUP_REQUIREMENT_FIELDS = {
+    "install_requires",
+    "setup_requires",
+    "tests_require",
+}
+
+
+def _split_setup_requirements(value: Any) -> list[str]:
+    if not isinstance(value, str):
+        return []
+    return [_parse_requirement_line(line) for line in value.splitlines()]
+
+
+def _parse_setup_cfg_dependencies(content: str) -> list[str]:
+    parser = configparser.ConfigParser()
+    try:
+        parser.read_string(textwrap.dedent(content))
+    except configparser.Error:
+        return []
+
+    dependencies = []
+    if parser.has_section("options"):
+        for field_name in PYTHON_SETUP_REQUIREMENT_FIELDS:
+            if parser.has_option("options", field_name):
+                dependencies.extend(_split_setup_requirements(parser.get("options", field_name)))
+
+    if parser.has_section("options.extras_require"):
+        for _extra_name, extra_requirements in parser.items("options.extras_require"):
+            dependencies.extend(_split_setup_requirements(extra_requirements))
+
+    return dependencies
+
+
+def _literal_string_values(node: ast.AST) -> list[str]:
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return [node.value]
+    if isinstance(node, (ast.List, ast.Tuple, ast.Set)):
+        values = []
+        for item in node.elts:
+            values.extend(_literal_string_values(item))
+        return values
+    return []
+
+
+def _literal_extra_require_values(node: ast.AST) -> list[str]:
+    if not isinstance(node, ast.Dict):
+        return []
+    values = []
+    for value in node.values:
+        values.extend(_literal_string_values(value))
+    return values
+
+
+def _parse_setup_py_dependencies(content: str) -> list[str]:
+    try:
+        tree = ast.parse(textwrap.dedent(content))
+    except SyntaxError:
+        return []
+
+    dependencies = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        if isinstance(node.func, ast.Name):
+            function_name = node.func.id
+        elif isinstance(node.func, ast.Attribute):
+            function_name = node.func.attr
+        else:
+            function_name = ""
+        if function_name != "setup":
+            continue
+
+        for keyword in node.keywords:
+            if keyword.arg in PYTHON_SETUP_REQUIREMENT_FIELDS:
+                dependencies.extend(_literal_string_values(keyword.value))
+            elif keyword.arg == "extras_require":
+                dependencies.extend(_literal_extra_require_values(keyword.value))
+    return dependencies
+
+
 def parse_python_setup(content: str) -> dict[str, list[str]]:
-    dependencies = re.findall(r"['\"]([A-Za-z0-9_.-]+)['\"]", content)
+    dependencies = _parse_setup_cfg_dependencies(content) or _parse_setup_py_dependencies(content)
     return _dependency_result(_dependency_names(dependencies, "python"))
 
 

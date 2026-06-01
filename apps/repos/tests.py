@@ -7,10 +7,12 @@ from types import SimpleNamespace
 
 import pytest
 from allauth.socialaccount.models import SocialAccount, SocialToken
+from defusedxml.common import EntitiesForbidden
 from django.contrib import admin as django_admin
 from django.core.cache import cache
 from django.core.management import call_command
 from django.db import IntegrityError, connection
+from django.template import Context, Template
 from django.test import override_settings
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
@@ -64,7 +66,12 @@ from apps.repos.services import (
     update_awesome_list_metadata,
     upsert_repository_from_github,
 )
-from apps.repos.stack_detection import dependency_file_candidates, detect_repository_stack
+from apps.repos.stack_detection import (
+    dependency_file_candidates,
+    detect_repository_stack,
+    parse_pom_xml,
+    parse_python_setup,
+)
 from apps.repos.tags import (
     build_repository_tagging_payload,
     generate_repository_tags,
@@ -954,6 +961,72 @@ def test_detect_repository_stack_parses_manifests_and_records_evidence():
         "pyproject.toml",
         "frontend/package.json",
     }
+
+
+def test_parse_python_setup_only_reads_dependency_fields():
+    result = parse_python_setup(
+        """
+        from setuptools import setup
+
+        setup(
+            name="example-project",
+            author="Jane Smith",
+            license="BSD-3-Clause",
+            install_requires=["Django>=5", "fastapi[standard]"],
+            extras_require={"dev": ["pytest", "ruff>=0.15"]},
+            classifiers=["Framework :: Django"],
+        )
+        """
+    )
+
+    assert result["dependencies"] == ["django", "fastapi", "pytest", "ruff"]
+
+
+def test_parse_python_setup_cfg_reads_options_dependency_sections():
+    result = parse_python_setup(
+        """
+        [metadata]
+        name = example-project
+        author = Jane Smith
+
+        [options]
+        install_requires =
+            Django>=5
+            fastapi[standard]
+
+        [options.extras_require]
+        dev =
+            pytest
+            ruff>=0.15
+        """
+    )
+
+    assert result["dependencies"] == ["django", "fastapi", "pytest", "ruff"]
+
+
+def test_parse_pom_xml_rejects_entity_expansion():
+    with pytest.raises(EntitiesForbidden):
+        parse_pom_xml(
+            """<?xml version="1.0"?>
+            <!DOCTYPE project [
+              <!ENTITY a "aaaaaaaaaa">
+              <!ENTITY b "&a;&a;&a;&a;&a;&a;&a;&a;&a;&a;">
+            ]>
+            <project>
+              <dependencies>
+                <dependency><artifactId>&b;</artifactId></dependency>
+              </dependencies>
+            </project>
+            """
+        )
+
+
+def test_package_manager_label_template_filter_formats_slugs():
+    rendered = Template("{% load repo_stack_tags %}{{ manager|package_manager_label }}").render(
+        Context({"manager": "go-modules"})
+    )
+
+    assert rendered == "Go modules"
 
 
 def test_fetch_repository_tree_items_rejects_truncated_github_trees(monkeypatch):
