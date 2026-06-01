@@ -11,7 +11,7 @@ from urllib.parse import urlencode
 import markdown as md
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.template.loader import render_to_string
 from django.utils import timezone
 from pydantic import BaseModel, ConfigDict, Field
@@ -63,6 +63,8 @@ SAFE_TAGS = {
     "tr",
     "ul",
 }
+
+
 @dataclass(frozen=True, slots=True)
 class NewsletterPeriod:
     start: date
@@ -154,8 +156,7 @@ def _newsletter_agent(output_type, instructions: str):
 
 
 def render_newsletter_markdown(markdown_text: str) -> str:
-    escaped_markdown = html.escape(markdown_text or "")
-    rendered = md.Markdown(extensions=["tables"]).convert(escaped_markdown)
+    rendered = md.Markdown(extensions=["tables"]).convert(markdown_text or "")
     parser = SafeHTMLRenderer()
     parser.feed(rendered)
     return parser.html()
@@ -195,21 +196,39 @@ def upsert_newsletter_subscription(
 ) -> NewsletterSubscription:
     if cadence not in NewsletterCadence.values:
         raise ValueError("Unsupported newsletter cadence.")
+    repository = Repository.objects.select_for_update().get(pk=repository.pk)
     enable_repository_newsletter_tracking(repository)
+    normalized_email = email.strip().lower()
     subscription = (
         NewsletterSubscription.objects.select_for_update()
         .filter(user=user, repository=repository, is_active=True)
         .first()
     )
     if subscription is None:
-        subscription = NewsletterSubscription.objects.create(
-            user=user,
-            repository=repository,
-            email=email.strip().lower(),
-            cadence=cadence,
-        )
+        try:
+            with transaction.atomic():
+                subscription = NewsletterSubscription.objects.create(
+                    user=user,
+                    repository=repository,
+                    email=normalized_email,
+                    cadence=cadence,
+                )
+        except IntegrityError:
+            subscription = (
+                NewsletterSubscription.objects.select_for_update()
+                .filter(user=user, repository=repository, is_active=True)
+                .first()
+            )
+            if subscription is None:
+                raise
+            subscription.email = normalized_email
+            subscription.cadence = cadence
+            subscription.unsubscribed_at = None
+            subscription.save(
+                update_fields=["email", "cadence", "unsubscribed_at", "updated_at"]
+            )
     else:
-        subscription.email = email.strip().lower()
+        subscription.email = normalized_email
         subscription.cadence = cadence
         subscription.unsubscribed_at = None
         subscription.save(update_fields=["email", "cadence", "unsubscribed_at", "updated_at"])
@@ -400,6 +419,28 @@ def save_repository_commit_detail(
     return commit, created
 
 
+def _save_polled_commit_item(
+    repository: Repository,
+    *,
+    branch: str,
+    item: dict,
+    started_at,
+) -> bool | None:
+    sha = item.get("sha") or ""
+    if not sha:
+        return None
+    detail = fetch_repository_commit_detail(repository, sha)
+    committed_at = dt(((detail.get("commit") or {}).get("committer") or {}).get("date"))
+    if committed_at and committed_at < started_at:
+        return None
+    _commit, was_created = save_repository_commit_detail(
+        repository,
+        branch=branch,
+        detail=detail,
+    )
+    return was_created
+
+
 def poll_repository_commits(repository: Repository) -> dict:
     if not repository.newsletter_tracking_enabled:
         return {"repository_id": repository.id, "skipped": "tracking_disabled", "saved": 0}
@@ -422,18 +463,21 @@ def poll_repository_commits(repository: Repository) -> dict:
                 page=page,
             )
             for item in commits:
-                sha = item.get("sha") or ""
-                if not sha:
-                    continue
-                detail = fetch_repository_commit_detail(repository, sha)
-                committed_at = dt(((detail.get("commit") or {}).get("committer") or {}).get("date"))
-                if committed_at and committed_at < started_at:
-                    continue
-                _commit, was_created = save_repository_commit_detail(
+                if _github_rate_limit_budget_exhausted():
+                    return {
+                        "repository_id": repository.id,
+                        "skipped": "github_rate_limit_budget",
+                        "saved": saved,
+                        "created": created,
+                    }
+                was_created = _save_polled_commit_item(
                     repository,
                     branch=branch,
-                    detail=detail,
+                    item=item,
+                    started_at=started_at,
                 )
+                if was_created is None:
+                    continue
                 saved += 1
                 created += int(was_created)
             if len(commits) < 100 or 'rel="next"' not in link_header:
@@ -574,7 +618,6 @@ def summarize_pending_commits(limit: int | None = None) -> dict:
     for commit in queryset:
         before = bool(commit.summary)
         summarize_commit(commit)
-        commit.refresh_from_db()
         summarized += int(not before and bool(commit.summary))
     return {"summarized": summarized, "limit": resolved_limit}
 

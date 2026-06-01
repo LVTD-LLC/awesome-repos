@@ -265,7 +265,7 @@ def test_poll_repository_commits_records_rate_limit_without_advancing_watermark(
     monkeypatch,
 ):
     repository.newsletter_tracking_enabled = True
-    repository.newsletter_tracking_started_at = timezone.now()
+    repository.newsletter_tracking_started_at = datetime(2026, 5, 25, tzinfo=UTC)
     repository.save(
         update_fields=["newsletter_tracking_enabled", "newsletter_tracking_started_at"]
     )
@@ -281,6 +281,50 @@ def test_poll_repository_commits_records_rate_limit_without_advancing_watermark(
     assert result["stopped_for_rate_limit"] is True
     assert repository.newsletter_tracking_last_polled_at is None
     assert "rate limit exceeded" in repository.newsletter_tracking_last_error
+
+
+@pytest.mark.django_db
+def test_poll_repository_commits_rechecks_rate_limit_before_commit_details(
+    repository,
+    monkeypatch,
+):
+    repository.newsletter_tracking_enabled = True
+    repository.newsletter_tracking_started_at = datetime(2026, 5, 25, tzinfo=UTC)
+    repository.save(
+        update_fields=["newsletter_tracking_enabled", "newsletter_tracking_started_at"]
+    )
+    detail_calls = []
+    budget_checks = {"count": 0}
+
+    monkeypatch.setattr(
+        "apps.repos.newsletters.fetch_repository_commit_page",
+        lambda repository, branch, since, page: ([{"sha": "abc123"}, {"sha": "def456"}], ""),
+    )
+    monkeypatch.setattr(
+        "apps.repos.newsletters.fetch_repository_commit_detail",
+        lambda repository, sha: detail_calls.append(sha) or commit_detail(sha=sha),
+    )
+
+    def budget_exhausted():
+        budget_checks["count"] += 1
+        return budget_checks["count"] >= 3
+
+    monkeypatch.setattr(
+        "apps.repos.newsletters._github_rate_limit_budget_exhausted",
+        budget_exhausted,
+    )
+
+    result = poll_repository_commits(repository)
+
+    repository.refresh_from_db()
+    assert result == {
+        "repository_id": repository.id,
+        "skipped": "github_rate_limit_budget",
+        "saved": 1,
+        "created": 1,
+    }
+    assert detail_calls == ["abc123"]
+    assert repository.newsletter_tracking_last_polled_at is None
 
 
 @pytest.mark.django_db
@@ -471,6 +515,21 @@ def test_render_newsletter_markdown_allows_safe_links_and_escapes_raw_html():
     assert "<script>" not in rendered
     assert "javascript:alert" not in rendered
     assert 'href="https://example.com"' in rendered
+
+
+def test_render_newsletter_markdown_preserves_blockquotes_and_query_links():
+    rendered = render_newsletter_markdown(
+        "> Important release note\n\n"
+        "[filtered changes](https://example.com/changes?repo=django&cadence=weekly)"
+    )
+
+    assert "<blockquote>" in rendered
+    assert "Important release note" in rendered
+    assert (
+        'href="https://example.com/changes?repo=django&amp;cadence=weekly"'
+        in rendered
+    )
+    assert "&amp;amp;" not in rendered
 
 
 @override_settings(
