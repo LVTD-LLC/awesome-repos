@@ -16,6 +16,11 @@ urlpatterns = [
         views.queue_repository_rescan,
         name="repo_rescan",
     ),
+    path(
+        "repos/<str:owner>/<str:name>/like/",
+        views.toggle_repository_like,
+        name="repo_like_toggle",
+    ),
     path("repos/<str:owner>/<str:name>/", views.RepositoryDetailView.as_view(), name="repo_detail"),
     path("lists/", views.AwesomeListListView.as_view(), name="list"),
     path(

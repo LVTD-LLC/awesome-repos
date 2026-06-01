@@ -28,6 +28,7 @@ from apps.repos.models import (
     AwesomeListRequest,
     Repository,
     RepositoryEmbedding,
+    RepositoryLike,
     RepositorySnapshot,
 )
 from apps.repos.services import (
@@ -3082,6 +3083,107 @@ def test_search_page_renders(client):
     assert b"Awesome Django (1)" in content
     assert b"Awesome Django (2)" not in content
     assert b"Inactive List" not in content
+
+
+@pytest.mark.django_db
+def test_authenticated_user_can_toggle_repository_like_with_htmx(auth_client, user):
+    repo = Repository.objects.create(
+        full_name="django/django",
+        owner="django",
+        name="django",
+        url="https://github.com/django/django",
+    )
+    url = reverse("repos:repo_like_toggle", kwargs={"owner": repo.owner, "name": repo.name})
+
+    response = auth_client.post(url, {"next": "/"}, HTTP_HX_REQUEST="true")
+
+    assert response.status_code == 200
+    assert RepositoryLike.objects.filter(user=user, repository=repo).exists()
+    assert b'aria-pressed="true"' in response.content
+    assert b'fill="currentColor"' in response.content
+
+    response = auth_client.post(url, {"next": "/"}, HTTP_HX_REQUEST="true")
+
+    assert response.status_code == 200
+    assert not RepositoryLike.objects.filter(user=user, repository=repo).exists()
+    assert b'aria-pressed="false"' in response.content
+    assert b'fill="none"' in response.content
+
+
+@pytest.mark.django_db
+def test_repository_like_htmx_response_uses_safe_next_url(auth_client):
+    repo = Repository.objects.create(
+        full_name="django/django",
+        owner="django",
+        name="django",
+        url="https://github.com/django/django",
+    )
+
+    response = auth_client.post(
+        reverse("repos:repo_like_toggle", kwargs={"owner": repo.owner, "name": repo.name}),
+        {"next": "https://example.invalid/not-local"},
+        HTTP_HX_REQUEST="true",
+    )
+
+    assert response.status_code == 200
+    assert f'value="{repo.get_absolute_url()}"'.encode() in response.content
+    assert b"https://example.invalid/not-local" not in response.content
+
+
+@pytest.mark.django_db
+def test_repository_like_falls_back_to_safe_redirect(auth_client):
+    repo = Repository.objects.create(
+        full_name="django/django",
+        owner="django",
+        name="django",
+        url="https://github.com/django/django",
+    )
+
+    response = auth_client.post(
+        reverse("repos:repo_like_toggle", kwargs={"owner": repo.owner, "name": repo.name}),
+        {"next": "https://example.invalid/not-local"},
+    )
+
+    assert response.status_code == 302
+    assert response["Location"] == repo.get_absolute_url()
+
+
+@pytest.mark.django_db
+def test_repository_pages_render_liked_heart_for_authenticated_user(auth_client, user):
+    repo = Repository.objects.create(
+        full_name="django/django",
+        owner="django",
+        name="django",
+        url="https://github.com/django/django",
+        description="The Web framework",
+    )
+    RepositoryLike.objects.create(user=user, repository=repo)
+    awesome_list = AwesomeList.objects.create(
+        name="Awesome Django",
+        slug="awesome-django",
+        source_url="https://github.com/wsvincent/awesome-django",
+    )
+    AwesomeListItem.objects.create(awesome_list=awesome_list, repository=repo)
+
+    response = auth_client.get(reverse("repos:search"))
+
+    assert response.status_code == 200
+    assert b"Remove django/django from liked repositories" in response.content
+    assert b'aria-pressed="true"' in response.content
+
+    response = auth_client.get(reverse("repos:list_detail", kwargs={"slug": awesome_list.slug}))
+
+    assert response.status_code == 200
+    assert b"Remove django/django from liked repositories" in response.content
+    assert b'aria-pressed="true"' in response.content
+
+    response = auth_client.get(
+        reverse("repos:repo_detail", kwargs={"owner": repo.owner, "name": repo.name})
+    )
+
+    assert response.status_code == 200
+    assert b"Remove django/django from liked repositories" in response.content
+    assert b'aria-pressed="true"' in response.content
 
 
 @pytest.mark.django_db

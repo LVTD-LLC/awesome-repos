@@ -6,14 +6,15 @@ from django.core.paginator import Paginator
 from django.db import IntegrityError, transaction
 from django.db.models import Count, Max, Q, Sum
 from django.http import HttpResponse
-from django.shortcuts import get_object_or_404, redirect
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 from django.views.generic import DetailView, FormView, ListView
 from django_q.tasks import async_task
 
 from apps.repos.forms import AwesomeListRequestForm
-from apps.repos.models import AwesomeList, Repository
+from apps.repos.models import AwesomeList, Repository, RepositoryLike
 from apps.repos.search_services import (
     awesome_list_search_queryset,
     visible_awesome_list_item_count,
@@ -27,6 +28,7 @@ from apps.repos.services import (
     repository_search_queryset,
     similar_repositories_for_repository,
     visible_repository_queryset,
+    with_repository_like_state,
 )
 
 AWESOME_LIST_SCAN_TASK_GROUP = "Scan awesome list"
@@ -94,6 +96,41 @@ def queue_repository_rescan(request, owner: str, name: str):
     return redirect(repository.get_absolute_url())
 
 
+@login_required(login_url="account_login")
+@require_POST
+def toggle_repository_like(request, owner: str, name: str):
+    repository = get_object_or_404(Repository, full_name=f"{owner}/{name}")
+    like, created = RepositoryLike.objects.get_or_create(
+        repository=repository,
+        user=request.user,
+    )
+    if created:
+        repository.is_liked = True
+    else:
+        like.delete()
+        repository.is_liked = False
+
+    next_url = request.POST.get("next") or repository.get_absolute_url()
+    if not url_has_allowed_host_and_scheme(
+        next_url,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        next_url = repository.get_absolute_url()
+
+    if request.headers.get("HX-Request") == "true":
+        return render(
+            request,
+            "repos/_repository_like_button.html",
+            {
+                "repository": repository,
+                "next_url": next_url,
+            },
+        )
+
+    return redirect(next_url)
+
+
 def awesome_list_request_client_ip(request) -> str:
     # X-Forwarded-For is only safe behind a trusted proxy that strips spoofed headers.
     return request.META.get("REMOTE_ADDR", "unknown")
@@ -109,8 +146,11 @@ class RepositorySearchView(ListView):
     paginate_by = 30
 
     def get_queryset(self):
-        return repository_search_queryset(self.request.GET).prefetch_related(
-            "awesome_items__awesome_list"
+        return with_repository_like_state(
+            repository_search_queryset(self.request.GET),
+            self.request.user,
+        ).prefetch_related(
+            "awesome_items__awesome_list",
         )
 
     def get_context_data(self, **kwargs):
@@ -197,6 +237,7 @@ class RepositoryDetailView(DetailView):
     def get_object(self, queryset=None):
         full_name = f"{self.kwargs['owner']}/{self.kwargs['name']}"
         queryset = Repository.objects.prefetch_related("awesome_items__awesome_list")
+        queryset = with_repository_like_state(queryset, self.request.user)
         return get_object_or_404(queryset, full_name=full_name)
 
     def get_context_data(self, **kwargs):
@@ -221,7 +262,10 @@ class AwesomeListDetailView(DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        repos = awesome_list_repository_queryset(self.object, self.request.GET)
+        repos = with_repository_like_state(
+            awesome_list_repository_queryset(self.object, self.request.GET),
+            self.request.user,
+        )
         all_list_repos = visible_repository_queryset().filter(
             awesome_items__awesome_list=self.object
         )
