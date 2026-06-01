@@ -50,6 +50,7 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Awesome: added a liked repositories page for authenticated users.
 
 ### Changed
+- Awesome: GitHub signups now land on Settings so starred-repository imports stay off by default until the user clicks the import CTA.
 - Awesome: updated default contact email and production domain references to rasul@lvtd.dev and awesome.lvtd.dev.
 - Awesome: renamed product-facing copy and brand assets to the shorter product name.
 - Awesome: awesome-list detail pages now show list-level GitHub stars and commits instead of aggregate repository growth charts.

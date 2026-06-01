@@ -27,6 +27,10 @@ def _social_account_adapter():
     return import_string(settings.SOCIALACCOUNT_ADAPTER)()
 
 
+def _account_adapter():
+    return import_string(settings.ACCOUNT_ADAPTER)()
+
+
 def _populate_user(email):
     """Run the social adapter the way allauth does mid-signup.
 
@@ -58,6 +62,13 @@ class TestGithubProviderConfig:
         github = build_github_provider_config("my-id", "my-secret")
 
         assert github["APP"] == {"client_id": "my-id", "secret": "my-secret"}
+
+
+class TestSocialSignupRedirect:
+    def test_signup_redirects_to_settings_for_starred_repo_import_cta(self):
+        request = RequestFactory().get("/accounts/github/login/callback/")
+
+        assert _account_adapter().get_signup_redirect_url(request) == reverse("settings")
 
 
 @pytest.mark.django_db

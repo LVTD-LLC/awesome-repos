@@ -72,17 +72,22 @@
         </form>
       </div>
     </section>
-    <section class="p-6 mt-6 mb-8 rounded-lg border border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800/50" aria-labelledby="github-starred-settings-heading">
-      <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+    <section class="p-6 mt-6 mb-8 rounded-lg border border-green-200 bg-green-50 dark:border-green-900/70 dark:bg-green-950/20" aria-labelledby="github-starred-settings-heading">
+      <div class="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
         <div class="min-w-0 flex-1">
-          <h3 id="github-starred-settings-heading" class="text-lg font-medium leading-6 text-gray-900 dark:text-gray-100">GitHub starred repositories</h3>
+          <h3 id="github-starred-settings-heading" class="text-xl font-semibold leading-7 text-gray-900 dark:text-gray-100">
+            {% if github_starred_import_enabled %}GitHub starred repositories{% else %}Import starred repos{% endif %}
+          </h3>
           <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">
             Import public repositories you have starred on GitHub into your personal searchable repository list.
+            {% if github_starred_import_enabled %}Daily refresh is enabled for this account.{% else %}Star imports are off until you start them here.{% endif %}
           </p>
           <div class="mt-3 flex flex-wrap gap-2 text-xs text-gray-600 dark:text-gray-300">
             <span class="rounded-full bg-white px-3 py-1 dark:bg-gray-900">{{ github_starred_count }} repo{{ github_starred_count|pluralize }} imported</span>
             {% if github_starred_import_enabled %}
               <span class="rounded-full bg-green-50 px-3 py-1 text-green-700 dark:bg-green-950 dark:text-green-200">Daily refresh enabled</span>
+            {% else %}
+              <span class="rounded-full bg-white px-3 py-1 text-gray-700 dark:bg-gray-900 dark:text-gray-200">Not importing yet</span>
             {% endif %}
             {% if github_starred_last_imported_at %}
               <span class="rounded-full bg-white px-3 py-1 dark:bg-gray-900">Last import {{ github_starred_last_imported_at|date:"M d, Y H:i" }}</span>
@@ -98,8 +103,8 @@
           {% if github_connected %}
             <form method="post" action="{% url 'import_starred_repositories' %}">
               {% csrf_token %}
-              <button type="submit" class="inline-flex justify-center rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900">
-                {% if github_starred_count %}Refresh starred repos{% else %}Import starred repos{% endif %}
+              <button type="submit" class="inline-flex min-h-12 items-center justify-center rounded-xl bg-green-600 px-6 text-base font-semibold text-white shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900">
+                {% if github_starred_import_enabled %}Refresh starred repos now{% else %}Import starred repos{% endif %}
               </button>
             </form>
             {% if github_starred_import_enabled %}

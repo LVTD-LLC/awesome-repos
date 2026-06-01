@@ -22,6 +22,29 @@ class TestHomeView:
         response = auth_client.get(url)
         assert "pages/home.html" in [t.name for t in response.templates]
 
+    def test_github_starred_import_defaults_off(self, profile):
+        assert profile.github_starred_repos_import_enabled is False
+
+    def test_settings_shows_clear_import_cta_when_github_connected_and_import_off(
+        self,
+        auth_client,
+        profile,
+    ):
+        account = SocialAccount.objects.create(
+            user=profile.user,
+            provider="github",
+            uid="github-user",
+        )
+        SocialToken.objects.create(account=account, token="user-token")
+
+        response = auth_client.get(reverse("settings"))
+        content = response.content.decode()
+
+        assert response.status_code == 200
+        assert "Import starred repos" in content
+        assert "Not importing yet" in content
+        assert "Daily refresh enabled" not in content
+
     def test_rotate_api_key_stores_hash_and_shows_key_once(self, auth_client, profile):
         response = auth_client.post(reverse("rotate_api_key"), follow=True)
         content = response.content.decode()
@@ -76,7 +99,51 @@ class TestHomeView:
                 },
             )
         ]
-        assert "Queued your GitHub starred repository import." in response.content.decode()
+        assert (
+            "Enabled daily GitHub starred repository refresh and queued your first import."
+            in response.content.decode()
+        )
+
+    def test_import_starred_repositories_shows_refresh_message_when_already_enabled(
+        self,
+        auth_client,
+        profile,
+        monkeypatch,
+    ):
+        account = SocialAccount.objects.create(
+            user=profile.user,
+            provider="github",
+            uid="github-user",
+        )
+        SocialToken.objects.create(account=account, token="user-token")
+        profile.github_starred_repos_import_enabled = True
+        profile.save(update_fields=["github_starred_repos_import_enabled", "updated_at"])
+        queued = []
+
+        def fake_async_task(func_path, profile_id, **kwargs):
+            queued.append((func_path, profile_id, kwargs))
+
+        monkeypatch.setattr("apps.core.views.async_task", fake_async_task)
+        monkeypatch.setattr("apps.core.views.transaction.on_commit", lambda callback: callback())
+
+        response = auth_client.post(reverse("import_starred_repositories"), follow=True)
+
+        profile.refresh_from_db()
+        assert response.status_code == 200
+        assert profile.github_starred_repos_import_enabled is True
+        assert queued == [
+            (
+                "apps.repos.tasks.import_starred_repositories_task",
+                profile.id,
+                {
+                    "refresh_existing": True,
+                    "group": "Import GitHub starred repositories",
+                },
+            )
+        ]
+        content = response.content.decode()
+        assert "Queued your GitHub starred repository refresh." in content
+        assert "queued your first import" not in content
 
     def test_disable_starred_repositories_import_turns_off_daily_refresh(
         self,
