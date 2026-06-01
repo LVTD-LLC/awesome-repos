@@ -397,6 +397,7 @@ def test_sync_awesome_list_marks_empty_scan_as_error(monkeypatch):
     assert result["discovered"] == 0
     assert result["synced"] == 0
     assert awesome_list.last_error == "No GitHub repository links found in README."
+    assert awesome_list.snapshots.count() == 0
 
 
 def github_awesome_list_payload(
@@ -3852,6 +3853,32 @@ def test_awesome_list_history_chart_data_uses_list_snapshots_chronologically():
 
 
 @pytest.mark.django_db
+def test_awesome_list_snapshot_string_uses_cached_list_identifier_without_fk_query():
+    awesome_list = AwesomeList.objects.create(
+        name="Awesome Django",
+        slug="awesome-django",
+        source_url="https://github.com/wsvincent/awesome-django",
+        repo_full_name="wsvincent/awesome-django",
+    )
+    snapshot = AwesomeListSnapshot.objects.create(
+        awesome_list=awesome_list,
+        repo_full_name="wsvincent/awesome-django",
+        stars=100,
+    )
+    deferred_snapshot = AwesomeListSnapshot.objects.only(
+        "repo_full_name",
+        "captured_at",
+        "awesome_list_id",
+    ).get(id=snapshot.id)
+
+    with CaptureQueriesContext(connection) as queries:
+        label = str(deferred_snapshot)
+
+    assert len(queries) == 0
+    assert label.startswith("wsvincent/awesome-django at ")
+
+
+@pytest.mark.django_db
 def test_awesome_list_history_chart_data_falls_back_to_current_list_metadata():
     scanned_at = timezone.now()
     awesome_list = AwesomeList.objects.create(
@@ -3873,6 +3900,18 @@ def test_awesome_list_history_chart_data_falls_back_to_current_list_metadata():
             "commit_count": 350,
         }
     ]
+
+
+@pytest.mark.django_db
+def test_awesome_list_history_chart_data_skips_unscanned_empty_lists():
+    awesome_list = AwesomeList.objects.create(
+        name="Awesome Django",
+        slug="awesome-django",
+        source_url="https://github.com/wsvincent/awesome-django",
+        repo_full_name="wsvincent/awesome-django",
+    )
+
+    assert awesome_list_history_chart_data(awesome_list) == []
 
 
 @pytest.mark.django_db
@@ -4605,6 +4644,24 @@ def test_awesome_list_detail_page_renders_list_history_not_repository_aggregate(
     assert b'"commit_count": 350' in response.content
     assert b'"stars": 79000' not in response.content
     assert b'"commit_count": 89000' not in response.content
+
+
+@pytest.mark.django_db
+def test_awesome_list_detail_page_skips_history_charts_without_list_metadata(client):
+    awesome_list = AwesomeList.objects.create(
+        name="Awesome Django",
+        slug="awesome-django",
+        source_url="https://github.com/wsvincent/awesome-django",
+        repo_full_name="wsvincent/awesome-django",
+    )
+
+    response = client.get(reverse("repos:list_detail", kwargs={"slug": awesome_list.slug}))
+
+    assert response.status_code == 200
+    assert b"Tracked list growth" not in response.content
+    assert b"/static/vendors/js/d3.min.js" not in response.content
+    assert b"/static/js/modules/repository-history-charts.js" not in response.content
+    assert b"awesome-list-history-data" not in response.content
 
 
 @pytest.mark.django_db

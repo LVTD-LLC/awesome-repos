@@ -94,7 +94,8 @@ class AwesomeListSnapshot(BaseModel):
         ]
 
     def __str__(self):
-        return f"{self.awesome_list.name} at {self.captured_at:%Y-%m-%d %H:%M}"
+        list_label = self.repo_full_name or f"awesome list {self.awesome_list_id}"
+        return f"{list_label} at {self.captured_at:%Y-%m-%d %H:%M}"
 
 
 class AwesomeListRequest(BaseModel):

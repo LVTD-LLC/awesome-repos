@@ -1187,7 +1187,8 @@ def update_awesome_list_metadata(
     awesome_list.save(update_fields=update_fields)
     if meta.get("commits_count") is None or meta.get("first_commit_at") is None:
         awesome_list.refresh_from_db(fields=["commits_count", "first_commit_at"])
-    record_awesome_list_snapshot(awesome_list, captured_at=scanned_at)
+    if not last_error:
+        record_awesome_list_snapshot(awesome_list, captured_at=scanned_at)
 
 
 def record_awesome_list_snapshot(
@@ -1653,6 +1654,14 @@ def awesome_list_history_chart_data(
             }
             for snapshot in reversed(snapshots)
         ]
+
+    has_current_metadata = (
+        awesome_list.last_scanned_at is not None
+        or awesome_list.stars > 0
+        or awesome_list.commits_count is not None
+    )
+    if not has_current_metadata:
+        return []
 
     captured_at = awesome_list.last_scanned_at or awesome_list.updated_at or timezone.now()
     return [
