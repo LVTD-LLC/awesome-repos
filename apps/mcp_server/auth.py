@@ -15,7 +15,7 @@ def get_profile_for_mcp_api_key(token: str) -> Profile | None:
 
 
 class AwesomeReposAPIKeyVerifier(TokenVerifier):
-    """FastMCP bearer-token verifier backed by Awesome Repos API keys."""
+    """FastMCP bearer-token verifier backed by Awesome API keys."""
 
     async def verify_token(self, token: str) -> AccessToken | None:
         profile = await sync_to_async(get_profile_for_mcp_api_key, thread_sensitive=True)(token)

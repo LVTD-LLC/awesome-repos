@@ -1,10 +1,10 @@
 <p align="center">
-  <img src="frontend/static/brand/awesome-repos-logo.svg" width="360" alt="Awesome Repos Logo">
+  <img src="frontend/static/brand/awesome-repos-logo.svg" width="360" alt="Awesome Logo">
 </p>
 
 <!--  -->
 <div align="center">
-  <b>Awesome Repos</b>
+  <b>Awesome</b>
   <b>Search and monitor GitHub repositories listed across awesome lists.</b>
 </div>
 
@@ -91,7 +91,7 @@ First-commit discovery may require an extra GitHub commit-page request. Normal r
 
 ### MCP endpoint
 
-Awesome Repos exposes a Streamable HTTP MCP endpoint at `/mcp` so users can connect
+Awesome exposes a Streamable HTTP MCP endpoint at `/mcp` so users can connect
 AI agents to the same search surface as the API. Use an account API key as either
 `Authorization: Bearer <api-key>` or `X-API-Key: <api-key>`.
 

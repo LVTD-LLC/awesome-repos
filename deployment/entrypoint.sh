@@ -61,7 +61,7 @@ wait_for_database
 
 case "$process_type" in
     server)
-        echo "Starting Awesome Repos server..."
+        echo "Starting Awesome server..."
         uv run --no-sync python manage.py collectstatic --noinput
         if [ -n "${FLY_APP_NAME:-}" ]; then
             echo "Skipping startup migrations on Fly.io; fly.toml release_command runs them before promotion."
@@ -72,7 +72,7 @@ case "$process_type" in
     
         ;;
     worker)
-        echo "Starting Awesome Repos workers..."
+        echo "Starting Awesome workers..."
         exec uv run --no-sync python manage.py qcluster
         ;;
     *)

@@ -36,13 +36,13 @@ def test_side_ad_slot_default_sponsor_email():
         {
             "slot_id": "test-slot",
             "position": "Test rail",
-            "headline": "Sponsor Awesome Repos",
+            "headline": "Sponsor Awesome",
             "body": "Reach developers browsing curated GitHub projects.",
             "cta": "Reserve",
         },
     )
 
-    assert "mailto:rasul@lvtd.dev?subject=Sponsor%20Awesome%20Repos" in content
+    assert "mailto:rasul@lvtd.dev?subject=Sponsor%20Awesome" in content
 
 
 def mark_password_reauthenticated(client, username):
@@ -116,7 +116,7 @@ def test_dashboard_does_not_show_email_confirmation_reminder(client):
     assert response.status_code == 200
     content = response.content.decode()
     assert "Your email is not yet confirmed" not in content
-    assert "Welcome to Awesome Repos" in content
+    assert "Welcome to Awesome" in content
 
 
 def test_landing_page_shows_github_button_for_anonymous_users(client, settings):
@@ -582,6 +582,6 @@ def test_settings_resend_confirmation_code_confirms_email(client, monkeypatch):
 
 
 def test_mailgun_sender_defaults_are_configurable():
-    assert settings.DEFAULT_FROM_EMAIL == "LVTD LLC from Awesome Repos <hello@awesome_repos.app>"
-    assert settings.SERVER_EMAIL == "Awesome Repos Errors <error@awesome_repos.app>"
+    assert settings.DEFAULT_FROM_EMAIL == "LVTD LLC from Awesome <hello@awesome_repos.app>"
+    assert settings.SERVER_EMAIL == "Awesome Errors <error@awesome_repos.app>"
     assert settings.ANYMAIL["MAILGUN_SENDER_DOMAIN"] == "mg.awesome_repos.app"

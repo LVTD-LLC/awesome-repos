@@ -17,7 +17,7 @@ def build_mcp_server() -> FastMCP:
     server = FastMCP(
         name="awesome-repos",
         instructions=(
-            "Use these read-only tools to search Awesome Repos data. "
+            "Use these read-only tools to search Awesome data. "
             "Authenticate with the same API key used for the HTTP API."
         ),
         version="0.1.0",
