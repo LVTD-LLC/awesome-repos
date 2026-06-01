@@ -622,6 +622,52 @@ def test_send_issue_to_subscribers_skips_delivery_locked_by_another_worker(
 
 
 @pytest.mark.django_db
+def test_send_issue_to_subscribers_recovers_from_concurrent_delivery_create(
+    user,
+    repository,
+    monkeypatch,
+):
+    subscription = NewsletterSubscription.objects.create(
+        user=user,
+        repository=repository,
+        email="reader@example.com",
+        cadence=NewsletterCadence.WEEKLY,
+    )
+    issue = RepositoryNewsletterIssue.objects.create(
+        repository=repository,
+        cadence=NewsletterCadence.WEEKLY,
+        period_start=date(2026, 5, 25),
+        period_end=date(2026, 5, 31),
+        slug="2026-05-25",
+        title="Django weekly update",
+        content_markdown="Update",
+        content_html="<p>Update</p>",
+        commit_count=1,
+        published_at=timezone.now(),
+    )
+    NewsletterIssueDelivery.objects.create(
+        issue=issue,
+        subscription=subscription,
+        recipient_email=subscription.email,
+    )
+    sent = []
+    monkeypatch.setattr(
+        "apps.repos.newsletters.NewsletterIssueDelivery.objects.get_or_create",
+        lambda *args, **kwargs: (_ for _ in ()).throw(IntegrityError("duplicate")),
+    )
+    monkeypatch.setattr(
+        "apps.repos.newsletters.send_transactional_email",
+        lambda send_callable, **kwargs: sent.append(kwargs["email_address"]) or True,
+    )
+
+    result = send_issue_to_subscribers(issue)
+
+    assert result == {"sent": 1, "failed": 0}
+    assert sent == ["reader@example.com"]
+    assert NewsletterIssueDelivery.objects.get().sent_at is not None
+
+
+@pytest.mark.django_db
 def test_unsubscribe_route_marks_subscription_inactive(client, user, repository):
     subscription = NewsletterSubscription.objects.create(
         user=user,

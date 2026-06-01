@@ -894,6 +894,23 @@ def send_issue_delivery(
         return _send_locked_issue_delivery(locked_delivery)
 
 
+def _get_or_create_issue_delivery(
+    *,
+    issue: RepositoryNewsletterIssue,
+    subscription: NewsletterSubscription,
+) -> NewsletterIssueDelivery:
+    try:
+        with transaction.atomic():
+            delivery, _created = NewsletterIssueDelivery.objects.get_or_create(
+                issue=issue,
+                subscription=subscription,
+                defaults={"recipient_email": subscription.email},
+            )
+            return delivery
+    except IntegrityError:
+        return NewsletterIssueDelivery.objects.get(issue=issue, subscription=subscription)
+
+
 def send_issue_to_subscribers(issue: RepositoryNewsletterIssue) -> dict:
     if not issue.published_at:
         return {"sent": 0, "skipped": "unpublished"}
@@ -905,10 +922,9 @@ def send_issue_to_subscribers(issue: RepositoryNewsletterIssue) -> dict:
     sent = 0
     failed = 0
     for subscription in subscriptions:
-        delivery, _created = NewsletterIssueDelivery.objects.get_or_create(
+        delivery = _get_or_create_issue_delivery(
             issue=issue,
             subscription=subscription,
-            defaults={"recipient_email": subscription.email},
         )
         if delivery.sent_at:
             continue
