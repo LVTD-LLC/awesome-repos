@@ -23,6 +23,7 @@ from apps.repos.search_services import (
 )
 from apps.repos.services import (
     awesome_list_directory_totals,
+    awesome_list_history_chart_data,
     awesome_list_repository_queryset,
     repository_history_chart_data,
     repository_json_value_counts,
@@ -477,6 +478,7 @@ class AwesomeListDetailView(DetailView):
             .annotate(count=Count("id"))
             .order_by("-count", "language")[:12]
         )
+        context["awesome_list_history_chart_data"] = awesome_list_history_chart_data(self.object)
         context["page_obj"] = Paginator(repos, 50).get_page(self.request.GET.get("page"))
         context["hide_side_ad_rails"] = True
         return context

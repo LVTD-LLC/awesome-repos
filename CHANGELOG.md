@@ -33,6 +33,7 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Awesome: generate repository discovery tags from descriptions and READMEs, and add filters for generated tags and GitHub topics.
 - Awesome: added a daily generated-tag backfill task so existing repository rows get tagged outside GitHub metadata refreshes.
 - Awesome: added an awesome-list directory and detail pages with stored list activity metrics including stars, commits, README repository counts, forks, issues, and scan freshness.
+- Awesome: record awesome-list GitHub metadata snapshots and show list-level likes/stars and commit charts on awesome-list detail pages.
 - Awesome: added D3 charts to repository detail pages for historical stars and commit counts.
 - Awesome: added search, filters, and sorting to awesome-list detail repository tables.
 - Awesome: added superuser-only catalog maintenance controls on awesome-list and repository detail pages, plus a missing-repository discovery action for awesome lists.

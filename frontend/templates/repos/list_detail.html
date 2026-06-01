@@ -1,10 +1,17 @@
 {% extends "base_landing.html" %}
-{% load humanize repo_stack_tags %}
+{% load humanize repo_stack_tags static %}
 
 {% block meta %}
 <title>{{ awesome_list.name }} · Awesome</title>
 <meta name="description" content="Activity and repository data for {{ awesome_list.name }}." />
 {% endblock meta %}
+
+{% block extra_head %}
+  {% if awesome_list_history_chart_data %}
+    <script defer src="{% static 'vendors/js/d3.min.js' %}"></script>
+    <script type="module" src="{% static 'js/modules/repository-history-charts.js' %}"></script>
+  {% endif %}
+{% endblock extra_head %}
 
 {% block content %}
 <section class="mx-auto max-w-7xl py-12">
@@ -77,6 +84,35 @@
       <dd class="mt-1 text-2xl font-bold">{{ awesome_list.open_issues|intcomma }}</dd>
     </div>
   </dl>
+
+  {% if awesome_list_history_chart_data %}
+    {{ awesome_list_history_chart_data|json_script:"awesome-list-history-data" }}
+    <div class="mt-8 border-t border-gray-200 pt-8 dark:border-gray-800">
+      <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h2 class="text-lg font-bold text-gray-950 dark:text-white">Tracked list growth</h2>
+          <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">GitHub stars and default-branch commits for {{ awesome_list.repo_full_name|default:awesome_list.name }}.</p>
+        </div>
+        <div class="text-sm text-gray-500 dark:text-gray-400">Latest scan {{ awesome_list.last_scanned_at|date:"Y-m-d H:i"|default:"-" }}</div>
+      </div>
+      <div class="mt-6 grid gap-4 lg:grid-cols-2">
+        <section class="rounded-2xl border border-gray-200 p-4 dark:border-gray-800" data-repository-history-chart data-history-source="awesome-list-history-data" data-metric="stars" data-label="Likes">
+          <div class="flex items-baseline justify-between gap-3">
+            <h3 class="text-sm font-semibold text-gray-950 dark:text-white">Likes history</h3>
+            <span class="text-xs font-medium text-gray-500 dark:text-gray-400">GitHub stars</span>
+          </div>
+          <div class="mt-4 h-64 w-full" data-chart-plot></div>
+        </section>
+        <section class="rounded-2xl border border-gray-200 p-4 dark:border-gray-800" data-repository-history-chart data-history-source="awesome-list-history-data" data-metric="commit_count" data-label="Commits">
+          <div class="flex items-baseline justify-between gap-3">
+            <h3 class="text-sm font-semibold text-gray-950 dark:text-white">Commits history</h3>
+            <span class="text-xs font-medium text-gray-500 dark:text-gray-400">Default branch commits</span>
+          </div>
+          <div class="mt-4 h-64 w-full" data-chart-plot></div>
+        </section>
+      </div>
+    </div>
+  {% endif %}
 
   <div class="mt-8 grid gap-6 lg:grid-cols-3">
     <section class="lg:col-span-2">
