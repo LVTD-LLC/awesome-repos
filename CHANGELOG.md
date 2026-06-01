@@ -47,6 +47,7 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Awesome: detect awesome-list repositories during repository sync and hide them from normal repository browse/search surfaces.
 
 ### Changed
+- Awesome: updated default contact email and production domain references to rasul@lvtd.dev and awesome.lvtd.dev.
 - Awesome: renamed product-facing copy and brand assets to the shorter product name.
 - Awesome: awesome-list detail pages now show list-level GitHub stars and commits instead of aggregate repository growth charts.
 - Awesome: replaced placeholder side-rail sponsor slots with equal-height ads for LVTD projects and attribution-tagged outbound links.
