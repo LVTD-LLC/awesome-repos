@@ -52,6 +52,7 @@ from apps.repos.services import (
     fetch_repository_tree_items,
     github_rate_limit_status,
     import_starred_repositories_for_profile,
+    is_same_repository_url_or_subpath,
     minimum_age_cutoff,
     normalize_homepage_url,
     parse_github_repo_url,
@@ -162,6 +163,52 @@ def test_repository_homepage_url_ignores_description_link_to_same_github_repo():
     payload = github_repo_payload()
     payload["homepage"] = ""
     payload["description"] = "Mirror of https://github.com/django/django."
+
+    assert repository_homepage_url(payload) == ""
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://github.com/django/django",
+        "https://github.com/django/django?tab=readme-ov-file",
+        "https://github.com/django/django#readme",
+        "https://github.com/django/django/releases",
+        "https://github.com/django/django/issues",
+        "https://github.com/django/django/blob/main/README.md",
+        "https://github.com/django/django/wiki",
+    ],
+)
+def test_is_same_repository_url_or_subpath_matches_repo_pages(url):
+    assert is_same_repository_url_or_subpath(url, "https://github.com/django/django")
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://github.com/django/django-cms",
+        "https://github.com/django",
+        "https://docs.djangoproject.com/",
+    ],
+)
+def test_is_same_repository_url_or_subpath_ignores_other_sites_and_repos(url):
+    assert not is_same_repository_url_or_subpath(url, "https://github.com/django/django")
+
+
+@pytest.mark.parametrize(
+    "repo_page_url",
+    [
+        "https://github.com/django/django/releases",
+        "https://github.com/django/django/issues",
+        "https://github.com/django/django/blob/main/README.md",
+    ],
+)
+def test_repository_homepage_url_ignores_description_link_to_github_repo_subpath(
+    repo_page_url,
+):
+    payload = github_repo_payload()
+    payload["homepage"] = ""
+    payload["description"] = f"Release notes live at {repo_page_url}."
 
     assert repository_homepage_url(payload) == ""
 

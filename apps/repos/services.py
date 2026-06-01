@@ -562,6 +562,17 @@ def extract_homepage_url_from_description(description: str) -> str:
     return ""
 
 
+def is_same_repository_url_or_subpath(url: str, repository_url: str) -> bool:
+    parsed_url = urlparse(url)
+    parsed_repository_url = urlparse(repository_url)
+    if parsed_url.netloc.lower() != parsed_repository_url.netloc.lower():
+        return False
+
+    url_path = parsed_url.path.rstrip("/")
+    repository_path = parsed_repository_url.path.rstrip("/")
+    return url_path == repository_path or url_path.startswith(f"{repository_path}/")
+
+
 def repository_homepage_url(data: dict) -> str:
     homepage_url = normalize_homepage_url(data.get("homepage"))
     if homepage_url:
@@ -569,7 +580,7 @@ def repository_homepage_url(data: dict) -> str:
 
     description_url = extract_homepage_url_from_description(data.get("description") or "")
     github_url = normalize_homepage_url(data.get("html_url"))
-    if description_url and description_url.rstrip("/") != github_url.rstrip("/"):
+    if description_url and not is_same_repository_url_or_subpath(description_url, github_url):
         return description_url
     return ""
 
