@@ -71,6 +71,15 @@ class TestSocialSignupRedirect:
         assert _account_adapter().get_signup_redirect_url(request) == reverse("settings")
 
 
+class TestSocialConnectRedirect:
+    def test_connect_redirects_to_settings_after_successful_connection(self):
+        request = RequestFactory().get("/accounts/github/login/callback/")
+
+        assert _social_account_adapter().get_connect_redirect_url(request, None) == reverse(
+            "settings"
+        )
+
+
 @pytest.mark.django_db
 class TestSocialUsernamePopulation:
     def test_username_derived_from_email_local_part(self):

@@ -5,6 +5,7 @@ from allauth.account.adapter import DefaultAccountAdapter
 from allauth.socialaccount.adapter import DefaultSocialAccountAdapter
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.urls import reverse
 
 from apps.core.choices import EmailType
 from apps.core.utils import send_transactional_email
@@ -89,6 +90,10 @@ class CustomSocialAccountAdapter(DefaultSocialAccountAdapter):
             request,
             sociallogin,
         )
+
+    def get_connect_redirect_url(self, request, socialaccount):
+        """Return users to settings after connecting GitHub from the settings CTA."""
+        return reverse("settings")
 
     def populate_user(self, request, sociallogin, data):
         """

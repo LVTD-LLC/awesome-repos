@@ -4,6 +4,7 @@ import pytest
 from allauth.account.models import EmailAddress
 from allauth.mfa.models import Authenticator
 from allauth.mfa.recovery_codes.internal.auth import RecoveryCodes
+from allauth.socialaccount.models import SocialAccount
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.messages import get_messages
@@ -495,6 +496,33 @@ def test_account_email_page_uses_app_styling(client):
     content = response.content.decode()
     assert "Email addresses" in content
     assert "Re-send verification" in content
+    assert "Menu:" not in content
+
+
+def test_social_connections_page_uses_app_styling(client, settings):
+    settings.SOCIALACCOUNT_PROVIDERS = {"github": {"APP": {"client_id": "x", "secret": "y"}}}
+    user = get_user_model().objects.create_user(
+        username="githubconnectionsuser",
+        email="githubconnectionsuser@example.com",
+        password="strong-test-pass-123",
+    )
+    SocialAccount.objects.create(
+        user=user,
+        provider="github",
+        uid="12345",
+        extra_data={"login": "octocat"},
+    )
+    client.force_login(user)
+
+    response = client.get(reverse("socialaccount_connections"))
+
+    assert response.status_code == 200
+    content = response.content.decode()
+    assert "Connected accounts" in content
+    assert "octocat" in content
+    assert "Remove selected account" in content
+    assert "Connect GitHub" in content
+    assert "data-social-account-connections" in content
     assert "Menu:" not in content
 
 

@@ -1,0 +1,100 @@
+{% extends "base_app.html" %}
+{% load socialaccount %}
+
+{% block meta %}
+<title>Connected accounts · Awesome</title>
+{% endblock meta %}
+
+{% block content %}
+<div class="px-4 py-12 mx-auto max-w-3xl sm:px-6 lg:px-8" data-social-account-connections>
+  <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900 sm:p-8">
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      <div>
+        <h1 class="text-2xl font-bold tracking-tight text-gray-900 dark:text-gray-100">Connected accounts</h1>
+        <p class="mt-2 text-sm leading-6 text-gray-600 dark:text-gray-300">
+          Manage third-party sign-in providers connected to your Awesome account.
+        </p>
+      </div>
+      <a href="{% url 'settings' %}" class="text-sm font-medium text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300">Back to settings</a>
+    </div>
+
+    {% if form.non_field_errors or form.account.errors %}
+      <div class="mt-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-200">
+        {% for error in form.non_field_errors %}
+          <p>{{ error }}</p>
+        {% endfor %}
+        {% for error in form.account.errors %}
+          <p>{{ error }}</p>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    <section class="mt-8 rounded-xl border border-gray-200 bg-gray-50 p-5 dark:border-gray-700 dark:bg-gray-800/50" aria-labelledby="connected-accounts-heading">
+      <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h2 id="connected-accounts-heading" class="text-lg font-semibold text-gray-900 dark:text-gray-100">Your connected providers</h2>
+          <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">
+            {% if form.accounts %}
+              You can use these accounts to sign in and authorize imports.
+            {% else %}
+              No third-party accounts are connected yet.
+            {% endif %}
+          </p>
+        </div>
+      </div>
+
+      {% if form.accounts %}
+        <form class="mt-5 space-y-4" method="post" action="{% url 'socialaccount_connections' %}">
+          {% csrf_token %}
+          <fieldset class="space-y-3">
+            <legend class="sr-only">Connected third-party accounts</legend>
+            {% for account in form.accounts %}
+              <label for="account_{{ account.pk }}" class="flex items-start gap-3 rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
+                <input id="account_{{ account.pk }}" type="radio" name="account" value="{{ account.pk }}" {% if forloop.first %}checked{% endif %} class="mt-1 h-4 w-4 border-gray-300 text-green-600 focus:ring-green-500">
+                <span class="min-w-0 flex-1">
+                  <span class="flex flex-wrap items-center gap-2">
+                    <span class="font-medium text-gray-900 dark:text-gray-100">{{ account.get_provider_account }}</span>
+                    <span class="inline-flex rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700 dark:bg-gray-700 dark:text-gray-200">
+                      {% if account.provider == "github" %}GitHub{% else %}{{ account.provider }}{% endif %}
+                    </span>
+                  </span>
+                  <span class="mt-1 block break-all text-sm text-gray-600 dark:text-gray-300">
+                    Provider UID: {{ account.uid }}
+                  </span>
+                </span>
+              </label>
+            {% endfor %}
+          </fieldset>
+
+          <button type="submit" class="inline-flex justify-center rounded-md border border-red-300 bg-white px-4 py-2 text-sm font-medium text-red-700 shadow-sm hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 dark:border-red-900/70 dark:bg-gray-900 dark:text-red-300 dark:hover:bg-red-950/40 dark:focus:ring-offset-gray-900">
+            Remove selected account
+          </button>
+        </form>
+      {% endif %}
+    </section>
+
+    <section class="mt-6 rounded-xl border border-green-200 bg-green-50 p-5 dark:border-green-900/70 dark:bg-green-950/20" aria-labelledby="add-connected-account-heading">
+      <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 id="add-connected-account-heading" class="text-lg font-semibold text-gray-900 dark:text-gray-100">Add a third-party account</h2>
+          <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">
+            Connect GitHub to import and refresh your starred repositories.
+          </p>
+        </div>
+        {% if "github" in available_social_providers %}
+          <a href="{% provider_login_url 'github' process='connect' %}" class="inline-flex justify-center gap-2 rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900">
+            <svg class="h-5 w-5 fill-current" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+              <path fill-rule="evenodd" d="M10 0C4.477 0 0 4.484 0 10.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0110 4.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.203 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.942.359.31.678.921.678 1.856 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0020 10.017C20 4.484 15.522 0 10 0z" clip-rule="evenodd" />
+            </svg>
+            Connect GitHub
+          </a>
+        {% else %}
+          <button type="button" disabled aria-disabled="true" class="inline-flex cursor-not-allowed justify-center rounded-md border border-gray-300 bg-gray-100 px-4 py-2 text-sm font-medium text-gray-500 shadow-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400">
+            GitHub auth unavailable
+          </button>
+        {% endif %}
+      </div>
+    </section>
+  </div>
+</div>
+{% endblock content %}
