@@ -43,6 +43,7 @@ from apps.repos.services import (
     detect_awesome_list_candidate,
     discover_missing_awesome_list_repositories,
     extract_github_repos,
+    extract_homepage_url_from_description,
     fetch_github_commit_count,
     fetch_github_commit_count_and_first_commit_at,
     fetch_json,
@@ -52,9 +53,11 @@ from apps.repos.services import (
     github_rate_limit_status,
     import_starred_repositories_for_profile,
     minimum_age_cutoff,
+    normalize_homepage_url,
     parse_github_repo_url,
     refresh_repositories,
     repository_history_chart_data,
+    repository_homepage_url,
     repository_performance_summary,
     repository_search_queryset,
     similar_repositories_for_repository,
@@ -116,6 +119,51 @@ def test_extract_github_repos_dedupes_and_skips_non_repo_paths():
     - duplicate https://github.com/django/django
     """
     assert extract_github_repos(markdown) == ["django/django", "paperless-ngx/paperless-ngx"]
+
+
+@pytest.mark.parametrize(
+    ("url", "expected"),
+    [
+        ("https://example.com/docs", "https://example.com/docs"),
+        ("www.example.com/docs", "https://www.example.com/docs"),
+        ("example.com", "https://example.com"),
+        ("javascript:alert(1)", ""),
+        ("not a url", ""),
+        (f"https://example.com/{'a' * 220}", ""),
+    ],
+)
+def test_normalize_homepage_url_allows_safe_http_links(url, expected):
+    assert normalize_homepage_url(url) == expected
+
+
+def test_extract_homepage_url_from_description_uses_first_safe_link():
+    description = "Framework docs live at https://docs.example.com/."
+
+    assert extract_homepage_url_from_description(description) == "https://docs.example.com/"
+
+
+def test_repository_homepage_url_prefers_github_homepage_over_description_link():
+    payload = github_repo_payload()
+    payload["homepage"] = "https://www.djangoproject.com/"
+    payload["description"] = "Docs at https://docs.djangoproject.com/."
+
+    assert repository_homepage_url(payload) == "https://www.djangoproject.com/"
+
+
+def test_repository_homepage_url_falls_back_to_description_link():
+    payload = github_repo_payload()
+    payload["homepage"] = ""
+    payload["description"] = "Docs at https://docs.djangoproject.com/."
+
+    assert repository_homepage_url(payload) == "https://docs.djangoproject.com/"
+
+
+def test_repository_homepage_url_ignores_description_link_to_same_github_repo():
+    payload = github_repo_payload()
+    payload["homepage"] = ""
+    payload["description"] = "Mirror of https://github.com/django/django."
+
+    assert repository_homepage_url(payload) == ""
 
 
 @pytest.mark.django_db
@@ -762,6 +810,39 @@ def test_upsert_repository_from_github_records_snapshot(monkeypatch):
     assert snapshot.commit_count == repo.commit_count
     assert snapshot.first_commit_at == repo.first_commit_at
     assert snapshot.captured_at == repo.last_synced_at
+
+
+@pytest.mark.django_db
+def test_upsert_repository_from_github_stores_homepage_from_github_api(monkeypatch):
+    monkeypatch.setattr(
+        "apps.repos.services.fetch_json",
+        lambda url, **kwargs: github_repo_payload(),
+    )
+    stub_repository_readme(monkeypatch)
+
+    repo = upsert_repository_from_github("django/django")
+
+    snapshot = RepositorySnapshot.objects.get(repository=repo)
+    assert repo.homepage_url == "https://www.djangoproject.com/"
+    assert snapshot.homepage_url == repo.homepage_url
+
+
+@pytest.mark.django_db
+def test_upsert_repository_from_github_stores_homepage_from_description_link(monkeypatch):
+    def fake_fetch_json(url, **kwargs):
+        payload = github_repo_payload()
+        payload["homepage"] = ""
+        payload["description"] = "Docs at https://docs.djangoproject.com/."
+        return payload
+
+    monkeypatch.setattr("apps.repos.services.fetch_json", fake_fetch_json)
+    stub_repository_readme(monkeypatch)
+
+    repo = upsert_repository_from_github("django/django")
+
+    snapshot = RepositorySnapshot.objects.get(repository=repo)
+    assert repo.homepage_url == "https://docs.djangoproject.com/"
+    assert snapshot.homepage_url == repo.homepage_url
 
 
 @pytest.mark.django_db
@@ -3515,6 +3596,7 @@ def test_liked_repositories_page_lists_current_users_likes(auth_client, user, dj
         name="django",
         url="https://github.com/django/django",
         description="The Web framework",
+        homepage_url="https://www.djangoproject.com/",
         language="Python",
         stars=80000,
     )
@@ -3536,10 +3618,51 @@ def test_liked_repositories_page_lists_current_users_likes(auth_client, user, dj
     assert response.status_code == 200
     assert b"Liked repositories" in content
     assert b"django/django" in content
+    assert b'href="https://www.djangoproject.com/"' in content
+    assert b"Website" in content
     assert b"pallets/flask" not in content
     assert b"Remove django/django from liked repositories" in content
     assert response.context["liked_repository_count"] == 1
     assert response.context["page_obj"].paginator.count == 1
+
+
+@pytest.mark.django_db
+def test_repository_pages_render_homepage_links(client):
+    repo = Repository.objects.create(
+        full_name="django/django",
+        owner="django",
+        name="django",
+        url="https://github.com/django/django",
+        homepage_url="https://www.djangoproject.com/",
+        description="The Web framework",
+        stars=80000,
+    )
+    awesome_list = AwesomeList.objects.create(
+        name="Awesome Django",
+        slug="awesome-django",
+        source_url="https://github.com/wsvincent/awesome-django",
+    )
+    AwesomeListItem.objects.create(awesome_list=awesome_list, repository=repo)
+
+    response = client.get(reverse("repos:search"))
+
+    assert response.status_code == 200
+    assert b'href="https://www.djangoproject.com/"' in response.content
+    assert b"Website" in response.content
+
+    response = client.get(reverse("repos:list_detail", kwargs={"slug": awesome_list.slug}))
+
+    assert response.status_code == 200
+    assert b'href="https://www.djangoproject.com/"' in response.content
+    assert b"Website" in response.content
+
+    response = client.get(
+        reverse("repos:repo_detail", kwargs={"owner": repo.owner, "name": repo.name})
+    )
+
+    assert response.status_code == 200
+    assert b'href="https://www.djangoproject.com/"' in response.content
+    assert b"Open website" in response.content
 
 
 @pytest.mark.django_db

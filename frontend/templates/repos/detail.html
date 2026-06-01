@@ -35,6 +35,9 @@
             </button>
           </form>
         {% endif %}
+        {% if repository.homepage_url and repository.homepage_url != repository.url %}
+          <a href="{{ repository.homepage_url }}" target="_blank" rel="noopener" class="inline-flex min-h-12 items-center justify-center rounded-xl border border-blue-200 px-5 text-sm font-semibold text-blue-700 transition hover:bg-blue-50 dark:border-blue-900 dark:text-blue-300 dark:hover:bg-blue-950">Open website</a>
+        {% endif %}
         <a href="{{ repository.url }}" target="_blank" rel="noopener" class="inline-flex min-h-12 items-center justify-center rounded-xl bg-green-600 px-5 text-sm font-semibold text-white hover:bg-green-700">Open GitHub</a>
       </div>
     </div>
@@ -107,6 +110,9 @@
           <li>Created: {{ repository.github_created_at|date:"Y-m-d"|default:"—" }}</li>
           <li>First commit: {{ repository.first_commit_at|date:"Y-m-d"|default:"—" }}</li>
           <li>Last pushed: {{ repository.github_pushed_at|date:"Y-m-d"|default:"—" }}</li>
+          {% if repository.homepage_url and repository.homepage_url != repository.url %}
+            <li>Website: <a href="{{ repository.homepage_url }}" target="_blank" rel="noopener" class="break-all text-green-700 hover:underline dark:text-green-300">{{ repository.homepage_url }}</a></li>
+          {% endif %}
           <li>Archived: {{ repository.is_archived|yesno:"yes,no" }}</li>
           <li>AI dev signals: {{ repository.uses_ai_for_development|yesno:"yes,no" }}</li>
           <li>License: {{ repository.license_name|default:"—" }}</li>

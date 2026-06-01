@@ -48,6 +48,7 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Awesome: detect awesome-list repositories during repository sync and hide them from normal repository browse/search surfaces.
 - Awesome: added opt-in GitHub starred repository imports with a personal starred-repo search surface and daily user-token refreshes.
 - Awesome: added a liked repositories page for authenticated users.
+- Awesome: store repository website links from GitHub metadata or description URLs and show them on repository pages.
 
 ### Changed
 - Awesome: GitHub signups now land on Settings so starred-repository imports stay off by default until the user clicks the import CTA.
