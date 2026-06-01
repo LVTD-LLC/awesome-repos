@@ -8,7 +8,6 @@ urlpatterns = [
     path("settings", views.UserSettingsView.as_view(), name="settings"),
     path("admin-panel", views.AdminPanelView.as_view(), name="admin_panel"),
     # Utils
-    path("settings/api-key/rotate/", views.rotate_api_key, name="rotate_api_key"),
     path(
         "settings/github/starred/import/",
         views.import_starred_repositories,

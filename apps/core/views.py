@@ -5,32 +5,29 @@ from allauth.account.internal.flows.email_verification import (
     send_verification_email_to_address,
 )
 from allauth.account.models import EmailAddress
-from allauth.mfa.models import Authenticator
+from allauth.socialaccount.models import SocialAccount
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth.models import User
-from django.contrib.messages.views import SuccessMessageMixin
 from django.db import transaction
 from django.db.models import Count
 from django.shortcuts import redirect
-from django.urls import reverse, reverse_lazy
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
-from django.views.generic import TemplateView, UpdateView
+from django.views.generic import TemplateView
 from django_q.tasks import async_task
 
-from apps.core.forms import ProfileUpdateForm
 from apps.core.models import Profile
 from apps.repos.forms import AwesomeListCreateForm
-from apps.repos.models import AwesomeList, UserStarredRepository
+from apps.repos.models import AwesomeList, RepositoryLike, UserStarredRepository
 from apps.repos.services import github_rate_limit_status, profile_has_github_token
 from awesome_repos.utils import get_awesome_repos_logger
 
 logger = get_awesome_repos_logger(__name__)
-NEW_API_KEY_SESSION_KEY = "new_api_key"
 
 
 def build_absolute_public_url(path: str) -> str:
@@ -65,58 +62,34 @@ class HomeView(LoginRequiredMixin, TemplateView):
         return context
 
 
-class UserSettingsView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
+class UserSettingsView(LoginRequiredMixin, TemplateView):
     login_url = "account_login"
-    model = Profile
-    form_class = ProfileUpdateForm
-    success_message = "User Profile Updated"
-    success_url = reverse_lazy("settings")
     template_name = "pages/user-settings.html"
-
-    def get_object(self):
-        profile, _created = Profile.objects.get_or_create(user=self.request.user)
-        return profile
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         user = self.request.user
-        profile = self.object
+        profile, _created = Profile.objects.get_or_create(user=user)
+        github_account = SocialAccount.objects.filter(user=user, provider="github").first()
+        github_account_data = (github_account.extra_data or {}) if github_account else {}
+        github_login = github_account_data.get("login", "")
 
         email_address = EmailAddress.objects.filter(user=user, email__iexact=user.email).first()
         context["email_verified"] = bool(email_address and email_address.verified)
         context["resend_confirmation_url"] = reverse("resend_confirmation")
-        context["passkey_count"] = Authenticator.objects.filter(
-            user=user,
-            type=Authenticator.Type.WEBAUTHN,
-        ).count()
-        context["has_recovery_codes"] = Authenticator.objects.filter(
-            user=user,
-            type=Authenticator.Type.RECOVERY_CODES,
-        ).exists()
-
-        context["api_key_prefix"] = profile.api_key_prefix
-        context["has_api_key"] = profile.has_api_key
-        context["new_api_key"] = self.request.session.pop(NEW_API_KEY_SESSION_KEY, "")
         context["github_auth_enabled"] = "github" in settings.SOCIALACCOUNT_PROVIDERS
         context["github_connected"] = profile_has_github_token(profile)
+        context["github_login"] = github_login
+        context["github_profile_url"] = github_account_data.get("html_url", "")
         context["github_starred_count"] = UserStarredRepository.objects.filter(
             profile=profile
         ).count()
         context["github_starred_import_enabled"] = profile.github_starred_repos_import_enabled
         context["github_starred_last_imported_at"] = profile.github_starred_repos_last_imported_at
         context["github_starred_last_error"] = profile.github_starred_repos_last_error
+        context["liked_repository_count"] = RepositoryLike.objects.filter(user=user).count()
 
         return context
-
-
-@login_required
-@require_POST
-def rotate_api_key(request):
-    profile, _created = Profile.objects.get_or_create(user=request.user)
-    api_key = profile.rotate_api_key()
-    request.session[NEW_API_KEY_SESSION_KEY] = api_key
-    messages.success(request, "New API key generated. Copy it now; it will only be shown once.")
-    return redirect("settings")
 
 
 @login_required

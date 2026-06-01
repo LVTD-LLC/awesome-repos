@@ -3735,6 +3735,8 @@ def test_awesome_list_list_page_renders_activity_metrics(client):
     assert b"350" in response.content
     assert b"django" in response.content
     assert b"Request a list" in response.content
+    assert b"requestListOpen" in response.content
+    assert b"Submit request" in response.content
 
 
 @pytest.mark.django_db

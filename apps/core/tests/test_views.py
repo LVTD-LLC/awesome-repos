@@ -42,26 +42,9 @@ class TestHomeView:
 
         assert response.status_code == 200
         assert "Import starred repos" in content
-        assert "Not importing yet" in content
+        assert "Manual import" in content
+        assert "Starts when you import" in content
         assert "Daily refresh enabled" not in content
-
-    def test_rotate_api_key_stores_hash_and_shows_key_once(self, auth_client, profile):
-        response = auth_client.post(reverse("rotate_api_key"), follow=True)
-        content = response.content.decode()
-        profile.refresh_from_db()
-
-        assert response.status_code == 200
-        assert profile.api_key_prefix
-        assert profile.api_key_hash
-        assert profile.api_key_hash not in content
-        assert "Copy this key now" in content
-        assert profile.api_key_prefix in content
-
-        response = auth_client.get(reverse("settings"))
-        content = response.content.decode()
-
-        assert "Copy this key now" not in content
-        assert profile.api_key_prefix in content
 
     def test_import_starred_repositories_enables_profile_and_queues_task(
         self,
@@ -351,10 +334,12 @@ def test_admin_panel_nav_links_to_repository_and_list_pages(
     assert response.status_code == 200
     repos_link = rf'<a href="{re.escape(reverse("repos:search"))}"[^>]*>\s*Repos\s*</a>'
     lists_link = rf'<a href="{re.escape(reverse("repos:list"))}"[^>]*>\s*Lists\s*</a>'
+    settings_link = rf'<a href="{re.escape(reverse("settings"))}"[^>]*>\s*Settings\s*</a>'
     assert re.search(repos_link, content)
     assert re.search(lists_link, content)
+    assert re.search(settings_link, content)
     assert not re.search(r"<a\b[^>]*>\s*Dashboard\s*</a>", content)
-    assert not re.search(r"<a\b[^>]*>\s*Settings\s*</a>", content)
+    assert not re.search(r"<a\b[^>]*>\s*Request list\s*</a>", content)
 
 
 @override_settings(SITE_URL="http://example.com")
