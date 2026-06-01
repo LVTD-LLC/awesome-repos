@@ -485,6 +485,38 @@ def test_send_issue_to_subscribers_is_idempotent_and_unsubscribe_blocks_future_s
 
 
 @pytest.mark.django_db
+def test_send_issue_to_subscribers_skips_delivery_locked_by_another_worker(
+    user,
+    repository,
+    monkeypatch,
+):
+    NewsletterSubscription.objects.create(
+        user=user,
+        repository=repository,
+        email="reader@example.com",
+        cadence=NewsletterCadence.WEEKLY,
+    )
+    issue = RepositoryNewsletterIssue.objects.create(
+        repository=repository,
+        cadence=NewsletterCadence.WEEKLY,
+        period_start=date(2026, 5, 25),
+        period_end=date(2026, 5, 31),
+        slug="2026-05-25",
+        title="Django weekly update",
+        content_markdown="Update",
+        content_html="<p>Update</p>",
+        commit_count=1,
+        published_at=timezone.now(),
+    )
+    monkeypatch.setattr("apps.repos.newsletters.send_issue_delivery", lambda *args, **kwargs: None)
+
+    result = send_issue_to_subscribers(issue)
+
+    assert result == {"sent": 0, "failed": 0}
+    assert NewsletterIssueDelivery.objects.filter(sent_at__isnull=True).count() == 1
+
+
+@pytest.mark.django_db
 def test_unsubscribe_route_marks_subscription_inactive(client, user, repository):
     subscription = NewsletterSubscription.objects.create(
         user=user,

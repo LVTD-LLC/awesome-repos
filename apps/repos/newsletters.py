@@ -826,9 +826,7 @@ def absolute_site_url(path: str) -> str:
     return f"{settings.SITE_URL.rstrip('/')}{path}"
 
 
-def send_issue_delivery(delivery: NewsletterIssueDelivery) -> bool:
-    if delivery.sent_at:
-        return True
+def _send_locked_issue_delivery(delivery: NewsletterIssueDelivery) -> bool:
     issue = delivery.issue
     subscription = delivery.subscription
     context = {
@@ -869,6 +867,28 @@ def send_issue_delivery(delivery: NewsletterIssueDelivery) -> bool:
     return success
 
 
+def send_issue_delivery(
+    delivery: NewsletterIssueDelivery,
+    *,
+    recipient_email: str | None = None,
+) -> bool | None:
+    with transaction.atomic():
+        locked_delivery = (
+            NewsletterIssueDelivery.objects.select_for_update(skip_locked=True)
+            .select_related("issue__repository", "subscription__user")
+            .filter(pk=delivery.pk)
+            .first()
+        )
+        if locked_delivery is None:
+            return None
+        if locked_delivery.sent_at:
+            return None
+        if recipient_email and locked_delivery.recipient_email != recipient_email:
+            locked_delivery.recipient_email = recipient_email
+            locked_delivery.save(update_fields=["recipient_email", "updated_at"])
+        return _send_locked_issue_delivery(locked_delivery)
+
+
 def send_issue_to_subscribers(issue: RepositoryNewsletterIssue) -> dict:
     if not issue.published_at:
         return {"sent": 0, "skipped": "unpublished"}
@@ -887,11 +907,10 @@ def send_issue_to_subscribers(issue: RepositoryNewsletterIssue) -> dict:
         )
         if delivery.sent_at:
             continue
-        delivery.recipient_email = subscription.email
-        delivery.save(update_fields=["recipient_email", "updated_at"])
-        if send_issue_delivery(delivery):
+        result = send_issue_delivery(delivery, recipient_email=subscription.email)
+        if result is True:
             sent += 1
-        else:
+        elif result is False:
             failed += 1
     return {"sent": sent, "failed": failed}
 
