@@ -39,6 +39,82 @@ MISSING_REPOSITORY_DISCOVERY_TASK_GROUP = "Manual awesome-list missing repo disc
 REPOSITORY_REFRESH_TASK_GROUP = "Refresh repositories"
 AWESOME_LIST_REQUEST_RATE_LIMIT = 5
 AWESOME_LIST_REQUEST_RATE_LIMIT_WINDOW_SECONDS = 60 * 60
+AI_DEVELOPMENT_VISIBLE_PATH_LIMIT = 6
+AI_DEVELOPMENT_DETAIL_PATH_LIMIT = 24
+AI_DEVELOPMENT_VISIBLE_TOOL_LIMIT = 5
+
+
+def _ai_development_signal_summary(signals):
+    normalized_signals = []
+    seen_paths = set()
+
+    for signal in signals or []:
+        if not isinstance(signal, dict):
+            continue
+
+        path = str(signal.get("path") or "").strip()
+        if not path:
+            continue
+
+        path_key = path.lower()
+        if path_key in seen_paths:
+            continue
+
+        seen_paths.add(path_key)
+        kind = signal.get("kind") if signal.get("kind") in {"directory", "file"} else "file"
+        tool = str(signal.get("tool") or "AI agent").strip() or "AI agent"
+        normalized_signals.append(
+            {
+                "path": path,
+                "path_key": path_key,
+                "kind": kind,
+                "kind_label": "dir" if kind == "directory" else "file",
+                "tool": tool,
+                "signal": signal.get("signal") or "",
+            }
+        )
+
+    normalized_signals.sort(key=lambda item: item["path_key"])
+
+    tool_counts = {}
+    for signal in normalized_signals:
+        tool_counts[signal["tool"]] = tool_counts.get(signal["tool"], 0) + 1
+
+    tools = [
+        {"name": tool, "count": count}
+        for tool, count in sorted(tool_counts.items(), key=lambda item: item[0].lower())
+    ]
+
+    key_signals = []
+    covered_prefixes = []
+    for signal in normalized_signals:
+        if any(signal["path_key"].startswith(prefix) for prefix in covered_prefixes):
+            continue
+
+        key_signals.append(signal)
+        if signal["kind"] == "directory":
+            covered_prefixes.append(f"{signal['path_key'].rstrip('/')}/")
+
+    visible_signals = key_signals[:AI_DEVELOPMENT_VISIBLE_PATH_LIMIT]
+    detail_signals = normalized_signals[:AI_DEVELOPMENT_DETAIL_PATH_LIMIT]
+    total_count = len(normalized_signals)
+
+    return {
+        "has_signals": bool(normalized_signals),
+        "total_count": total_count,
+        "file_count": sum(1 for signal in normalized_signals if signal["kind"] == "file"),
+        "directory_count": sum(
+            1 for signal in normalized_signals if signal["kind"] == "directory"
+        ),
+        "tools": tools,
+        "visible_tools": tools[:AI_DEVELOPMENT_VISIBLE_TOOL_LIMIT],
+        "extra_tool_count": max(len(tools) - AI_DEVELOPMENT_VISIBLE_TOOL_LIMIT, 0),
+        "visible_signals": visible_signals,
+        "hidden_signal_count": max(len(key_signals) - len(visible_signals), 0),
+        "detail_signals": detail_signals,
+        "detail_hidden_count": max(total_count - len(detail_signals), 0),
+        "show_detail_signals": total_count > len(visible_signals),
+    }
 
 
 def _require_superuser(request):
@@ -404,6 +480,9 @@ class RepositoryDetailView(DetailView):
         if performance["has_history"]:
             context["repository_history_chart_data"] = repository_history_chart_data(self.object)
         context["similar_repositories"] = similar_repositories_for_repository(self.object)
+        context["ai_development_signal_summary"] = _ai_development_signal_summary(
+            self.object.ai_development_signals
+        )
         return context
 
 
