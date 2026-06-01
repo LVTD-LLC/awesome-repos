@@ -3,9 +3,11 @@
     id="repo-like-{{ repository.pk }}"
     method="post"
     action="{% url 'repos:repo_like_toggle' owner=repository.owner name=repository.name %}"
+    {% if not disable_hx %}
     hx-post="{% url 'repos:repo_like_toggle' owner=repository.owner name=repository.name %}"
     hx-target="#repo-like-{{ repository.pk }}"
     hx-swap="outerHTML"
+    {% endif %}
     class="inline-flex"
   >
     {% csrf_token %}

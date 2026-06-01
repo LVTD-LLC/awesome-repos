@@ -47,6 +47,7 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Awesome: added a management command to backfill first-commit dates for existing awesome-list and repository rows.
 - Awesome: detect awesome-list repositories during repository sync and hide them from normal repository browse/search surfaces.
 - Awesome: added opt-in GitHub starred repository imports with a personal starred-repo search surface and daily user-token refreshes.
+- Awesome: added a liked repositories page for authenticated users.
 
 ### Changed
 - Awesome: updated default contact email and production domain references to rasul@lvtd.dev and awesome.lvtd.dev.
@@ -57,6 +58,7 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Awesome: repository search is now the root landing page, with `/repos/` permanently redirecting to `/` and a prominent link to the `/lists/` awesome-list directory.
 - Awesome: admin navbar now links directly to Repos and Lists instead of Dashboard and Settings.
 - Awesome: moved repository search filters into a compact vertical modal opened from a single filter button.
+- Awesome: replaced separate public/app navigation with a shared search-first navbar that exposes repos, lists, starred repos, liked repos, and list requests.
 - Awesome admin-panel add flow now only asks for the GitHub URL; list names and slugs are derived automatically from the source repo.
 - Awesome-list scans now log start/finish/failure details and surface empty scans or sync failures in the admin panel.
 - Awesome: repository detail history now relies on D3 charts instead of duplicating growth cards and a snapshot table.
