@@ -359,6 +359,8 @@ DEFAULT_FROM_EMAIL = env(
     "DEFAULT_FROM_EMAIL",
     default="LVTD LLC from Awesome <rasul@lvtd.dev>",
 )
+# Keep the project contact address as the default; deployments can override this
+# for a dedicated alert inbox without changing the source default.
 SERVER_EMAIL = env(
     "SERVER_EMAIL",
     default="Awesome Errors <rasul@lvtd.dev>",
