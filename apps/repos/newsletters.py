@@ -747,7 +747,12 @@ def generate_repository_newsletter_issue(
         cadence=cadence,
         period_start=period.start,
     ).first()
-    if existing and not force and existing.generation_source_hash == source_hash:
+    if (
+        existing
+        and not force
+        and not existing.generation_last_error
+        and existing.generation_source_hash == source_hash
+    ):
         return existing
     if not newsletter_ai_configured():
         issue, _created = RepositoryNewsletterIssue.objects.update_or_create(

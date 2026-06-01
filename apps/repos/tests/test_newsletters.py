@@ -390,6 +390,111 @@ def test_generate_repository_newsletter_issue_skips_empty_period(repository, mon
 
 
 @pytest.mark.django_db
+def test_generate_repository_newsletter_issue_retries_after_generation_error(
+    repository,
+    monkeypatch,
+):
+    repository.newsletter_tracking_enabled = True
+    repository.save(update_fields=["newsletter_tracking_enabled"])
+    RepositoryCommit.objects.create(
+        repository=repository,
+        sha="abc123",
+        branch="main",
+        message="Add newsletter tracking",
+        summary="Added newsletter tracking.",
+        summary_source_hash="summary-hash",
+        committed_at=datetime(2026, 5, 26, 12, tzinfo=UTC),
+        html_url="https://github.com/django/django/commit/abc123",
+    )
+    calls = {"count": 0}
+    monkeypatch.setattr("apps.repos.newsletters.newsletter_ai_configured", lambda: True)
+    monkeypatch.setattr("apps.repos.newsletters.newsletter_model_id", lambda: "model/test")
+
+    def generate(text):
+        calls["count"] += 1
+        if calls["count"] == 1:
+            raise RuntimeError("temporary failure")
+        return NewsletterIssueOutput(
+            title="Django weekly update",
+            content_markdown="## Changes\n- Added tracking.",
+        )
+
+    monkeypatch.setattr("apps.repos.newsletters.generate_issue_content", generate)
+    period = NewsletterPeriod(start=date(2026, 5, 25), end=date(2026, 5, 31))
+
+    failed_issue = generate_repository_newsletter_issue(
+        repository,
+        cadence=NewsletterCadence.WEEKLY,
+        period=period,
+    )
+    retried_issue = generate_repository_newsletter_issue(
+        repository,
+        cadence=NewsletterCadence.WEEKLY,
+        period=period,
+    )
+
+    assert failed_issue is not None
+    assert retried_issue is not None
+    assert retried_issue.id == failed_issue.id
+    assert calls["count"] == 2
+    assert retried_issue.generation_last_error == ""
+    assert retried_issue.published_at is not None
+    assert "<h2>Changes</h2>" in retried_issue.content_html
+
+
+@pytest.mark.django_db
+def test_generate_repository_newsletter_issue_retries_after_ai_configuration_returns(
+    repository,
+    monkeypatch,
+):
+    repository.newsletter_tracking_enabled = True
+    repository.save(update_fields=["newsletter_tracking_enabled"])
+    RepositoryCommit.objects.create(
+        repository=repository,
+        sha="abc123",
+        branch="main",
+        message="Add newsletter tracking",
+        summary="Added newsletter tracking.",
+        summary_source_hash="summary-hash",
+        committed_at=datetime(2026, 5, 26, 12, tzinfo=UTC),
+        html_url="https://github.com/django/django/commit/abc123",
+    )
+    configured = {"enabled": False}
+    monkeypatch.setattr(
+        "apps.repos.newsletters.newsletter_ai_configured",
+        lambda: configured["enabled"],
+    )
+    monkeypatch.setattr("apps.repos.newsletters.newsletter_model_id", lambda: "model/test")
+    monkeypatch.setattr(
+        "apps.repos.newsletters.generate_issue_content",
+        lambda text: NewsletterIssueOutput(
+            title="Django weekly update",
+            content_markdown="## Changes\n- Added tracking.",
+        ),
+    )
+    period = NewsletterPeriod(start=date(2026, 5, 25), end=date(2026, 5, 31))
+
+    unconfigured_issue = generate_repository_newsletter_issue(
+        repository,
+        cadence=NewsletterCadence.WEEKLY,
+        period=period,
+    )
+    configured["enabled"] = True
+    retried_issue = generate_repository_newsletter_issue(
+        repository,
+        cadence=NewsletterCadence.WEEKLY,
+        period=period,
+    )
+
+    assert unconfigured_issue is not None
+    assert retried_issue is not None
+    assert retried_issue.id == unconfigured_issue.id
+    assert retried_issue.generation_last_error == ""
+    assert retried_issue.published_at is not None
+    assert "<h2>Changes</h2>" in retried_issue.content_html
+
+
+@pytest.mark.django_db
 def test_public_newsletter_pages_and_rss_render(client, repository):
     issue = RepositoryNewsletterIssue.objects.create(
         repository=repository,
