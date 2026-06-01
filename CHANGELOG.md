@@ -67,6 +67,8 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Awesome: repository generated-tag prompts now include known language, GitHub topics, and AI-development signals.
 
 ### Fixed
+- Awesome: keep personal Starred and Liked nav links hidden from anonymous visitors.
+- Awesome: keep explicitly liked repositories visible in the personal liked page even when hidden from public catalog search.
 - Awesome: fixed invalid nested links on awesome-list repository cards that created empty clickable containers.
 - Awesome: loosened desktop side sponsor rail spacing so ad cards no longer crowd or overlap their copy.
 - Awesome: repair repository migration graph ordering so production can migrate past the AI-development and activity merge branches.

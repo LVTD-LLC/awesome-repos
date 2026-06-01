@@ -272,10 +272,16 @@ class LikedRepositoryListView(LoginRequiredMixin, ListView):
     paginate_by = 30
     login_url = "account_login"
 
+    def liked_repository_queryset(self):
+        # Personal liked search intentionally includes explicit saves even when a
+        # repository is hidden from public catalog search.
+        return Repository.objects.filter(likes__user=self.request.user).distinct()
+
     def get_queryset(self):
         sort = (self.request.GET.get("sort") or "").strip()
-        liked_queryset = repository_search_queryset(self.request.GET).filter(
-            likes__user=self.request.user
+        liked_queryset = repository_search_queryset(
+            self.request.GET,
+            queryset=self.liked_repository_queryset(),
         )
         queryset = with_repository_like_state(
             liked_queryset,
@@ -291,9 +297,7 @@ class LikedRepositoryListView(LoginRequiredMixin, ListView):
         params.pop("page", None)
         context["params"] = params
         context["querystring"] = params.urlencode()
-        context["liked_repository_count"] = RepositoryLike.objects.filter(
-            user=self.request.user
-        ).count()
+        context["liked_repository_count"] = self.liked_repository_queryset().count()
         return context
 
 
