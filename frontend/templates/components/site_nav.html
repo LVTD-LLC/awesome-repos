@@ -56,12 +56,6 @@
         >
           Liked
         </a>
-        <a
-          href="{% url 'repos:request_list' %}"
-          class="hidden rounded-full px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-100 hover:text-gray-950 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:text-gray-300 dark:hover:bg-gray-900 dark:hover:text-white dark:focus-visible:ring-offset-gray-950 xl:inline-flex"
-        >
-          Request list
-        </a>
         {% if user.is_superuser %}
           <a href="{% url 'admin_panel' %}" class="rounded-full px-4 py-2.5 text-sm font-semibold text-green-700 transition hover:bg-green-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:text-green-300 dark:hover:bg-green-950 dark:focus-visible:ring-offset-gray-950">
             Admin
@@ -93,6 +87,19 @@
           </svg>
         </button>
         {% if user.is_authenticated %}
+          <a
+            href="{% url 'settings' %}"
+            aria-label="Settings"
+            title="Settings"
+            {% if current_name == "settings" %}aria-current="page"{% endif %}
+            class="inline-flex h-11 w-11 items-center justify-center rounded-full border transition focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-950 {% if current_name == "settings" %}border-gray-950 bg-gray-950 text-white dark:border-white dark:bg-white dark:text-gray-950{% else %}border-gray-200 bg-white text-gray-700 hover:bg-gray-50 hover:text-gray-950 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white{% endif %}"
+          >
+            <span class="sr-only">Settings</span>
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.52a2 2 0 0 1-1 1.72l-.15.1a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.72v-.52a2 2 0 0 1 1-1.72l.15-.1a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2Z" />
+              <circle cx="12" cy="12" r="3" />
+            </svg>
+          </a>
           <form method="post" action="{% url 'account_logout' %}">
             {% csrf_token %}
             <button type="submit" class="inline-flex min-h-11 items-center justify-center rounded-full border border-gray-300 bg-white px-4 text-sm font-semibold text-gray-900 transition hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:hover:bg-gray-800 dark:focus-visible:ring-offset-gray-950">
@@ -162,9 +169,11 @@
             <a href="{% url 'repos:liked' %}" class="rounded-xl px-3 py-3 text-sm font-semibold {% if current_namespace == "repos" and current_name == "liked" %}bg-gray-950 text-white dark:bg-white dark:text-gray-950{% else %}text-gray-800 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-900{% endif %}">
               Liked
             </a>
-            <a href="{% url 'repos:request_list' %}" class="rounded-xl px-3 py-3 text-sm font-semibold text-gray-800 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-900">
-              Request list
-            </a>
+            {% if user.is_authenticated %}
+              <a href="{% url 'settings' %}" class="rounded-xl px-3 py-3 text-sm font-semibold {% if current_name == "settings" %}bg-gray-950 text-white dark:bg-white dark:text-gray-950{% else %}text-gray-800 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-900{% endif %}">
+                Settings
+              </a>
+            {% endif %}
             {% if user.is_superuser %}
               <a href="{% url 'admin_panel' %}" class="rounded-xl px-3 py-3 text-sm font-semibold text-green-700 hover:bg-green-50 dark:text-green-300 dark:hover:bg-green-950">
                 Admin

@@ -481,6 +481,14 @@ def github_social_token_for_profile(profile) -> SocialToken | None:
     )
 
 
+def github_social_token_is_usable(social_token: SocialToken | None) -> bool:
+    return bool(
+        social_token
+        and social_token.token
+        and (not social_token.expires_at or social_token.expires_at > timezone.now())
+    )
+
+
 def github_token_for_profile(profile) -> str:
     social_token = github_social_token_for_profile(profile)
     if social_token is None:

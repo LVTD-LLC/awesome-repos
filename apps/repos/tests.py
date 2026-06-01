@@ -3735,6 +3735,11 @@ def test_awesome_list_list_page_renders_activity_metrics(client):
     assert b"350" in response.content
     assert b"django" in response.content
     assert b"Request a list" in response.content
+    assert b"requestListOpen" in response.content
+    assert b"openRequestList()" in response.content
+    assert b"handleRequestListTab($event)" in response.content
+    assert b'name="next"' in response.content
+    assert b"Submit request" in response.content
 
 
 @pytest.mark.django_db
@@ -3761,6 +3766,22 @@ def test_awesome_list_request_page_accepts_public_requests(client):
     assert list_request.repo_full_name == "wsvincent/awesome-django"
     assert list_request.requester_email == "reader@example.com"
     assert "has been submitted" in response.content.decode()
+
+
+@pytest.mark.django_db
+@override_settings(CACHES=LOC_MEM_CACHES)
+def test_awesome_list_request_modal_redirects_back_to_lists(client):
+    response = client.post(
+        reverse("repos:request_list"),
+        data={
+            "source_url": "https://github.com/wsvincent/awesome-django",
+            "requester_email": "reader@example.com",
+            "next": reverse("repos:list"),
+        },
+    )
+
+    assert response.status_code == 302
+    assert response["Location"] == reverse("repos:list")
 
 
 @pytest.mark.django_db

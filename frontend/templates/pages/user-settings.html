@@ -1,239 +1,312 @@
-{% extends 'base_app.html' %}
-{% load widget_tweaks socialaccount %}
+{% extends "base_app.html" %}
+{% load humanize socialaccount %}
 
 {% block meta %}
-  <title>Awesome - User Settings</title>
+  <title>Settings · Awesome</title>
+  <meta name="description" content="Manage your Awesome account, GitHub imports, and repository update preferences." />
 {% endblock meta %}
 
 {% block content %}
-  <div class="container px-4 py-8 mx-auto max-w-3xl bg-white text-gray-900 dark:bg-gray-900 dark:text-gray-100 lg:min-w-0 md:pt-10 lg:flex-1">
-    {% include "components/confirm-email.html" with email_verified=email_verified %}
-    <section class="p-6 mt-6 mb-8 rounded-lg border border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800/50" aria-labelledby="passkey-settings-heading">
-      <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h3 id="passkey-settings-heading" class="text-lg font-medium leading-6 text-gray-900 dark:text-gray-100">Passkeys</h3>
-          <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">
-            Add a passkey after account creation to sign in faster without typing your password.
-            {% if passkey_count %}You have {{ passkey_count }} passkey{{ passkey_count|pluralize }} set up.{% endif %}
-          </p>
-        </div>
-        <div class="flex flex-col gap-2 sm:flex-row">
-          {% if email_verified %}
-            <a href="{% url 'mfa_add_webauthn' %}" class="inline-flex justify-center rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900">
-              Add passkey
-            </a>
-          {% else %}
-            <button type="button" disabled aria-disabled="true" class="inline-flex cursor-not-allowed justify-center rounded-md border border-gray-300 bg-gray-100 px-4 py-2 text-sm font-medium text-gray-500 shadow-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400">
-              Confirm email to add passkey
-            </button>
-          {% endif %}
-          {% if passkey_count %}
-            <a href="{% url 'mfa_list_webauthn' %}" class="inline-flex justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 shadow-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:hover:bg-gray-800">
-              Manage passkeys
-            </a>
-            {% if has_recovery_codes %}
-              <a href="{% url 'mfa_view_recovery_codes' %}" class="inline-flex justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 shadow-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:hover:bg-gray-800">
-                View recovery codes
-              </a>
-            {% else %}
-              <a href="{% url 'mfa_generate_recovery_codes' %}" class="inline-flex justify-center rounded-md border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-900 shadow-sm hover:bg-amber-100 dark:border-amber-900/70 dark:bg-amber-950/30 dark:text-amber-100 dark:hover:bg-amber-950/50">
-                Generate recovery codes
-              </a>
-            {% endif %}
-          {% endif %}
-        </div>
+  <div class="mx-auto max-w-5xl px-4 py-10 sm:px-6 lg:px-8">
+    <div class="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <div>
+        <h1 class="text-3xl font-black tracking-tight text-gray-950 dark:text-white">Settings</h1>
+        <p class="app-text-muted mt-3 max-w-2xl text-base leading-7">
+          Manage the GitHub data Awesome uses for your account today, with space for repository update emails as they become available.
+        </p>
       </div>
-    </section>
-    <section class="p-6 mt-6 mb-8 rounded-lg border border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800/50" aria-labelledby="api-key-settings-heading">
-      <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div class="min-w-0 flex-1">
-          <h3 id="api-key-settings-heading" class="text-lg font-medium leading-6 text-gray-900 dark:text-gray-100">API key</h3>
-          <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">
-            Use API keys for server-to-server requests. Send them with an <span class="font-mono">Authorization: Bearer</span> or <span class="font-mono">X-API-Key</span> header.
-          </p>
-          {% if new_api_key %}
-            <div class="mt-4 rounded-md border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/60 dark:bg-amber-950/40">
-              <p class="text-sm font-medium text-amber-900 dark:text-amber-100">Copy this key now. It is stored hashed and will not be shown again.</p>
-              <code class="mt-3 block overflow-x-auto rounded-md bg-white p-3 text-xs text-gray-900 dark:bg-gray-950 dark:text-gray-100">{{ new_api_key }}</code>
-            </div>
-          {% elif has_api_key %}
-            <p class="mt-3 text-sm text-gray-600 dark:text-gray-300">
-              Active key prefix: <span class="font-mono text-gray-900 dark:text-gray-100">{{ api_key_prefix }}</span>
-            </p>
-          {% else %}
-            <p class="mt-3 text-sm text-gray-600 dark:text-gray-300">No API key has been generated yet.</p>
-          {% endif %}
-        </div>
-        <form method="post" action="{% url 'rotate_api_key' %}">
-          {% csrf_token %}
-          <button type="submit" class="inline-flex justify-center rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900">
-            {% if has_api_key %}Rotate key{% else %}Generate key{% endif %}
-          </button>
-        </form>
-      </div>
-    </section>
-    <section class="p-6 mt-6 mb-8 rounded-lg border border-green-200 bg-green-50 dark:border-green-900/70 dark:bg-green-950/20" aria-labelledby="github-starred-settings-heading">
-      <div class="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
-        <div class="min-w-0 flex-1">
-          <h3 id="github-starred-settings-heading" class="text-xl font-semibold leading-7 text-gray-900 dark:text-gray-100">
-            {% if github_starred_import_enabled %}GitHub starred repositories{% else %}Import starred repos{% endif %}
-          </h3>
-          <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">
-            Import public repositories you have starred on GitHub into your personal searchable repository list.
-            {% if github_starred_import_enabled %}Daily refresh is enabled for this account.{% else %}Star imports are off until you start them here.{% endif %}
-          </p>
-          <div class="mt-3 flex flex-wrap gap-2 text-xs text-gray-600 dark:text-gray-300">
-            <span class="rounded-full bg-white px-3 py-1 dark:bg-gray-900">{{ github_starred_count }} repo{{ github_starred_count|pluralize }} imported</span>
-            {% if github_starred_import_enabled %}
-              <span class="rounded-full bg-green-50 px-3 py-1 text-green-700 dark:bg-green-950 dark:text-green-200">Daily refresh enabled</span>
-            {% else %}
-              <span class="rounded-full bg-white px-3 py-1 text-gray-700 dark:bg-gray-900 dark:text-gray-200">Not importing yet</span>
-            {% endif %}
-            {% if github_starred_last_imported_at %}
-              <span class="rounded-full bg-white px-3 py-1 dark:bg-gray-900">Last import {{ github_starred_last_imported_at|date:"M d, Y H:i" }}</span>
-            {% endif %}
-          </div>
-          {% if github_starred_last_error %}
-            <p class="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-100">
-              {{ github_starred_last_error }}
-            </p>
-          {% endif %}
-        </div>
-        <div class="flex flex-col gap-2 sm:items-end">
-          {% if github_connected %}
-            <form method="post" action="{% url 'import_starred_repositories' %}">
-              {% csrf_token %}
-              <button type="submit" class="inline-flex min-h-12 items-center justify-center rounded-xl bg-green-600 px-6 text-base font-semibold text-white shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900">
-                {% if github_starred_import_enabled %}Refresh starred repos now{% else %}Import starred repos{% endif %}
-              </button>
-            </form>
-            {% if github_starred_import_enabled %}
-              <form method="post" action="{% url 'disable_starred_repository_import' %}">
-                {% csrf_token %}
-                <button type="submit" class="inline-flex justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 shadow-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:hover:bg-gray-800">
-                  Disable daily refresh
-                </button>
-              </form>
-            {% endif %}
-            {% if github_starred_count %}
-              <a href="{% url 'repos:starred' %}" class="inline-flex justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 shadow-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:hover:bg-gray-800">
-                Search starred repos
-              </a>
-            {% endif %}
-          {% elif github_auth_enabled %}
-            <a href="{% provider_login_url 'github' process='connect' %}" class="inline-flex justify-center rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900">
-              Connect GitHub
-            </a>
-          {% else %}
-            <button type="button" disabled aria-disabled="true" class="inline-flex cursor-not-allowed justify-center rounded-md border border-gray-300 bg-gray-100 px-4 py-2 text-sm font-medium text-gray-500 shadow-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400">
-              GitHub auth unavailable
-            </button>
-          {% endif %}
-        </div>
-      </div>
-    </section>
-    <div class="p-4 border-t border-b border-gray-200 dark:border-gray-700 sm:p-6 lg:p-8 xl:border-t-0">
-      <div class="flex justify-between items-center">
-        <h1 class="flex-1 pt-2 text-xl font-medium">Settings</h1>
-      </div>
+      <a href="{% url 'repos:search' %}" class="app-button-secondary shrink-0">
+        Browse repositories
+      </a>
     </div>
-    
 
+    {% include "components/confirm-email.html" with email_verified=email_verified %}
 
-    <form id="settings-form" action="" method="post">
-      {% csrf_token %}
-
-      <div class="px-6 py-4">
-        <div class="flex flex-col">
-          <h3 class="mb-6 text-lg font-medium leading-6 text-gray-900 dark:text-gray-100">Personal Information</h3>
-          <div class="mt-5 md:mt-0">
-            <div class="overflow-hidden sm:rounded-md">
-              <div class="px-2 py-5">
-                <div class="grid grid-cols-6 gap-6">
-                  {{ form.non_field_errors }}
-                  <div class="col-span-6 sm:col-span-3">
-                    {{ form.first_name.errors | safe }}
-                    <label for="{{ form.first_name.id_for_label }}" class="block text-sm font-medium text-gray-700 dark:text-gray-300">First name</label>
-                    {% render_field form.first_name id="first-name" name="first-name" type="text" autocomplete="given-name" class="block mt-1 w-full rounded-md border-gray-300 bg-white text-gray-900 shadow-sm focus:border-{{ cookiecutter.project_main_color }}-500 focus:ring-{{ cookiecutter.project_main_color }}-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-{{ cookiecutter.project_main_color }}-400 dark:focus:ring-{{ cookiecutter.project_main_color }}-400 sm:text-sm" %}
-                  </div>
-
-                  <div class="col-span-6 sm:col-span-3">
-                    {{ form.last_name.errors | safe }}
-                    <label for="{{ form.last_name.id_for_label }}" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Last name</label>
-                    {% render_field form.last_name id="last-name" name="last-name" type="text" autocomplete="family-name" class="block mt-1 w-full rounded-md border-gray-300 bg-white text-gray-900 shadow-sm focus:border-{{ cookiecutter.project_main_color }}-500 focus:ring-{{ cookiecutter.project_main_color }}-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-{{ cookiecutter.project_main_color }}-400 dark:focus:ring-{{ cookiecutter.project_main_color }}-400 sm:text-sm" %}
-                  </div>
+    <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
+      <div class="space-y-6">
+        <section class="app-card overflow-hidden" aria-labelledby="github-settings-heading">
+          <div class="border-b border-gray-200 p-6 dark:border-gray-800">
+            <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div class="flex gap-4">
+                <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gray-950 text-white dark:bg-white dark:text-gray-950">
+                  <svg class="h-5 w-5 fill-current" viewBox="0 0 20 20" aria-hidden="true">
+                    <path fill-rule="evenodd" d="M10 0C4.477 0 0 4.484 0 10.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0 1 10 4.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.203 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.942.359.31.678.921.678 1.856 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0 0 20 10.017C20 4.484 15.522 0 10 0z" clip-rule="evenodd" />
+                  </svg>
+                </span>
+                <div>
+                  <h2 id="github-settings-heading" class="text-xl font-bold text-gray-950 dark:text-white">GitHub connection</h2>
+                  <p class="app-text-muted mt-2 max-w-2xl text-sm leading-6">
+                    GitHub is the account source for Awesome. Connect it to import starred repositories and keep your personal search surface current.
+                  </p>
                 </div>
               </div>
+              <span class="inline-flex w-fit items-center rounded-full px-3 py-1 text-sm font-semibold {% if github_connected %}bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-200{% else %}bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-100{% endif %}">
+                {% if github_connected %}Connected{% else %}Not connected{% endif %}
+              </span>
             </div>
           </div>
-        </div>
+
+          <div class="grid divide-y divide-gray-200 dark:divide-gray-800 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+            <div class="p-5">
+              <div class="text-2xl font-black text-gray-950 dark:text-white">{{ github_starred_count|intcomma }}</div>
+              <div class="app-text-muted mt-1 text-sm">starred repo{{ github_starred_count|pluralize }} imported</div>
+            </div>
+            <div class="p-5">
+              <div class="text-sm font-semibold text-gray-950 dark:text-white">
+                {% if github_starred_import_enabled %}Daily refresh{% else %}Manual import{% endif %}
+              </div>
+              <div class="app-text-muted mt-1 text-sm">
+                {% if github_starred_import_enabled %}Enabled for this account{% else %}Starts when you import{% endif %}
+              </div>
+            </div>
+            <div class="p-5">
+              <div class="text-sm font-semibold text-gray-950 dark:text-white">
+                {% if github_starred_last_imported_at %}{{ github_starred_last_imported_at|date:"M d, Y H:i" }}{% else %}Not imported yet{% endif %}
+              </div>
+              <div class="app-text-muted mt-1 text-sm">last successful import</div>
+            </div>
+          </div>
+
+          <div class="border-t border-gray-200 p-6 dark:border-gray-800">
+            {% if github_starred_last_error %}
+              <p class="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-medium text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-100">
+                {{ github_starred_last_error }}
+              </p>
+            {% endif %}
+
+            <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+              {% if github_connected %}
+                <form method="post" action="{% url 'import_starred_repositories' %}">
+                  {% csrf_token %}
+                  <button type="submit" class="app-button-primary w-full sm:w-auto">
+                    {% if github_starred_import_enabled %}Refresh starred repos now{% else %}Import starred repos{% endif %}
+                  </button>
+                </form>
+                {% if github_starred_import_enabled %}
+                  <form method="post" action="{% url 'disable_starred_repository_import' %}">
+                    {% csrf_token %}
+                    <button type="submit" class="app-button-secondary w-full sm:w-auto">
+                      Disable daily refresh
+                    </button>
+                  </form>
+                {% endif %}
+                {% if github_starred_count %}
+                  <a href="{% url 'repos:starred' %}" class="app-button-secondary">
+                    Search starred repos
+                  </a>
+                {% endif %}
+              {% elif github_auth_enabled %}
+                <a href="{% provider_login_url 'github' process='connect' %}" class="app-button-primary">
+                  Connect GitHub
+                </a>
+              {% else %}
+                <button type="button" disabled aria-disabled="true" class="app-button-secondary">
+                  GitHub auth unavailable
+                </button>
+              {% endif %}
+            </div>
+          </div>
+        </section>
+
+        <section class="app-card overflow-hidden" aria-labelledby="repo-updates-heading">
+          <div class="border-b border-gray-200 p-6 dark:border-gray-800">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <h2 id="repo-updates-heading" class="text-xl font-bold text-gray-950 dark:text-white">Repository updates</h2>
+                <p class="app-text-muted mt-2 max-w-2xl text-sm leading-6">
+                  Future watch and newsletter preferences will live here. For now, liked repositories and starred imports are the signals Awesome can already use.
+                </p>
+              </div>
+              <span class="inline-flex w-fit rounded-full bg-blue-50 px-3 py-1 text-sm font-semibold text-blue-700 dark:bg-blue-950/40 dark:text-blue-200">
+                Planned
+              </span>
+            </div>
+          </div>
+          <div class="divide-y divide-gray-200 dark:divide-gray-800">
+            <div class="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h3 class="text-sm font-semibold text-gray-950 dark:text-white">Watchlist source</h3>
+                <p class="app-text-muted mt-1 text-sm">{{ liked_repository_count|intcomma }} liked repo{{ liked_repository_count|pluralize }} ready to become watch candidates.</p>
+              </div>
+              <a href="{% url 'repos:liked' %}" class="app-button-secondary shrink-0">
+                Review liked repos
+              </a>
+            </div>
+            <div class="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h3 class="text-sm font-semibold text-gray-950 dark:text-white">Digest cadence</h3>
+                <p class="app-text-muted mt-1 text-sm">Weekly and monthly summaries are planned for watched repositories.</p>
+              </div>
+              <span class="inline-flex w-fit rounded-full bg-gray-100 px-3 py-1 text-sm font-semibold text-gray-700 dark:bg-gray-800 dark:text-gray-200">
+                Coming later
+              </span>
+            </div>
+            <div class="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h3 class="text-sm font-semibold text-gray-950 dark:text-white">Per-repo subscriptions</h3>
+                <p class="app-text-muted mt-1 text-sm">Repository pages will expose watch controls when digest delivery is ready.</p>
+              </div>
+              <a href="{% url 'repos:search' %}" class="app-button-secondary shrink-0">
+                Find repos
+              </a>
+            </div>
+          </div>
+        </section>
       </div>
 
-      <div class="block" aria-hidden="true">
-        <div class="py-5">
-          <div class="border-t border-gray-200 dark:border-gray-700"></div>
-        </div>
-      </div>
+      <aside class="space-y-6">
+        <section class="app-card p-6" aria-labelledby="account-settings-heading">
+          <h2 id="account-settings-heading" class="text-lg font-bold text-gray-950 dark:text-white">Account</h2>
+          <dl class="mt-5 space-y-4">
+            <div>
+              <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Sign-in method</dt>
+              <dd class="mt-1 text-sm font-semibold text-gray-950 dark:text-white">GitHub OAuth</dd>
+            </div>
+            <div>
+              <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">GitHub user</dt>
+              <dd class="mt-1 text-sm font-semibold text-gray-950 dark:text-white">
+                {% if github_profile_url %}
+                  <a href="{{ github_profile_url }}" target="_blank" rel="noopener noreferrer" class="text-green-700 hover:text-green-800 dark:text-green-300 dark:hover:text-green-200">
+                    @{{ github_login|default:request.user.username }}
+                  </a>
+                {% elif github_login %}
+                  @{{ github_login }}
+                {% elif github_connected %}
+                  Connected
+                {% else %}
+                  Not connected
+                {% endif %}
+              </dd>
+            </div>
+            <div>
+              <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Email</dt>
+              <dd class="mt-1 break-words text-sm font-semibold text-gray-950 dark:text-white">{{ request.user.email|default:"No email on file" }}</dd>
+            </div>
+            <div>
+              <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Email status</dt>
+              <dd class="mt-2">
+                <span class="inline-flex rounded-full px-3 py-1 text-sm font-semibold {% if email_verified %}bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-200{% else %}bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-100{% endif %}">
+                  {% if email_verified %}Confirmed{% else %}Confirmation needed{% endif %}
+                </span>
+              </dd>
+            </div>
+          </dl>
+        </section>
 
-      <div class="px-6 py-4">
-        <div class="mt-6 text-right">
-          <button type="submit" class="inline-flex justify-center px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md border border-transparent shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 dark:focus:ring-green-400 dark:focus:ring-offset-gray-900">
-            Save Changes
-          </button>
-        </div>
-      </div>
-    </form>
+        <section class="app-card p-6" aria-labelledby="account-data-heading">
+          <h2 id="account-data-heading" class="text-lg font-bold text-gray-950 dark:text-white">Account data</h2>
+          <p class="app-text-muted mt-2 text-sm leading-6">
+            Your imported stars, liked repositories, and future watch preferences are attached to this account.
+          </p>
+          <div class="mt-5 grid grid-cols-2 gap-3 text-sm">
+            <div class="rounded-xl bg-gray-50 p-3 dark:bg-gray-950/70">
+              <div class="font-bold text-gray-950 dark:text-white">{{ github_starred_count|intcomma }}</div>
+              <div class="app-text-muted mt-1">imported</div>
+            </div>
+            <div class="rounded-xl bg-gray-50 p-3 dark:bg-gray-950/70">
+              <div class="font-bold text-gray-950 dark:text-white">{{ liked_repository_count|intcomma }}</div>
+              <div class="app-text-muted mt-1">liked</div>
+            </div>
+          </div>
+        </section>
+      </aside>
+    </div>
 
-    <!-- Danger Zone -->
-    <div class="mt-10 rounded-lg border border-red-200 bg-red-50 p-6 dark:border-red-900/50 dark:bg-red-950/30" x-data="{ open: false, confirmation: '' }" @keydown.escape.window="open = false">
-      <div class="flex items-start justify-between gap-6">
+    <section
+      class="mt-6 rounded-2xl border border-red-200 bg-red-50 p-6 dark:border-red-900/50 dark:bg-red-950/20"
+      aria-labelledby="delete-account-heading"
+      x-data="{
+        open: false,
+        confirmation: '',
+        previousFocus: null,
+        focusableSelector: 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex=\'-1\'])',
+        openDeleteAccount() {
+          this.previousFocus = document.activeElement;
+          this.open = true;
+          this.confirmation = '';
+          this.$nextTick(() => this.$refs.deleteConfirmation.focus());
+        },
+        closeDeleteAccount() {
+          this.open = false;
+          this.$nextTick(() => {
+            if (this.previousFocus && typeof this.previousFocus.focus === 'function') {
+              this.previousFocus.focus();
+            }
+          });
+        },
+        handleDeleteAccountTab(event) {
+          const focusable = Array.from(this.$refs.deleteAccountDialog.querySelectorAll(this.focusableSelector)).filter((element) => element.offsetParent !== null);
+          if (focusable.length === 0) {
+            event.preventDefault();
+            return;
+          }
+
+          const first = focusable[0];
+          const last = focusable[focusable.length - 1];
+          if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last.focus();
+          } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first.focus();
+          }
+        }
+      }"
+      @keydown.escape.window="open && closeDeleteAccount()"
+    >
+      <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h3 class="text-lg font-semibold text-red-900 dark:text-red-200">Danger Zone</h3>
-          <p class="mt-1 text-sm text-red-800/80 dark:text-red-200/80">
-            Deleting your account is irreversible. This will permanently delete your user record and related data from the database.
+          <h2 id="delete-account-heading" class="text-lg font-bold text-red-950 dark:text-red-100">Delete account</h2>
+          <p class="mt-2 max-w-2xl text-sm leading-6 text-red-800 dark:text-red-200">
+            This permanently removes your account and related data from Awesome. This action cannot be undone.
           </p>
         </div>
         <button
           type="button"
-          @click="open = true; confirmation = ''; $nextTick(() => $refs.deleteConfirmation.focus())"
-          class="inline-flex items-center rounded-md bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
+          @click="openDeleteAccount()"
+          class="app-button-danger shrink-0"
         >
           Delete account
         </button>
       </div>
 
-      <!-- Modal -->
       <div
         x-cloak
         x-show="open"
         x-transition.opacity
-        class="fixed inset-0 z-50 flex items-center justify-center"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4"
         role="dialog"
         aria-modal="true"
-        aria-label="Delete account confirmation"
+        aria-labelledby="delete-account-modal-heading"
       >
-        <div class="absolute inset-0 bg-black/50" @click="open = false"></div>
+        <div class="absolute inset-0 bg-gray-950/60" @click="closeDeleteAccount()"></div>
 
-        <div x-show="open" x-transition.scale.origin.center class="relative mx-4 w-full max-w-lg rounded-2xl border border-gray-200 bg-white p-6 shadow-xl dark:border-gray-800 dark:bg-gray-900">
+        <div
+          x-ref="deleteAccountDialog"
+          x-show="open"
+          x-transition.scale.origin.center
+          @keydown.tab="handleDeleteAccountTab($event)"
+          class="relative w-full max-w-lg rounded-2xl border border-gray-200 bg-white p-6 shadow-xl dark:border-gray-800 dark:bg-gray-900"
+        >
           <div class="flex items-start justify-between gap-4">
             <div>
-              <h4 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Delete account</h4>
-              <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">
-                This action is irreversible. To confirm, type <span class="font-mono font-semibold">DELETE</span> below.
+              <h3 id="delete-account-modal-heading" class="text-lg font-bold text-gray-950 dark:text-white">Delete account</h3>
+              <p class="app-text-muted mt-2 text-sm leading-6">
+                Type <span class="font-mono font-semibold text-gray-950 dark:text-white">DELETE</span> to confirm permanent account deletion.
               </p>
             </div>
-            <button type="button" class="rounded-md p-1 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100" @click="open = false" aria-label="Close">
-              <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            <button type="button" class="rounded-xl p-2 text-gray-500 transition hover:bg-gray-100 hover:text-gray-950 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white" @click="closeDeleteAccount()" aria-label="Close">
+              <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18 18 6M6 6l12 12" />
               </svg>
             </button>
           </div>
 
-          <form method="post" action="{% url 'delete_account' %}" class="mt-6 space-y-4">
+          <form method="post" action="{% url 'delete_account' %}" class="mt-6 space-y-5">
             {% csrf_token %}
 
             <div>
-              <label for="delete-confirmation" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Confirmation</label>
+              <label for="delete-confirmation" class="block text-sm font-semibold text-gray-900 dark:text-gray-100">Confirmation</label>
               <input
                 id="delete-confirmation"
                 name="confirmation"
@@ -242,18 +315,18 @@
                 x-ref="deleteConfirmation"
                 x-model="confirmation"
                 placeholder="Type DELETE"
-                class="mt-1 block w-full rounded-md border-gray-300 bg-white text-gray-900 shadow-sm focus:border-red-500 focus:ring-red-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+                class="app-input mt-2 block w-full"
               />
             </div>
 
-            <div class="flex items-center justify-end gap-3">
-              <button type="button" class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-900 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:hover:bg-gray-800" @click="open = false">
+            <div class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button type="button" class="app-button-secondary" @click="closeDeleteAccount()">
                 Cancel
               </button>
               <button
                 type="submit"
                 :disabled="confirmation !== 'DELETE'"
-                class="inline-flex items-center rounded-md bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-50 hover:bg-red-700"
+                class="app-button-danger"
               >
                 Yes, delete my account
               </button>
@@ -261,7 +334,6 @@
           </form>
         </div>
       </div>
-    </div>
-
+    </section>
   </div>
 {% endblock content %}

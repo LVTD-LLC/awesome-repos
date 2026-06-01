@@ -173,7 +173,7 @@ def test_app_pages_use_standard_ad_layout(client):
     assert_standard_ad_layout(response.content.decode())
 
 
-def test_settings_requires_email_confirmation_before_passkey_setup(client):
+def test_settings_shows_email_confirmation_without_passkey_controls(client):
     user = get_user_model().objects.create_user(
         username="settingsuser",
         email="settingsuser@example.com",
@@ -191,9 +191,11 @@ def test_settings_requires_email_confirmation_before_passkey_setup(client):
     assert response.status_code == 200
     content = response.content.decode()
     assert "Your email is not yet confirmed" in content
-    assert "Confirm email to add passkey" in content
     assert "Add passkey" not in content
     assert reverse("mfa_add_webauthn") not in content
+    assert "API key" not in content
+    assert "Repository updates" in content
+    assert "handleDeleteAccountTab($event)" in content
 
 
 def test_settings_handles_users_without_allauth_email_address(client):
@@ -209,12 +211,12 @@ def test_settings_handles_users_without_allauth_email_address(client):
     assert response.status_code == 200
     content = response.content.decode()
     assert "Your email is not yet confirmed" in content
-    assert "Confirm email to add passkey" in content
     assert "Add passkey" not in content
     assert reverse("mfa_add_webauthn") not in content
+    assert "Repository updates" in content
 
 
-def test_settings_shows_passkey_setup_when_email_confirmed(client):
+def test_settings_hides_email_confirmation_when_email_confirmed(client):
     user = get_user_model().objects.create_user(
         username="verifiedsettingsuser",
         email="verifiedsettingsuser@example.com",
@@ -232,12 +234,14 @@ def test_settings_shows_passkey_setup_when_email_confirmed(client):
     assert response.status_code == 200
     content = response.content.decode()
     assert "Your email is not yet confirmed" not in content
-    assert "Confirm email to add passkey" not in content
-    assert "Add passkey" in content
-    assert reverse("mfa_add_webauthn") in content
+    assert "Confirmation needed" not in content
+    assert "GitHub connection" in content
+    assert "Add passkey" not in content
+    assert reverse("mfa_add_webauthn") not in content
+    assert "openDeleteAccount()" in content
 
 
-def test_settings_shows_passkey_manage_link_when_passkey_exists(client):
+def test_settings_hides_passkey_management_when_passkey_exists(client):
     user = get_user_model().objects.create_user(
         username="passkeyuser",
         email="passkeyuser@example.com",
@@ -259,14 +263,14 @@ def test_settings_shows_passkey_manage_link_when_passkey_exists(client):
 
     assert response.status_code == 200
     content = response.content.decode()
-    assert "You have 1 passkey set up." in content
-    assert "Manage passkeys" in content
-    assert "Generate recovery codes" in content
-    assert reverse("mfa_list_webauthn") in content
-    assert reverse("mfa_generate_recovery_codes") in content
+    assert "Passkeys" not in content
+    assert "Manage passkeys" not in content
+    assert "Generate recovery codes" not in content
+    assert reverse("mfa_list_webauthn") not in content
+    assert reverse("mfa_generate_recovery_codes") not in content
 
 
-def test_settings_links_to_existing_recovery_codes(client):
+def test_settings_hides_recovery_code_links(client):
     user = get_user_model().objects.create_user(
         username="recoverysettingsuser",
         email="recoverysettingsuser@example.com",
@@ -289,8 +293,8 @@ def test_settings_links_to_existing_recovery_codes(client):
 
     assert response.status_code == 200
     content = response.content.decode()
-    assert "View recovery codes" in content
-    assert reverse("mfa_view_recovery_codes") in content
+    assert "View recovery codes" not in content
+    assert reverse("mfa_view_recovery_codes") not in content
 
 
 def test_mfa_index_uses_app_styling(client):
