@@ -31,6 +31,7 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Awesome: store each ingested repository README alongside the GitHub API metadata.
 - Awesome: detect AI development config files during repository sync and add an AI dev signals filter to repository search.
 - Awesome: generate repository discovery tags from descriptions and READMEs, and add filters for generated tags and GitHub topics.
+- Awesome: added a daily generated-tag backfill task so existing repository rows get tagged outside GitHub metadata refreshes.
 - Awesome: added an awesome-list directory and detail pages with stored list activity metrics including stars, commits, README repository counts, forks, issues, and scan freshness.
 - Awesome: added D3 charts to repository detail pages for historical stars and commit counts.
 - Awesome: added search, filters, and sorting to awesome-list detail repository tables.
@@ -59,6 +60,7 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Awesome: repository detail history now relies on D3 charts instead of duplicating growth cards and a snapshot table.
 - Awesome: GitHub star counts now render with thousands separators, and repository search results no longer show tracked star-growth deltas.
 - Awesome: moved the MCP endpoint into its own Django app and rebuilt it on FastMCP while keeping API and MCP search payloads on shared service functions.
+- Awesome: repository generated-tag prompts now include known language, GitHub topics, and AI-development signals.
 
 ### Fixed
 - Awesome: fixed invalid nested links on awesome-list repository cards that created empty clickable containers.

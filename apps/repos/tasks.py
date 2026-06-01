@@ -12,6 +12,7 @@ from apps.repos.services import (
     github_rate_limit_status,
     is_github_rate_limit_error,
 )
+from apps.repos.tags import repository_tagging_configured, tag_repository_batch
 from awesome_repos.utils import get_awesome_repos_logger
 
 logger = get_awesome_repos_logger(__name__)
@@ -351,3 +352,29 @@ def refresh_repositories_task(
         "rate_limit_remaining": github_rate_limit_remaining(),
         "repositories": queued[:25],
     }
+
+
+def tag_repositories_task(limit: int | None = None, *, force: bool = False):
+    if not repository_tagging_configured():
+        logger.info(
+            "repository_tagging_task_skipped",
+            reason="tagging_not_configured",
+        )
+        return {
+            "tagged": 0,
+            "skipped": 0,
+            "unchanged": 0,
+            "failure_count": 0,
+            "failures": [],
+            "skipped_reason": "tagging_not_configured",
+        }
+
+    resolved_limit = settings.REPOSITORY_DAILY_TAGGING_LIMIT if limit is None else limit
+    result = tag_repository_batch(limit=resolved_limit, force=force)
+    logger.info(
+        "repository_tagging_task_finished",
+        limit=resolved_limit,
+        force=force,
+        result=result,
+    )
+    return result

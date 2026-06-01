@@ -1,11 +1,8 @@
 from django.core.management.base import BaseCommand, CommandError
 
-from apps.repos.models import Repository
 from apps.repos.tags import (
-    build_repository_tagging_payload,
     repository_tagging_configured,
-    repository_tags_are_current,
-    save_repository_tags,
+    tag_repository_batch,
 )
 
 
@@ -27,45 +24,7 @@ class Command(BaseCommand):
                 "and the provider API key is set."
             )
 
-        queryset = Repository.objects.order_by("full_name")
-        if options["limit"]:
-            queryset = queryset[: options["limit"]]
-
-        tagged = 0
-        skipped = 0
-        unchanged = 0
-        failures = []
-        for repository in queryset:
-            try:
-                payload = build_repository_tagging_payload(repository, repository.readme)
-                if payload is None:
-                    skipped += 1
-                    continue
-
-                if not options["force"] and repository_tags_are_current(repository, payload):
-                    unchanged += 1
-                    continue
-
-                tags = save_repository_tags(
-                    repository,
-                    repository.readme,
-                    force=options["force"],
-                )
-            except Exception as exc:  # noqa: BLE001 - report and continue batch backfills
-                failures.append({"repo": repository.full_name, "error": str(exc)})
-                self.stderr.write(self.style.ERROR(f"{repository.full_name}: {exc}"))
-                continue
-
-            if not tags:
-                skipped += 1
-                continue
-            tagged += 1
-
-        result = {
-            "tagged": tagged,
-            "skipped": skipped,
-            "unchanged": unchanged,
-            "failure_count": len(failures),
-            "failures": failures[:25],
-        }
+        result = tag_repository_batch(limit=options["limit"], force=options["force"])
+        for failure in result["failures"]:
+            self.stderr.write(self.style.ERROR(f"{failure['repo']}: {failure['error']}"))
         self.stdout.write(self.style.SUCCESS(str(result)))
