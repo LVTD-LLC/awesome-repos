@@ -3495,6 +3495,54 @@ def test_repository_like_falls_back_to_safe_redirect(auth_client):
 
 
 @pytest.mark.django_db
+def test_liked_repositories_page_requires_login(client):
+    response = client.get(reverse("repos:liked"))
+
+    assert response.status_code == 302
+    assert response["Location"].startswith(f"{reverse('account_login')}?next=")
+
+
+@pytest.mark.django_db
+def test_liked_repositories_page_lists_current_users_likes(auth_client, user, django_user_model):
+    other_user = django_user_model.objects.create_user(
+        username="other",
+        email="other@example.com",
+        password="password123",
+    )
+    liked_repo = Repository.objects.create(
+        full_name="django/django",
+        owner="django",
+        name="django",
+        url="https://github.com/django/django",
+        description="The Web framework",
+        language="Python",
+        stars=80000,
+    )
+    other_repo = Repository.objects.create(
+        full_name="pallets/flask",
+        owner="pallets",
+        name="flask",
+        url="https://github.com/pallets/flask",
+        description="A lightweight WSGI framework",
+        language="Python",
+        stars=70000,
+    )
+    RepositoryLike.objects.create(user=user, repository=liked_repo)
+    RepositoryLike.objects.create(user=other_user, repository=other_repo)
+
+    response = auth_client.get(reverse("repos:liked"))
+    content = response.content
+
+    assert response.status_code == 200
+    assert b"Liked repositories" in content
+    assert b"django/django" in content
+    assert b"pallets/flask" not in content
+    assert b"Remove django/django from liked repositories" in content
+    assert response.context["liked_repository_count"] == 1
+    assert response.context["page_obj"].paginator.count == 1
+
+
+@pytest.mark.django_db
 def test_repository_pages_render_liked_heart_for_authenticated_user(auth_client, user):
     repo = Repository.objects.create(
         full_name="django/django",

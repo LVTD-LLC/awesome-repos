@@ -266,6 +266,37 @@ class UserStarredRepositorySearchView(LoginRequiredMixin, ListView):
         return context
 
 
+class LikedRepositoryListView(LoginRequiredMixin, ListView):
+    template_name = "repos/liked.html"
+    context_object_name = "repositories"
+    paginate_by = 30
+    login_url = "account_login"
+
+    def get_queryset(self):
+        sort = (self.request.GET.get("sort") or "").strip()
+        liked_queryset = repository_search_queryset(self.request.GET).filter(
+            likes__user=self.request.user
+        )
+        queryset = with_repository_like_state(
+            liked_queryset,
+            self.request.user,
+        ).prefetch_related("awesome_items__awesome_list")
+        if sort in {"", "liked"}:
+            return queryset.order_by("-likes__created_at", "full_name")
+        return queryset
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        params = self.request.GET.copy()
+        params.pop("page", None)
+        context["params"] = params
+        context["querystring"] = params.urlencode()
+        context["liked_repository_count"] = RepositoryLike.objects.filter(
+            user=self.request.user
+        ).count()
+        return context
+
+
 class AwesomeListListView(ListView):
     model = AwesomeList
     template_name = "repos/lists.html"

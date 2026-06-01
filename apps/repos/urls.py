@@ -23,6 +23,7 @@ urlpatterns = [
         name="repo_like_toggle",
     ),
     path("repos/<str:owner>/<str:name>/", views.RepositoryDetailView.as_view(), name="repo_detail"),
+    path("liked/", views.LikedRepositoryListView.as_view(), name="liked"),
     path("lists/", views.AwesomeListListView.as_view(), name="list"),
     path(
         "lists/<slug:slug>/rescan/",
