@@ -58,6 +58,7 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Awesome: renamed product-facing copy and brand assets to the shorter product name.
 - Awesome: awesome-list detail pages now show list-level GitHub stars and commits instead of aggregate repository growth charts.
 - Awesome: replaced placeholder side-rail sponsor slots with equal-height ads for LVTD projects and attribution-tagged outbound links.
+- Awesome: moved desktop side sponsor rails closer to the viewport edges while keeping page content centered.
 - Awesome: standardized page width around global side ad rails with five sponsor slots on each side.
 - Awesome: repository search is now the root landing page, with `/repos/` permanently redirecting to `/` and a prominent link to the `/lists/` awesome-list directory.
 - Awesome: admin navbar now links directly to Repos and Lists instead of Dashboard and Settings.

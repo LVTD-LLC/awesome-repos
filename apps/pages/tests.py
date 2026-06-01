@@ -16,6 +16,9 @@ pytestmark = pytest.mark.django_db
 def assert_standard_ad_layout(content):
     assert "data-page-ad-shell" in content
     assert "data-page-content" in content
+    assert "max-w-none" in content
+    assert "xl:col-start-3" in content
+    assert "xl:col-start-5" in content
     assert 'data-ad-rail="left"' in content
     assert 'data-ad-rail="right"' in content
     assert "grid-rows-5" in content
