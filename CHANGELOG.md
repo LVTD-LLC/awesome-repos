@@ -16,61 +16,62 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 
 ## [Unreleased]
 ### Added
-- Awesome Repos: added optional Chatwoot live-chat widget support configured with `CHATWOOT_BASE_URL` and `CHATWOOT_WEBSITE_TOKEN`.
-- Awesome Repos: added local logo assets and wired the navbar, favicon, touch icon, README, and base social metadata to the new branding.
-- Awesome Repos: ingest GitHub awesome-list READMEs, index the linked repositories, and expose searchable repository/list detail pages with stars, freshness, archive-state, and cross-list counts.
-- Awesome Repos: added an admin-panel flow to create new awesome-list sources and queue their initial scan.
-- Awesome Repos admin panel now shows GitHub API rate-limit status for the configured scanner token.
-- Awesome Repos admin panel now lets superusers retry scans for existing awesome-list repos.
-- Awesome Repos: added a daily scheduled task that queues a capped number of newly discovered repositories from awesome-list READMEs.
-- Awesome Repos: added pgvector-backed repository embeddings from GitHub descriptions and READMEs via OpenRouter/PydanticAI.
-- Awesome Repos search filters now expose semantic relevance mode for repository queries.
-- Awesome Repos: record repository metadata snapshots on every GitHub refresh and show tracked star growth in repository search/detail pages.
-- Awesome Repos: record default-branch commit counts during repository refreshes and show commit growth in repository history.
-- Awesome Repos: added a daily budgeted repository refresh that walks the oldest-synced repositories first and uses the same full-source sync path as manual repository rescans.
-- Awesome Repos: store each ingested repository README alongside the GitHub API metadata.
-- Awesome Repos: detect AI development config files during repository sync and add an AI dev signals filter to repository search.
-- Awesome Repos: generate repository discovery tags from descriptions and READMEs, and add filters for generated tags and GitHub topics.
-- Awesome Repos: added an awesome-list directory and detail pages with stored list activity metrics including stars, commits, README repository counts, forks, issues, and scan freshness.
-- Awesome Repos: added D3 charts to repository detail pages for historical stars and commit counts.
-- Awesome Repos: added search, filters, and sorting to awesome-list detail repository tables.
-- Awesome Repos: added superuser-only catalog maintenance controls on awesome-list and repository detail pages, plus a missing-repository discovery action for awesome lists.
-- Awesome Repos search now has desktop side sponsor placements for future ads.
-- Awesome Repos: show semantically similar repositories on repository detail pages when pgvector embeddings are available.
-- Awesome Repos: added API endpoints for authenticated repository search, repository detail, awesome-list search/detail, and list-scoped repository search.
-- Awesome Repos: added an authenticated Streamable HTTP MCP endpoint at `/mcp` for AI agents to search repositories and awesome lists.
-- Awesome Repos: added a public awesome-list request form with an admin-reviewable request queue.
-- Awesome Repos: repository topic badges now link to the matching topic-filtered search results.
-- Awesome Repos: expanded desktop side sponsor rails to ten placements, including one open "Get sponsored" slot.
-- Awesome Repos: store first-commit dates for awesome lists and repositories, show them in search/detail pages, and add age filters.
-- Awesome Repos: added a management command to backfill first-commit dates for existing awesome-list and repository rows.
-- Awesome Repos: detect awesome-list repositories during repository sync and hide them from normal repository browse/search surfaces.
+- Awesome: added optional Chatwoot live-chat widget support configured with `CHATWOOT_BASE_URL` and `CHATWOOT_WEBSITE_TOKEN`.
+- Awesome: added local logo assets and wired the navbar, favicon, touch icon, README, and base social metadata to the new branding.
+- Awesome: ingest GitHub awesome-list READMEs, index the linked repositories, and expose searchable repository/list detail pages with stars, freshness, archive-state, and cross-list counts.
+- Awesome: added an admin-panel flow to create new awesome-list sources and queue their initial scan.
+- Awesome admin panel now shows GitHub API rate-limit status for the configured scanner token.
+- Awesome admin panel now lets superusers retry scans for existing awesome-list repos.
+- Awesome: added a daily scheduled task that queues a capped number of newly discovered repositories from awesome-list READMEs.
+- Awesome: added pgvector-backed repository embeddings from GitHub descriptions and READMEs via OpenRouter/PydanticAI.
+- Awesome search filters now expose semantic relevance mode for repository queries.
+- Awesome: record repository metadata snapshots on every GitHub refresh and show tracked star growth in repository search/detail pages.
+- Awesome: record default-branch commit counts during repository refreshes and show commit growth in repository history.
+- Awesome: added a daily budgeted repository refresh that walks the oldest-synced repositories first and uses the same full-source sync path as manual repository rescans.
+- Awesome: store each ingested repository README alongside the GitHub API metadata.
+- Awesome: detect AI development config files during repository sync and add an AI dev signals filter to repository search.
+- Awesome: generate repository discovery tags from descriptions and READMEs, and add filters for generated tags and GitHub topics.
+- Awesome: added an awesome-list directory and detail pages with stored list activity metrics including stars, commits, README repository counts, forks, issues, and scan freshness.
+- Awesome: added D3 charts to repository detail pages for historical stars and commit counts.
+- Awesome: added search, filters, and sorting to awesome-list detail repository tables.
+- Awesome: added superuser-only catalog maintenance controls on awesome-list and repository detail pages, plus a missing-repository discovery action for awesome lists.
+- Awesome search now has desktop side sponsor placements for future ads.
+- Awesome: show semantically similar repositories on repository detail pages when pgvector embeddings are available.
+- Awesome: added API endpoints for authenticated repository search, repository detail, awesome-list search/detail, and list-scoped repository search.
+- Awesome: added an authenticated Streamable HTTP MCP endpoint at `/mcp` for AI agents to search repositories and awesome lists.
+- Awesome: added a public awesome-list request form with an admin-reviewable request queue.
+- Awesome: repository topic badges now link to the matching topic-filtered search results.
+- Awesome: expanded desktop side sponsor rails to ten placements, including one open "Get sponsored" slot.
+- Awesome: store first-commit dates for awesome lists and repositories, show them in search/detail pages, and add age filters.
+- Awesome: added a management command to backfill first-commit dates for existing awesome-list and repository rows.
+- Awesome: detect awesome-list repositories during repository sync and hide them from normal repository browse/search surfaces.
 
 ### Changed
-- Awesome Repos: awesome-list detail pages now show list-level GitHub stars and commits instead of aggregate repository growth charts.
-- Awesome Repos: replaced placeholder side-rail sponsor slots with equal-height ads for LVTD projects and attribution-tagged outbound links.
-- Awesome Repos: standardized page width around global side ad rails with five sponsor slots on each side.
-- Awesome Repos: repository search is now the root landing page, with `/repos/` permanently redirecting to `/` and a prominent link to the `/lists/` awesome-list directory.
-- Awesome Repos: admin navbar now links directly to Repos and Lists instead of Dashboard and Settings.
-- Awesome Repos: moved repository search filters into a compact vertical modal opened from a single filter button.
-- Awesome Repos admin-panel add flow now only asks for the GitHub URL; list names and slugs are derived automatically from the source repo.
+- Awesome: renamed product-facing copy and brand assets to the shorter product name.
+- Awesome: awesome-list detail pages now show list-level GitHub stars and commits instead of aggregate repository growth charts.
+- Awesome: replaced placeholder side-rail sponsor slots with equal-height ads for LVTD projects and attribution-tagged outbound links.
+- Awesome: standardized page width around global side ad rails with five sponsor slots on each side.
+- Awesome: repository search is now the root landing page, with `/repos/` permanently redirecting to `/` and a prominent link to the `/lists/` awesome-list directory.
+- Awesome: admin navbar now links directly to Repos and Lists instead of Dashboard and Settings.
+- Awesome: moved repository search filters into a compact vertical modal opened from a single filter button.
+- Awesome admin-panel add flow now only asks for the GitHub URL; list names and slugs are derived automatically from the source repo.
 - Awesome-list scans now log start/finish/failure details and surface empty scans or sync failures in the admin panel.
-- Awesome Repos: repository detail history now relies on D3 charts instead of duplicating growth cards and a snapshot table.
-- Awesome Repos: GitHub star counts now render with thousands separators, and repository search results no longer show tracked star-growth deltas.
-- Awesome Repos: moved the MCP endpoint into its own Django app and rebuilt it on FastMCP while keeping API and MCP search payloads on shared service functions.
+- Awesome: repository detail history now relies on D3 charts instead of duplicating growth cards and a snapshot table.
+- Awesome: GitHub star counts now render with thousands separators, and repository search results no longer show tracked star-growth deltas.
+- Awesome: moved the MCP endpoint into its own Django app and rebuilt it on FastMCP while keeping API and MCP search payloads on shared service functions.
 
 ### Fixed
-- Awesome Repos: fixed invalid nested links on awesome-list repository cards that created empty clickable containers.
-- Awesome Repos: loosened desktop side sponsor rail spacing so ad cards no longer crowd or overlap their copy.
-- Awesome Repos: repair repository migration graph ordering so production can migrate past the AI-development and activity merge branches.
-- Awesome Repos admin panel now bounds the Recent awesome lists card height so long list histories do not stretch the dashboard row.
-- Awesome Repos: include `django.contrib.postgres` so pgvector HNSW indexes pass Django production checks.
-- Awesome Repos: removed manifest-dependent logo static references so production template rendering works after `collectstatic`.
-- Awesome Repos: run generated-tag sync when a repository has no stored generated tags, including metadata-only refreshes.
-- Awesome Repos: removed side sponsor rail reservations from awesome-list detail pages to keep the repository list layout balanced.
+- Awesome: fixed invalid nested links on awesome-list repository cards that created empty clickable containers.
+- Awesome: loosened desktop side sponsor rail spacing so ad cards no longer crowd or overlap their copy.
+- Awesome: repair repository migration graph ordering so production can migrate past the AI-development and activity merge branches.
+- Awesome admin panel now bounds the Recent awesome lists card height so long list histories do not stretch the dashboard row.
+- Awesome: include `django.contrib.postgres` so pgvector HNSW indexes pass Django production checks.
+- Awesome: removed manifest-dependent logo static references so production template rendering works after `collectstatic`.
+- Awesome: run generated-tag sync when a repository has no stored generated tags, including metadata-only refreshes.
+- Awesome: removed side sponsor rail reservations from awesome-list detail pages to keep the repository list layout balanced.
 
 ### Changed
-- Awesome Repos landing pages no longer render a public navbar.
+- Awesome landing pages no longer render a public navbar.
 - Frontend assets now use Tailwind CLI plus Django staticfiles instead of a JavaScript bundler.
 - AI-assisted development guidance now uses tool-neutral `AGENTS.md` files
   instead of agent-vendor-specific instruction files.
@@ -85,7 +86,7 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Superuser-only admin blog API for creating, listing, reading, updating, patching, deleting, reviewing, and publishing blog posts when the blog app is generated.
 
 ### Removed
-- Awesome Repos: removed the feedback collection widget, API endpoint, admin feedback stats, and stored feedback model.
+- Awesome: removed the feedback collection widget, API endpoint, admin feedback stats, and stored feedback model.
 - Stimulus, Webpack, `python-webpack-boilerplate`, manifest loading, and generated Webpack configuration.
 
 ### Fixed

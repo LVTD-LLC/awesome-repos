@@ -357,11 +357,11 @@ ANYMAIL = {
 }
 DEFAULT_FROM_EMAIL = env(
     "DEFAULT_FROM_EMAIL",
-    default="LVTD LLC from Awesome Repos <hello@awesome_repos.app>",
+    default="LVTD LLC from Awesome <hello@awesome_repos.app>",
 )
 SERVER_EMAIL = env(
     "SERVER_EMAIL",
-    default="Awesome Repos Errors <error@awesome_repos.app>",
+    default="Awesome Errors <error@awesome_repos.app>",
 )
 
 if DEBUG:

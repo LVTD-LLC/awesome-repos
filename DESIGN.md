@@ -1,7 +1,7 @@
 ---
 version: alpha
-name: "Awesome Repos"
-description: "Default SaaS design system for Awesome Repos. Replace these tokens and notes as the product identity matures."
+name: "Awesome"
+description: "Default SaaS design system for Awesome. Replace these tokens and notes as the product identity matures."
 colors:
   primary: "#15803D"
   primary-hover: "#166534"
@@ -174,7 +174,7 @@ components:
     typography: "{typography.body-sm}"
 ---
 
-# Awesome Repos Design System
+# Awesome Design System
 
 ## Overview
 

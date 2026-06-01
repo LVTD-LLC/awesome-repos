@@ -31,7 +31,7 @@ def _positive_int(value: int, name: str) -> int:
 
 
 def _not_found_error(exc: Http404) -> ValueError:
-    return ValueError("No matching Awesome Repos record was found.")
+    return ValueError("No matching record was found.")
 
 
 def _run_read_only_tool(callback: Callable[[], dict]) -> dict[str, Any]:
@@ -162,7 +162,7 @@ def register_tools(server: FastMCP) -> None:  # noqa: C901
         page: Annotated[int, Field(ge=1)] = 1,
         page_size: Annotated[int, Field(ge=1, le=100)] = 30,
     ) -> dict:
-        """Search active awesome lists tracked by Awesome Repos."""
+        """Search active awesome-lists tracked by Awesome."""
         return _run_read_only_tool(
             lambda: search_awesome_lists_payload(
                 q=q,

@@ -1,4 +1,4 @@
-# AGENTS.md - Awesome Repos
+# AGENTS.md - Awesome
 
 This is a generated Django SaaS app. Keep changes small, tested, and aligned
 with the app structure that Cookiecutter created.
