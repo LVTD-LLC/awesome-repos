@@ -930,6 +930,22 @@ def test_starred_repository_search_sorts_by_starred_at(auth_client, profile):
 
 
 @pytest.mark.django_db
+def test_starred_sort_label_is_scoped_to_starred_search(client):
+    Repository.objects.create(
+        full_name="owner/repo",
+        owner="owner",
+        name="repo",
+        url="https://github.com/owner/repo",
+        stars=10,
+    )
+
+    response = client.get(reverse("repos:search"), {"sort": "starred"})
+
+    assert response.status_code == 200
+    assert "Sort: Recently starred" not in response.content.decode()
+
+
+@pytest.mark.django_db
 def test_starred_repository_search_uses_shared_repository_filters(auth_client, profile):
     awesome_list = AwesomeList.objects.create(
         name="Awesome Django",

@@ -161,7 +161,6 @@ REPOSITORY_SORT_LABELS = {
     "velocity": "Commit velocity",
     "star_growth": "Star growth",
     "liability": "Star growth",
-    "starred": "Recently starred",
     "awesome": "Most awesome-list mentions",
     "least_awesome": "Fewest awesome-list mentions",
     "name": "Name",
@@ -359,7 +358,12 @@ def repository_filters_applied(params, *, include_sort: bool = False) -> bool:
     return any(params.get(name) for name in names)
 
 
-def active_repository_filter_chips(params) -> list[dict[str, str]]:
+def active_repository_filter_chips(
+    params,
+    *,
+    sort_labels: dict[str, str] | None = None,
+) -> list[dict[str, str]]:
+    resolved_sort_labels = {**REPOSITORY_SORT_LABELS, **(sort_labels or {})}
     chips = []
     for name in (*REPOSITORY_FILTER_PARAM_NAMES, "sort"):
         value = (params.get(name) or "").strip()
@@ -378,7 +382,9 @@ def active_repository_filter_chips(params) -> list[dict[str, str]]:
         }:
             value = f"{value}%+"
         elif name == "sort":
-            value = REPOSITORY_SORT_LABELS.get(value, value)
+            if value not in resolved_sort_labels:
+                continue
+            value = resolved_sort_labels[value]
         else:
             value = REPOSITORY_FILTER_VALUE_LABELS.get(name, {}).get(value, value)
         chips.append({"label": REPOSITORY_FILTER_LABELS[name], "value": value})
@@ -398,6 +404,7 @@ def repository_filter_context(
     show_search_mode: bool = True,
     search_field_class: str = "",
     filter_id_prefix: str = "repo-filter",
+    sort_labels: dict[str, str] | None = None,
 ):
     params = repository_search_params(request)
     if not show_list_filter:
@@ -414,7 +421,10 @@ def repository_filter_context(
         "params": params,
         "querystring": params.urlencode(),
         "filters_applied": repository_filters_applied(params),
-        "active_repository_filters": active_repository_filter_chips(params),
+        "active_repository_filters": active_repository_filter_chips(
+            params,
+            sort_labels=sort_labels,
+        ),
         "awesome_lists": awesome_lists,
         "languages": (
             base_queryset.exclude(language="")
@@ -504,19 +514,21 @@ class UserStarredRepositorySearchView(LoginRequiredMixin, ListView):
             self.profile, _created = Profile.objects.get_or_create(user=self.request.user)
         return self.profile
 
-    def starred_repository_queryset(self):
+    def base_starred_repository_queryset(self):
         # Personal starred search intentionally includes every imported star, including
         # repositories hidden from public catalog search as awesome-list candidates.
         profile = self.get_profile()
+        return Repository.objects.filter(starred_by_profiles__profile=profile).distinct()
+
+    def starred_repository_queryset(self):
+        profile = self.get_profile()
         return (
-            Repository.objects.filter(starred_by_profiles__profile=profile)
-            .annotate(
+            self.base_starred_repository_queryset().annotate(
                 user_starred_at=Max(
                     "starred_by_profiles__starred_at",
                     filter=Q(starred_by_profiles__profile=profile),
                 )
             )
-            .distinct()
         )
 
     def get_queryset(self):
@@ -532,7 +544,7 @@ class UserStarredRepositorySearchView(LoginRequiredMixin, ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         profile = self.get_profile()
-        starred_repositories = self.starred_repository_queryset()
+        starred_repositories = self.base_starred_repository_queryset()
         search_url = reverse("repos:starred")
         awesome_lists = (
             AwesomeList.objects.filter(
@@ -558,6 +570,7 @@ class UserStarredRepositorySearchView(LoginRequiredMixin, ListView):
                 awesome_lists=awesome_lists,
                 profile=profile,
                 filter_id_prefix="repo-filter",
+                sort_labels={"starred": "Recently starred"},
             )
         )
         context["total_repositories"] = starred_repositories.count()
