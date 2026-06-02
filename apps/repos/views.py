@@ -375,6 +375,8 @@ def repository_filter_context(
     filter_id_prefix: str = "repo-filter",
 ):
     params = repository_search_params(request)
+    if not show_list_filter:
+        params.pop("list", None)
     if awesome_lists is None and show_list_filter:
         awesome_lists = (
             AwesomeList.objects.filter(is_active=True)

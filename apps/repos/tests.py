@@ -4834,6 +4834,7 @@ def test_awesome_list_detail_page_filters_repositories(client):
             "min_age_years": "10",
             "archived": "no",
             "ai_development": "yes",
+            "list": "awesome-python",
             "sort": "commits",
         },
     )
@@ -4847,10 +4848,12 @@ def test_awesome_list_detail_page_filters_repositories(client):
     assert "web-framework (1)" in content
     assert 'name="mode"' in content
     assert 'name="list"' not in content
+    assert "List: awesome-python" not in content
     assert "Most forks" in content
     assert "Fewest awesome-list mentions" in content
     assert "Search: django" in content
     assert "Mode: Semantic relevance" not in content
+    assert "list=awesome-python" not in response.context["querystring"]
     assert response.context["filters_applied"] is True
     assert response.context["page_obj"].paginator.count == 1
     assert response.context["repo_stats"]["active_count"] == 1
