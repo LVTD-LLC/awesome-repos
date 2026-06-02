@@ -608,7 +608,7 @@ class UserStarredRepositorySearchView(LoginRequiredMixin, ListView):
         # Personal starred search intentionally includes every imported star, including
         # repositories hidden from public catalog search as awesome-list candidates.
         profile = self.get_profile()
-        return Repository.objects.filter(starred_by_profiles__profile=profile).distinct()
+        return Repository.objects.filter(starred_by_profiles__profile=profile)
 
     def starred_repository_queryset(self):
         profile = self.get_profile()
@@ -626,6 +626,7 @@ class UserStarredRepositorySearchView(LoginRequiredMixin, ListView):
             repository_search_queryset(
                 self.request.GET,
                 queryset=self.starred_repository_queryset(),
+                include_snapshot_metrics=False,
                 extra_sort_map={"starred": ("user_starred_at", "desc")},
             ),
             self.request.user,
@@ -633,6 +634,9 @@ class UserStarredRepositorySearchView(LoginRequiredMixin, ListView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        context["repositories"] = attach_repository_snapshot_counts(context["repositories"])
+        context["object_list"] = context["repositories"]
+        context["page_obj"].object_list = context["repositories"]
         profile = self.get_profile()
         starred_repositories = self.base_starred_repository_queryset()
         search_url = reverse("repos:starred")
@@ -663,7 +667,7 @@ class UserStarredRepositorySearchView(LoginRequiredMixin, ListView):
                 sort_labels={"starred": "Recently starred"},
             )
         )
-        context["total_repositories"] = starred_repositories.count()
+        context["total_repositories"] = profile.starred_repository_links.count()
         context["total_lists"] = awesome_lists.count()
         context["search_eyebrow"] = "Your GitHub stars"
         context["search_title"] = "Search your starred repositories."
