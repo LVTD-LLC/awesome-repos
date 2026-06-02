@@ -16,6 +16,10 @@ from django.views.generic import DetailView, FormView, ListView
 from django_q.tasks import async_task
 
 from apps.core.models import Profile
+from apps.repos.cache import (
+    PUBLIC_REPOSITORY_FILTER_OPTIONS_CACHE_KEY,
+    PUBLIC_REPOSITORY_FILTER_OPTIONS_CACHE_TIMEOUT_SECONDS,
+)
 from apps.repos.forms import AwesomeListRequestForm, NewsletterSubscriptionForm
 from apps.repos.models import (
     AwesomeList,
@@ -24,6 +28,7 @@ from apps.repos.models import (
     Repository,
     RepositoryLike,
     RepositoryNewsletterIssue,
+    RepositorySnapshot,
 )
 from apps.repos.newsletters import (
     disable_repository_newsletter_tracking,
@@ -347,6 +352,62 @@ def labeled_repository_value_counts(field_name: str, labeler, **kwargs) -> list[
     ]
 
 
+def public_repository_filter_options(base_queryset) -> dict:
+    options = cache.get(PUBLIC_REPOSITORY_FILTER_OPTIONS_CACHE_KEY)
+    if options is not None:
+        return options
+
+    options = {
+        "awesome_lists": list(
+            AwesomeList.objects.filter(is_active=True)
+            .annotate(repo_count=visible_awesome_list_item_count())
+            .order_by("name")
+        ),
+        "languages": list(
+            base_queryset.exclude(language="")
+            .values_list("language", flat=True)
+            .distinct()
+            .order_by("language")
+        ),
+        "topic_options": repository_json_value_counts("topics"),
+        "generated_tag_options": repository_json_value_counts("generated_tags"),
+        "stack_options": labeled_repository_value_counts("detected_stacks", stack_label),
+        "package_manager_options": labeled_repository_value_counts(
+            "package_managers",
+            package_manager_label,
+        ),
+        "total_repositories": base_queryset.count(),
+        "total_lists": AwesomeList.objects.filter(is_active=True).count(),
+    }
+    cache.set(
+        PUBLIC_REPOSITORY_FILTER_OPTIONS_CACHE_KEY,
+        options,
+        PUBLIC_REPOSITORY_FILTER_OPTIONS_CACHE_TIMEOUT_SECONDS,
+    )
+    return options
+
+
+def attach_repository_snapshot_counts(repositories):
+    repository_list = list(repositories)
+    repository_ids = [
+        repository.pk
+        for repository in repository_list
+        if "snapshot_count" not in repository.__dict__
+    ]
+    if not repository_ids:
+        return repository_list
+
+    snapshot_counts = dict(
+        RepositorySnapshot.objects.filter(repository_id__in=repository_ids)
+        .values_list("repository_id")
+        .annotate(total=Count("id"))
+    )
+    for repository in repository_list:
+        if "snapshot_count" not in repository.__dict__:
+            repository.snapshot_count = snapshot_counts.get(repository.pk, 0)
+    return repository_list
+
+
 def repository_search_params(request):
     params = request.GET.copy()
     params.pop("page", None)
@@ -405,6 +466,11 @@ def repository_filter_context(
     search_field_class: str = "",
     filter_id_prefix: str = "repo-filter",
     sort_labels: dict[str, str] | None = None,
+    languages=None,
+    topic_options=None,
+    generated_tag_options=None,
+    stack_options=None,
+    package_manager_options=None,
 ):
     params = repository_search_params(request)
     if not show_list_filter:
@@ -417,6 +483,39 @@ def repository_filter_context(
         )
     elif awesome_lists is None:
         awesome_lists = []
+    if languages is None:
+        languages = (
+            base_queryset.exclude(language="")
+            .values_list("language", flat=True)
+            .distinct()
+            .order_by("language")
+        )
+    if topic_options is None:
+        topic_options = repository_json_value_counts(
+            "topics",
+            awesome_list=awesome_list,
+            profile=profile,
+        )
+    if generated_tag_options is None:
+        generated_tag_options = repository_json_value_counts(
+            "generated_tags",
+            awesome_list=awesome_list,
+            profile=profile,
+        )
+    if stack_options is None:
+        stack_options = labeled_repository_value_counts(
+            "detected_stacks",
+            stack_label,
+            awesome_list=awesome_list,
+            profile=profile,
+        )
+    if package_manager_options is None:
+        package_manager_options = labeled_repository_value_counts(
+            "package_managers",
+            package_manager_label,
+            awesome_list=awesome_list,
+            profile=profile,
+        )
     return {
         "params": params,
         "querystring": params.urlencode(),
@@ -426,34 +525,11 @@ def repository_filter_context(
             sort_labels=sort_labels,
         ),
         "awesome_lists": awesome_lists,
-        "languages": (
-            base_queryset.exclude(language="")
-            .values_list("language", flat=True)
-            .distinct()
-            .order_by("language")
-        ),
-        "topic_options": repository_json_value_counts(
-            "topics",
-            awesome_list=awesome_list,
-            profile=profile,
-        ),
-        "generated_tag_options": repository_json_value_counts(
-            "generated_tags",
-            awesome_list=awesome_list,
-            profile=profile,
-        ),
-        "stack_options": labeled_repository_value_counts(
-            "detected_stacks",
-            stack_label,
-            awesome_list=awesome_list,
-            profile=profile,
-        ),
-        "package_manager_options": labeled_repository_value_counts(
-            "package_managers",
-            package_manager_label,
-            awesome_list=awesome_list,
-            profile=profile,
-        ),
+        "languages": languages,
+        "topic_options": topic_options,
+        "generated_tag_options": generated_tag_options,
+        "stack_options": stack_options,
+        "package_manager_options": package_manager_options,
         "filter_id_prefix": filter_id_prefix,
         "search_field_class": search_field_class,
         "show_list_filter": show_list_filter,
@@ -470,7 +546,10 @@ class RepositorySearchView(ListView):
 
     def get_queryset(self):
         return with_repository_like_state(
-            repository_search_queryset(self.request.GET),
+            repository_search_queryset(
+                self.request.GET,
+                include_snapshot_metrics=False,
+            ),
             self.request.user,
         ).prefetch_related(
             "awesome_items__awesome_list",
@@ -478,7 +557,11 @@ class RepositorySearchView(ListView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        context["repositories"] = attach_repository_snapshot_counts(context["repositories"])
+        context["object_list"] = context["repositories"]
+        context["page_obj"].object_list = context["repositories"]
         visible_repositories = visible_repository_queryset()
+        filter_options = public_repository_filter_options(visible_repositories)
         search_url = reverse("repos:search")
         context.update(
             repository_filter_context(
@@ -486,11 +569,17 @@ class RepositorySearchView(ListView):
                 base_queryset=visible_repositories,
                 search_url=search_url,
                 reset_url=search_url,
+                awesome_lists=filter_options["awesome_lists"],
+                languages=filter_options["languages"],
+                topic_options=filter_options["topic_options"],
+                generated_tag_options=filter_options["generated_tag_options"],
+                stack_options=filter_options["stack_options"],
+                package_manager_options=filter_options["package_manager_options"],
                 filter_id_prefix="repo-filter",
             )
         )
-        context["total_repositories"] = visible_repositories.count()
-        context["total_lists"] = AwesomeList.objects.filter(is_active=True).count()
+        context["total_repositories"] = filter_options["total_repositories"]
+        context["total_lists"] = filter_options["total_lists"]
         context["search_eyebrow"] = "Awesome-list intelligence for GitHub"
         context["search_title"] = "Search every repository hiding inside awesome lists."
         context["search_description"] = (

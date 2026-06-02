@@ -73,6 +73,7 @@ from apps.repos.services import (
     sync_repository_stack_detection,
     update_awesome_list_metadata,
     upsert_repository_from_github,
+    visible_repository_queryset,
 )
 from apps.repos.stack_detection import (
     dependency_file_candidates,
@@ -95,7 +96,11 @@ from apps.repos.tasks import (
     refresh_repository_task,
     tag_repositories_task,
 )
-from apps.repos.views import awesome_list_directory_totals, repository_json_value_counts
+from apps.repos.views import (
+    awesome_list_directory_totals,
+    public_repository_filter_options,
+    repository_json_value_counts,
+)
 
 LOC_MEM_CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
 
@@ -3559,6 +3564,82 @@ def test_awesome_list_repository_queryset_skips_snapshot_metrics():
 
 
 @pytest.mark.django_db
+def test_search_page_skips_full_snapshot_metrics_for_default_queryset(client, monkeypatch):
+    from apps.repos import views as repo_views
+
+    Repository.objects.create(
+        full_name="django/django",
+        owner="django",
+        name="django",
+        url="https://github.com/django/django",
+        description="The Web framework",
+        language="Python",
+        stars=75,
+    )
+    original_repository_search_queryset = repo_views.repository_search_queryset
+    calls = []
+
+    def capture_repository_search_queryset(params, *args, **kwargs):
+        calls.append(kwargs.get("include_snapshot_metrics"))
+        return original_repository_search_queryset(params, *args, **kwargs)
+
+    monkeypatch.setattr(
+        repo_views,
+        "repository_search_queryset",
+        capture_repository_search_queryset,
+    )
+
+    response = client.get(reverse("repos:search"))
+
+    assert response.status_code == 200
+    assert calls == [False]
+
+
+@pytest.mark.django_db
+@override_settings(CACHES=LOC_MEM_CACHES)
+def test_public_repository_filter_options_are_cached():
+    cache.clear()
+    try:
+        active_list = AwesomeList.objects.create(
+            name="Awesome Django",
+            slug="awesome-django",
+            source_url="https://github.com/wsvincent/awesome-django",
+        )
+        repo = Repository.objects.create(
+            full_name="django/django",
+            owner="django",
+            name="django",
+            url="https://github.com/django/django",
+            description="The Web framework",
+            language="Python",
+            topics=["django"],
+            generated_tags=["web-framework"],
+            detected_stacks=["django"],
+            package_managers=["pip"],
+            stars=75,
+        )
+        AwesomeListItem.objects.create(awesome_list=active_list, repository=repo)
+
+        visible_repositories = visible_repository_queryset()
+        first_options = public_repository_filter_options(visible_repositories)
+
+        assert first_options["languages"] == ["Python"]
+        assert first_options["awesome_lists"][0].repo_count == 1
+        assert first_options["topic_options"] == [{"name": "django", "count": 1}]
+
+        with CaptureQueriesContext(connection) as queries:
+            cached_options = public_repository_filter_options(visible_repositories)
+
+        assert len(queries) == 0
+        assert cached_options["languages"] == ["Python"]
+        assert [awesome_list.id for awesome_list in cached_options["awesome_lists"]] == [
+            active_list.id
+        ]
+    finally:
+        cache.clear()
+
+
+@pytest.mark.django_db
 def test_repository_search_filters_growth_unmaintained_and_sort_direction():
     now = timezone.now()
     awesome_list = AwesomeList.objects.create(
@@ -4453,7 +4534,9 @@ def test_search_page_renders(client):
     assert b"data-sponsor-modal-open" in content
     assert b'action="/sponsor/checkout/"' in content
     assert response.context["total_lists"] == 1
-    assert list(response.context["awesome_lists"].values_list("id", flat=True)) == [active_list.id]
+    assert [awesome_list.id for awesome_list in response.context["awesome_lists"]] == [
+        active_list.id
+    ]
     assert response.context["awesome_lists"][0].repo_count == 1
     assert b"Awesome Django (1)" in content
     assert b"Awesome Django (2)" not in content
@@ -4713,6 +4796,7 @@ def test_search_page_humanizes_stars_and_hides_tracked_star_growth(client):
 
     assert response.status_code == 200
     assert b"123,456" in response.content
+    assert b"2 history points" in response.content
     assert b"-65 tracked" not in response.content
     assert b" tracked</div>" not in response.content
 
