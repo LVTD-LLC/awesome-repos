@@ -72,6 +72,43 @@ class AwesomeList(BaseModel):
         return discover_missing_awesome_list_repositories(self, limit=limit)
 
 
+class AwesomeListSnapshot(BaseModel):
+    awesome_list = models.ForeignKey(
+        AwesomeList,
+        on_delete=models.CASCADE,
+        related_name="snapshots",
+    )
+    captured_at = models.DateTimeField(default=timezone.now)
+    source = models.CharField(max_length=50, default="github_api")
+    repo_full_name = models.CharField(max_length=255, blank=True, default="")
+    description = models.TextField(blank=True, default="")
+    topics = models.JSONField(default=list, blank=True)
+    stars = models.PositiveIntegerField(default=0)
+    forks = models.PositiveIntegerField(default=0)
+    open_issues = models.PositiveIntegerField(default=0)
+    watchers = models.PositiveIntegerField(default=0)
+    commits_count = models.PositiveIntegerField(null=True, blank=True)
+    readme_repository_count = models.PositiveIntegerField(default=0)
+    default_branch = models.CharField(max_length=255, blank=True, default="")
+    is_archived = models.BooleanField(default=False)
+    is_disabled = models.BooleanField(default=False)
+    github_created_at = models.DateTimeField(null=True, blank=True)
+    github_updated_at = models.DateTimeField(null=True, blank=True)
+    github_pushed_at = models.DateTimeField(null=True, blank=True)
+    first_commit_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-captured_at", "-id"]
+        indexes = [
+            models.Index(fields=["awesome_list", "-captured_at"]),
+            models.Index(fields=["-captured_at"]),
+        ]
+
+    def __str__(self):
+        list_label = self.repo_full_name or f"awesome list {self.awesome_list_id}"
+        return f"{list_label} at {self.captured_at:%Y-%m-%d %H:%M}"
+
+
 class AwesomeListRequest(BaseModel):
     class Status(models.TextChoices):
         PENDING = "pending", "Pending"

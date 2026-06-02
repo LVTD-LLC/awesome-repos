@@ -29,6 +29,7 @@ from apps.repos.models import (
     REPOSITORY_EMBEDDING_DIMENSIONS,
     AwesomeList,
     AwesomeListItem,
+    AwesomeListSnapshot,
     Repository,
     RepositoryEmbedding,
     RepositoryLike,
@@ -1184,6 +1185,40 @@ def update_awesome_list_metadata(
         key: value for key, value in meta.items() if key not in AWESOME_LIST_DERIVED_META_KEYS
     }
     awesome_list.save(update_fields=update_fields)
+    if meta.get("commits_count") is None or meta.get("first_commit_at") is None:
+        awesome_list.refresh_from_db(fields=["commits_count", "first_commit_at"])
+    if not last_error:
+        record_awesome_list_snapshot(awesome_list, captured_at=scanned_at)
+
+
+def record_awesome_list_snapshot(
+    awesome_list: AwesomeList,
+    *,
+    captured_at: datetime | None = None,
+    source: str = "github_api",
+) -> AwesomeListSnapshot:
+    captured_at = captured_at or timezone.now()
+    return AwesomeListSnapshot.objects.create(
+        awesome_list=awesome_list,
+        captured_at=captured_at,
+        source=source,
+        repo_full_name=awesome_list.repo_full_name,
+        description=awesome_list.description,
+        topics=awesome_list.topics,
+        stars=awesome_list.stars,
+        forks=awesome_list.forks,
+        open_issues=awesome_list.open_issues,
+        watchers=awesome_list.watchers,
+        commits_count=awesome_list.commits_count,
+        readme_repository_count=awesome_list.readme_repository_count,
+        default_branch=awesome_list.default_branch,
+        is_archived=awesome_list.is_archived,
+        is_disabled=awesome_list.is_disabled,
+        github_created_at=awesome_list.github_created_at,
+        github_updated_at=awesome_list.github_updated_at,
+        github_pushed_at=awesome_list.github_pushed_at,
+        first_commit_at=awesome_list.first_commit_at,
+    )
 
 
 def record_repository_snapshot(
@@ -1592,6 +1627,45 @@ def repository_history_chart_data(
             "commit_count": snapshot.commit_count,
         }
         for snapshot in reversed(snapshots)
+    ]
+
+
+def awesome_list_history_chart_data(
+    awesome_list: AwesomeList,
+    *,
+    limit: int = 365,
+) -> list[dict[str, int | str | None]]:
+    if limit <= 0:
+        return []
+
+    snapshots = list(
+        awesome_list.snapshots.order_by("-captured_at", "-id").only(
+            "captured_at",
+            "stars",
+            "commits_count",
+        )[:limit]
+    )
+    if snapshots:
+        return [
+            {
+                "captured_at": snapshot.captured_at.isoformat(),
+                "stars": snapshot.stars,
+                "commit_count": snapshot.commits_count,
+            }
+            for snapshot in reversed(snapshots)
+        ]
+
+    has_current_metadata = awesome_list.stars > 0 or awesome_list.commits_count is not None
+    if not has_current_metadata:
+        return []
+
+    captured_at = awesome_list.last_scanned_at or awesome_list.updated_at or timezone.now()
+    return [
+        {
+            "captured_at": captured_at.isoformat(),
+            "stars": awesome_list.stars,
+            "commit_count": awesome_list.commits_count,
+        }
     ]
 
 
