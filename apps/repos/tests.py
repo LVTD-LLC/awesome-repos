@@ -3512,6 +3512,12 @@ def test_repository_search_filters_and_sorts():
     qs = repository_search_queryset({"sort": "forks"})
     assert list(qs) == [old, recent, unsynced]
 
+    qs = repository_search_queryset(
+        {"sort": "stars"},
+        extra_sort_map={"stars": ("full_name", "asc")},
+    )
+    assert list(qs) == [old, unsynced, recent]
+
     qs = repository_search_queryset({"sort": "least_awesome"})
     assert list(qs) == [old, unsynced, recent]
 
