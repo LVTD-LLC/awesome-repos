@@ -423,3 +423,100 @@ class TestHighlightedRepoCheckout:
             stripe_checkout_session_id="cs_test_highlight_paid"
         ).exists()
         assert len(notified) == 1
+
+
+@pytest.mark.django_db
+class TestRemoveAdsCheckout:
+    @override_settings(
+        STRIPE_SECRET_KEY="sk_test",
+        STRIPE_AWESOME_REMOVE_ADS_PRICE_ID="price_remove_ads",
+    )
+    def test_remove_ads_checkout_payload_uses_remove_ads_product(self, monkeypatch):
+        from apps.core.payments import create_remove_ads_checkout_session
+
+        captured = {}
+
+        def fake_stripe_request(method, path, data):
+            captured.update({"method": method, "path": path, "data": data})
+            return {"id": "cs_test_remove_ads", "url": "https://checkout.stripe.com/c/pay"}
+
+        monkeypatch.setattr("apps.core.payments._stripe_request", fake_stripe_request)
+
+        create_remove_ads_checkout_session(
+            success_url="https://example.com/settings?remove_ads=success",
+            cancel_url="https://example.com/settings",
+            client_reference_id="123",
+        )
+
+        assert captured["path"] == "checkout/sessions"
+        assert captured["data"]["line_items[0][price]"] == "price_remove_ads"
+        assert captured["data"]["metadata[kind]"] == "remove_ads"
+        assert captured["data"]["metadata[duration]"] == "lifetime"
+        assert captured["data"]["client_reference_id"] == "123"
+
+    @override_settings(
+        STRIPE_SECRET_KEY="sk_test",
+        STRIPE_AWESOME_REMOVE_ADS_PRICE_ID="price_remove_ads",
+    )
+    def test_remove_ads_checkout_redirects_authenticated_user(
+        self, client, django_user_model, monkeypatch
+    ):
+        user = django_user_model.objects.create_user(username="buyer", password="pw")
+        client.force_login(user)
+        monkeypatch.setattr(
+            "apps.core.views.create_remove_ads_checkout_session",
+            lambda **kwargs: {"id": "cs_test_remove_ads", "url": "https://checkout.stripe.com/c/pay"},
+        )
+
+        response = client.post(reverse("remove_ads_checkout"))
+
+        assert response.status_code == 302
+        assert response.url == "https://checkout.stripe.com/c/pay"
+
+    @override_settings(STRIPE_WEBHOOK_SECRET="whsec_test")
+    def test_webhook_enables_remove_ads_on_profile(self, client, django_user_model, monkeypatch):
+        user = django_user_model.objects.create_user(username="buyer", password="pw")
+        profile = user.profile
+        event = {
+            "type": "checkout.session.completed",
+            "data": {
+                "object": {
+                    "id": "cs_test_remove_ads_paid",
+                    "payment_status": "paid",
+                    "client_reference_id": str(user.id),
+                    "metadata": {"app": "awesome", "kind": "remove_ads"},
+                }
+            },
+        }
+        monkeypatch.setattr(
+            "apps.core.views.verify_webhook_signature",
+            lambda *args, **kwargs: True,
+        )
+
+        response = client.post(
+            reverse("stripe_webhook"),
+            data=json.dumps(event),
+            content_type="application/json",
+            HTTP_STRIPE_SIGNATURE="t=1,v1=ok",
+        )
+
+        assert response.status_code == 200
+        profile.refresh_from_db()
+        assert profile.remove_ads is True
+
+    def test_remove_ads_profile_hides_sponsor_and_highlighted_ads(
+        self, django_user_model, rf, monkeypatch
+    ):
+        from apps.core.context_processors import active_highlighted_repo, active_sponsor_ad
+
+        user = django_user_model.objects.create_user(username="buyer", password="pw")
+        profile = user.profile
+        profile.remove_ads = True
+        profile.save(update_fields=["remove_ads", "updated_at"])
+        request = rf.get("/settings")
+        request.user = user
+
+        with monkeypatch.context() as m:
+            m.setattr("apps.core.context_processors.cache.get", lambda *args, **kwargs: None)
+            assert active_sponsor_ad(request) == {"awesome_sponsor_ad": None}
+            assert active_highlighted_repo(request) == {"awesome_highlighted_repo": None}
