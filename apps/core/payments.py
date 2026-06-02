@@ -2,7 +2,7 @@ import hashlib
 import hmac
 import json
 import time
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
@@ -52,6 +52,8 @@ def _stripe_request(method, path, data=None):
     except HTTPError as exc:
         body = exc.read().decode("utf-8", errors="replace")
         raise StripeRequestError(body) from exc
+    except URLError as exc:
+        raise StripeRequestError(str(exc.reason)) from exc
 
 
 def create_ads_checkout_session(*, success_url, cancel_url, client_reference_id=""):
