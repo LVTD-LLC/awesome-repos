@@ -4091,6 +4091,9 @@ def test_search_page_renders(client):
     assert b"web-framework (1)" in content
     assert b"data-page-ad-shell" in content
     assert b"data-page-content" in content
+    assert b"max-w-none" in content
+    assert b"xl:col-start-3" in content
+    assert b"xl:col-start-5" in content
     assert b'data-ad-rail="left"' in content
     assert b'data-ad-rail="right"' in content
     assert b"grid-rows-5" in content
