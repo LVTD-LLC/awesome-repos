@@ -4202,6 +4202,7 @@ def test_liked_repositories_page_lists_current_users_likes(auth_client, user, dj
         homepage_url="https://www.djangoproject.com/",
         language="Python",
         stars=80000,
+        is_awesome_list_candidate=True,
     )
     other_repo = Repository.objects.create(
         full_name="pallets/flask",

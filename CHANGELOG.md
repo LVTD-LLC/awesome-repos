@@ -76,6 +76,8 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Awesome: repository generated-tag prompts now include known language, GitHub topics, and AI-development signals.
 
 ### Fixed
+- Awesome: keep personal Starred and Liked nav links hidden from anonymous visitors.
+- Awesome: keep explicitly liked repositories visible in the personal liked page even when hidden from public catalog search.
 - Awesome: trapped keyboard focus inside the list-request and delete-account modals.
 - Awesome: return users to Settings after connecting GitHub and style the allauth connected-accounts fallback page.
 - Awesome: fixed invalid nested links on awesome-list repository cards that created empty clickable containers.

@@ -157,6 +157,31 @@ def test_landing_page_hides_github_button_for_authenticated_users(client):
     assert "Continue with GitHub" not in content
 
 
+def test_public_nav_hides_personal_repository_links_for_anonymous_users(client):
+    response = client.get(reverse("repos:search"))
+
+    assert response.status_code == 200
+    content = response.content.decode()
+    assert f'href="{reverse("repos:starred")}"' not in content
+    assert f'href="{reverse("repos:liked")}"' not in content
+
+
+def test_public_nav_shows_personal_repository_links_for_authenticated_users(client):
+    user = get_user_model().objects.create_user(
+        username="loggedin",
+        email="loggedin@example.com",
+        password="strong-test-pass-123",
+    )
+    client.force_login(user)
+
+    response = client.get(reverse("repos:search"))
+
+    assert response.status_code == 200
+    content = response.content.decode()
+    assert f'href="{reverse("repos:starred")}"' in content
+    assert f'href="{reverse("repos:liked")}"' in content
+
+
 def test_public_pages_use_standard_ad_layout(client):
     response = client.get(reverse("repos:search"))
 
