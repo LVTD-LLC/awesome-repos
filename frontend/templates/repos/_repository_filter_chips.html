@@ -1,0 +1,7 @@
+{% if active_repository_filters %}
+  {% for filter in active_repository_filters %}
+    <span class="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-900">{{ filter.label }}: {{ filter.value }}</span>
+  {% endfor %}
+{% else %}
+  <span>No filters applied</span>
+{% endif %}

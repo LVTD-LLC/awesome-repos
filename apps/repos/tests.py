@@ -844,6 +844,94 @@ def test_starred_repository_search_is_scoped_to_current_user(
     assert "encode/httpx" not in content
 
 
+@pytest.mark.django_db
+def test_starred_repository_search_uses_shared_repository_filters(auth_client, profile):
+    awesome_list = AwesomeList.objects.create(
+        name="Awesome Django",
+        slug="awesome-django",
+        source_url="https://github.com/wsvincent/awesome-django",
+    )
+    matching_repo = Repository.objects.create(
+        full_name="django/django",
+        owner="django",
+        name="django",
+        url="https://github.com/django/django",
+        description="Django web framework",
+        language="Python",
+        topics=["django", "python"],
+        generated_tags=["web-framework"],
+        detected_stacks=["django"],
+        package_managers=["poetry"],
+        stars=80000,
+        forks=32000,
+        first_commit_at=timezone.now() - timedelta(days=365 * 12),
+        github_pushed_at=timezone.now(),
+        uses_ai_for_development=True,
+    )
+    other_starred_repo = Repository.objects.create(
+        full_name="nodejs/node",
+        owner="nodejs",
+        name="node",
+        url="https://github.com/nodejs/node",
+        description="JavaScript runtime",
+        language="JavaScript",
+        topics=["javascript", "runtime"],
+        generated_tags=["server-runtime"],
+        stars=110000,
+        forks=40000,
+        first_commit_at=timezone.now() - timedelta(days=365 * 2),
+        github_pushed_at=timezone.now() - timedelta(days=500),
+        is_archived=True,
+    )
+    unstarred_match = Repository.objects.create(
+        full_name="example/django-tool",
+        owner="example",
+        name="django-tool",
+        url="https://github.com/example/django-tool",
+        description="Django web framework",
+        language="Python",
+        topics=["django"],
+        generated_tags=["web-framework"],
+        stars=90000,
+        first_commit_at=timezone.now() - timedelta(days=365 * 12),
+        github_pushed_at=timezone.now(),
+        uses_ai_for_development=True,
+    )
+    AwesomeListItem.objects.create(awesome_list=awesome_list, repository=matching_repo)
+    AwesomeListItem.objects.create(awesome_list=awesome_list, repository=unstarred_match)
+    UserStarredRepository.objects.create(profile=profile, repository=matching_repo)
+    UserStarredRepository.objects.create(profile=profile, repository=other_starred_repo)
+
+    response = auth_client.get(
+        reverse("repos:starred"),
+        {
+            "q": "django",
+            "list": "awesome-django",
+            "language": "Python",
+            "topic": "django",
+            "generated_tag": "web-framework",
+            "stack": "django",
+            "package_manager": "poetry",
+            "min_stars": "50",
+            "updated_days": "30",
+            "min_age_years": "10",
+            "archived": "no",
+            "ai_development": "yes",
+            "sort": "forks",
+        },
+    )
+    content = response.content.decode()
+
+    assert response.status_code == 200
+    assert "django/django" in content
+    assert "nodejs/node" not in content
+    assert "example/django-tool" not in content
+    assert "Awesome Django (1)" in content
+    assert "web-framework (1)" in content
+    assert "Sort: Forks" in content
+    assert response.context["page_obj"].paginator.count == 1
+
+
 def stub_repository_readme(monkeypatch, content="# Django\n"):
     monkeypatch.setattr(
         "apps.repos.services.fetch_repository_readme_data",
@@ -3257,7 +3345,9 @@ def test_repository_search_filters_and_sorts():
         url="https://github.com/owner/recent",
         description="Django tool",
         language="Python",
+        license_name="BSD-3-Clause",
         stars=50,
+        forks=25,
         commit_count=20,
         first_commit_at=timezone.now() - timedelta(days=500),
         github_pushed_at=timezone.now(),
@@ -3279,6 +3369,7 @@ def test_repository_search_filters_and_sorts():
         description="Node app",
         language="JavaScript",
         stars=100,
+        forks=75,
         commit_count=40,
         first_commit_at=timezone.now() - timedelta(days=365 * 12),
         github_pushed_at=timezone.now() - timedelta(days=500),
@@ -3290,6 +3381,7 @@ def test_repository_search_filters_and_sorts():
         url="https://github.com/owner/unsynced",
         description="No commit count yet",
         stars=75,
+        forks=5,
     )
     awesome = AwesomeList.objects.create(
         name="Awesome Django",
@@ -3315,6 +3407,15 @@ def test_repository_search_filters_and_sorts():
 
     qs = repository_search_queryset({"sort": "commits"})
     assert list(qs) == [old, recent, unsynced]
+
+    qs = repository_search_queryset({"sort": "forks"})
+    assert list(qs) == [old, recent, unsynced]
+
+    qs = repository_search_queryset({"sort": "least_awesome"})
+    assert list(qs) == [old, unsynced, recent]
+
+    qs = repository_search_queryset({"q": "bsd"})
+    assert list(qs) == [recent]
 
 
 @pytest.mark.django_db
@@ -4744,6 +4845,12 @@ def test_awesome_list_detail_page_filters_repositories(client):
     assert "first commit" in content
     assert "django (1)" in content
     assert "web-framework (1)" in content
+    assert 'name="mode"' in content
+    assert 'name="list"' not in content
+    assert "Most forks" in content
+    assert "Fewest awesome-list mentions" in content
+    assert "Search: django" in content
+    assert "Mode: Semantic relevance" not in content
     assert response.context["filters_applied"] is True
     assert response.context["page_obj"].paginator.count == 1
     assert response.context["repo_stats"]["active_count"] == 1

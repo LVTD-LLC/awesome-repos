@@ -16,6 +16,7 @@ from allauth.socialaccount.models import SocialToken
 from django.conf import settings
 from django.db import connection, models, transaction
 from django.db.models import Count
+from django.db.models.functions import Coalesce
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from pgvector.django import CosineDistance
@@ -2156,112 +2157,6 @@ def minimum_age_cutoff(params, name: str = "min_age_years"):
         return cutoff.replace(year=cutoff.year - years, day=28)
 
 
-def _apply_list_repository_keyword_filter(qs, params):
-    q = (params.get("q") or "").strip()
-    if q:
-        return qs.filter(
-            models.Q(full_name__icontains=q)
-            | models.Q(description__icontains=q)
-            | models.Q(language__icontains=q)
-            | models.Q(license_name__icontains=q)
-            | models.Q(topics__icontains=q)
-            | models.Q(generated_tags__icontains=q)
-            | models.Q(package_managers__icontains=q)
-            | models.Q(detected_stacks__icontains=q)
-        )
-    return qs
-
-
-def _apply_list_repository_taxonomy_filters(qs, params):
-    language = (params.get("language") or "").strip()
-    if language:
-        qs = qs.filter(language__iexact=language)
-
-    topic = normalize_repository_tag(params.get("topic") or "")
-    if topic:
-        qs = qs.filter(topics__contains=[topic])
-
-    generated_tag = normalize_repository_tag(params.get("generated_tag") or "")
-    if generated_tag:
-        qs = qs.filter(generated_tags__contains=[generated_tag])
-
-    stack = normalize_repository_tag(params.get("stack") or "")
-    if stack:
-        qs = qs.filter(detected_stacks__contains=[stack])
-
-    package_manager = normalize_repository_tag(params.get("package_manager") or "")
-    if package_manager:
-        qs = qs.filter(package_managers__contains=[package_manager])
-    return qs
-
-
-def _apply_list_repository_state_filters(qs, params):
-    min_stars = _positive_int_param(params, "min_stars")
-    if min_stars is not None:
-        qs = qs.filter(stars__gte=min_stars)
-
-    updated_days = _positive_int_param(params, "updated_days")
-    if updated_days and updated_days <= MAX_UPDATED_DAYS_FILTER:
-        cutoff = timezone.now() - timezone.timedelta(days=updated_days)
-        qs = qs.filter(github_pushed_at__gte=cutoff)
-
-    age_cutoff = minimum_age_cutoff(params)
-    if age_cutoff:
-        qs = qs.filter(first_commit_at__lte=age_cutoff)
-
-    archived = params.get("archived")
-    if archived == "yes":
-        qs = qs.filter(is_archived=True)
-    elif archived == "no":
-        qs = qs.filter(is_archived=False)
-
-    ai_development = params.get("ai_development")
-    if ai_development == "yes":
-        qs = qs.filter(uses_ai_for_development=True)
-    elif ai_development == "no":
-        qs = qs.filter(uses_ai_for_development=False)
-    return qs
-
-
-def _order_list_repositories(qs, params):
-    sort = params.get("sort") or "stars"
-    sort_map = {
-        "stars": "-stars",
-        "forks": "-forks",
-        "recent": models.F("github_pushed_at").desc(nulls_last=True),
-        "created": models.F("github_created_at").desc(nulls_last=True),
-        "oldest": models.F("first_commit_at").asc(nulls_last=True),
-        "commits": models.F("commit_count").desc(nulls_last=True),
-        "awesome": models.F("awesome_count").desc(nulls_last=True),
-        "least_awesome": models.F("awesome_count").asc(nulls_last=True),
-        "name": "full_name",
-    }
-    return qs.order_by(sort_map.get(sort, "-stars"), "full_name")
-
-
-def awesome_list_repository_queryset(awesome_list: AwesomeList, params):
-    mention_count = (
-        AwesomeListItem.objects.filter(repository=models.OuterRef("pk"))
-        .values("repository")
-        .annotate(total=Count("id"))
-        .values("total")
-    )
-    qs = (
-        visible_repository_queryset()
-        .filter(awesome_items__awesome_list=awesome_list)
-        .annotate(
-            awesome_count=models.Subquery(
-                mention_count,
-                output_field=models.PositiveIntegerField(),
-            )
-        )
-    )
-    qs = _apply_list_repository_keyword_filter(qs, params)
-    qs = _apply_list_repository_taxonomy_filters(qs, params)
-    qs = _apply_list_repository_state_filters(qs, params)
-    return _order_list_repositories(qs, params)
-
-
 def _apply_repository_semantic_search(qs, q: str):
     try:
         response = generate_embedding(q, input_type="query")
@@ -2292,6 +2187,7 @@ def _apply_repository_keyword_search(qs, q: str):
         models.Q(full_name__icontains=q)
         | models.Q(description__icontains=q)
         | models.Q(language__icontains=q)
+        | models.Q(license_name__icontains=q)
         | models.Q(topics__icontains=q)
         | models.Q(generated_tags__icontains=q)
         | models.Q(package_managers__icontains=q)
@@ -2299,13 +2195,15 @@ def _apply_repository_keyword_search(qs, q: str):
     )
 
 
-def _apply_repository_taxonomy_filters(qs, params):
+def _apply_repository_taxonomy_filters(qs, params, *, allow_list_filter: bool):
     language = (params.get("language") or "").strip()
     if language:
         qs = qs.filter(language__iexact=language)
-    list_slug = (params.get("list") or "").strip()
+
+    list_slug = (params.get("list") or "").strip() if allow_list_filter else ""
     if list_slug:
         qs = qs.filter(awesome_items__awesome_list__slug=list_slug)
+
     topic = normalize_repository_tag(params.get("topic") or "")
     if topic:
         qs = qs.filter(topics__contains=[topic])
@@ -2345,18 +2243,46 @@ def _apply_repository_state_filters(qs, params):
     return qs
 
 
-def _apply_repository_filters(qs, params):
-    qs = _apply_repository_taxonomy_filters(qs, params)
+def _apply_repository_filters(qs, params, *, allow_list_filter: bool):
+    qs = _apply_repository_taxonomy_filters(qs, params, allow_list_filter=allow_list_filter)
     return _apply_repository_state_filters(qs, params)
 
 
-def repository_search_queryset(params, queryset=None):
+def _order_repositories(qs, params):
+    sort = params.get("sort") or "stars"
+    sort_map = {
+        "stars": "-stars",
+        "forks": "-forks",
+        "recent": models.F("github_pushed_at").desc(nulls_last=True),
+        "created": models.F("github_created_at").desc(nulls_last=True),
+        "oldest": models.F("first_commit_at").asc(nulls_last=True),
+        "commits": models.F("commit_count").desc(nulls_last=True),
+        "awesome": models.F("awesome_count").desc(nulls_last=True),
+        "least_awesome": models.F("awesome_count").asc(nulls_last=True),
+        "name": "full_name",
+    }
+    return qs.order_by(sort_map.get(sort, "-stars"), "full_name")
+
+
+def repository_search_queryset(params, queryset=None, *, allow_list_filter: bool = True):
     first_snapshot = RepositorySnapshot.objects.filter(repository=models.OuterRef("pk")).order_by(
         "captured_at", "id"
     )
+    mention_count = (
+        AwesomeListItem.objects.filter(repository=models.OuterRef("pk"))
+        .values("repository")
+        .annotate(total=Count("id"))
+        .values("total")
+    )
     base_queryset = queryset if queryset is not None else visible_repository_queryset()
     qs = base_queryset.annotate(
-        awesome_count=Count("awesome_items", distinct=True),
+        awesome_count=Coalesce(
+            models.Subquery(
+                mention_count,
+                output_field=models.PositiveIntegerField(),
+            ),
+            models.Value(0),
+        ),
         snapshot_count=Count("snapshots", distinct=True),
         first_snapshot_stars=models.Subquery(
             first_snapshot.values("stars")[:1],
@@ -2392,21 +2318,19 @@ def repository_search_queryset(params, queryset=None):
 
     if q and not semantic_search:
         qs = _apply_repository_keyword_search(qs, q)
-    qs = _apply_repository_filters(qs, params)
+    qs = _apply_repository_filters(qs, params, allow_list_filter=allow_list_filter)
 
-    sort = params.get("sort") or "stars"
-    sort_map = {
-        "stars": "-stars",
-        "recent": "-github_pushed_at",
-        "created": "-github_created_at",
-        "oldest": models.F("first_commit_at").asc(nulls_last=True),
-        "commits": models.F("commit_count").desc(nulls_last=True),
-        "awesome": "-awesome_count",
-        "name": "full_name",
-    }
     if semantic_search:
         return qs.order_by("vector_distance", "-stars", "full_name")
-    return qs.order_by(sort_map.get(sort, "-stars"), "full_name")
+    return _order_repositories(qs, params)
+
+
+def awesome_list_repository_queryset(awesome_list: AwesomeList, params):
+    return repository_search_queryset(
+        params,
+        queryset=visible_repository_queryset().filter(awesome_items__awesome_list=awesome_list),
+        allow_list_filter=False,
+    )
 
 
 def similar_repositories_for_repository(repository: Repository, *, limit: int = 6):

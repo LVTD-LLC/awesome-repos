@@ -123,144 +123,20 @@
             {{ page_obj.paginator.count|intcomma }} repo{{ page_obj.paginator.count|pluralize }}
             {% if filters_applied %}matching these filters.{% else %}currently saved from this list.{% endif %}
           </p>
+          <div class="mt-2 flex flex-wrap gap-2 text-xs text-gray-600 dark:text-gray-300">
+            {% include "repos/_repository_filter_chips.html" %}
+          </div>
         </div>
         <div class="text-sm text-gray-500 dark:text-gray-400">Latest repo push {{ repo_stats.latest_repo_push|date:"Y-m-d"|default:"-" }}</div>
       </div>
 
-      <form method="get" class="mb-6 rounded-2xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-900">
+      <form method="get" class="mb-6 rounded-2xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-900" x-data="{ searchMode: '{{ request.GET.mode|escapejs }}' }">
         <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <div class="md:col-span-2">
-            <label for="list-repo-query" class="block text-sm font-semibold text-gray-800 dark:text-gray-200">Search</label>
-            <input
-              id="list-repo-query"
-              name="q"
-              value="{{ request.GET.q }}"
-              placeholder="Name, description, language, topics, tags, stacks"
-              class="mt-2 block w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 dark:placeholder:text-gray-500"
-            />
-          </div>
-
-          <div>
-            <label for="list-repo-sort" class="block text-sm font-semibold text-gray-800 dark:text-gray-200">Sort</label>
-            <select id="list-repo-sort" name="sort" class="mt-2 block w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100">
-              <option value="stars" {% if request.GET.sort == "stars" or not request.GET.sort %}selected{% endif %}>Sort by stars</option>
-              <option value="forks" {% if request.GET.sort == "forks" %}selected{% endif %}>Most forks</option>
-              <option value="recent" {% if request.GET.sort == "recent" %}selected{% endif %}>Recently updated</option>
-              <option value="created" {% if request.GET.sort == "created" %}selected{% endif %}>Recently created</option>
-              <option value="oldest" {% if request.GET.sort == "oldest" %}selected{% endif %}>Oldest first commit</option>
-              <option value="commits" {% if request.GET.sort == "commits" %}selected{% endif %}>Most commits</option>
-              <option value="awesome" {% if request.GET.sort == "awesome" %}selected{% endif %}>Most list mentions</option>
-              <option value="least_awesome" {% if request.GET.sort == "least_awesome" %}selected{% endif %}>Fewest list mentions</option>
-              <option value="name" {% if request.GET.sort == "name" %}selected{% endif %}>Name</option>
-            </select>
-          </div>
-
-          <div>
-            <label for="list-repo-language" class="block text-sm font-semibold text-gray-800 dark:text-gray-200">Language</label>
-            <select id="list-repo-language" name="language" class="mt-2 block w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100">
-              <option value="">Any language</option>
-              {% for language in languages %}
-                <option value="{{ language }}" {% if request.GET.language == language %}selected{% endif %}>{{ language }}</option>
-              {% endfor %}
-            </select>
-          </div>
-
-          <div>
-            <label for="list-repo-topic" class="block text-sm font-semibold text-gray-800 dark:text-gray-200">GitHub topic</label>
-            <select id="list-repo-topic" name="topic" class="mt-2 block w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100">
-              <option value="">Any topic</option>
-              {% for topic in topic_options %}
-                <option value="{{ topic.name }}" {% if request.GET.topic == topic.name %}selected{% endif %}>{{ topic.name }}{% if topic.count %} ({{ topic.count }}){% endif %}</option>
-              {% endfor %}
-            </select>
-          </div>
-
-          <div>
-            <label for="list-repo-generated-tag" class="block text-sm font-semibold text-gray-800 dark:text-gray-200">Generated tag</label>
-            <select id="list-repo-generated-tag" name="generated_tag" class="mt-2 block w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100">
-              <option value="">Any generated tag</option>
-              {% for tag in generated_tag_options %}
-                <option value="{{ tag.name }}" {% if request.GET.generated_tag == tag.name %}selected{% endif %}>{{ tag.name }}{% if tag.count %} ({{ tag.count }}){% endif %}</option>
-              {% endfor %}
-            </select>
-          </div>
-
-          <div>
-            <label for="list-repo-stack" class="block text-sm font-semibold text-gray-800 dark:text-gray-200">Detected stack</label>
-            <select id="list-repo-stack" name="stack" class="mt-2 block w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100">
-              <option value="">Any detected stack</option>
-              {% for stack in stack_options %}
-                <option value="{{ stack.name }}" {% if request.GET.stack == stack.name %}selected{% endif %}>{{ stack.label }}{% if stack.count %} ({{ stack.count }}){% endif %}</option>
-              {% endfor %}
-            </select>
-          </div>
-
-          <div>
-            <label for="list-repo-package-manager" class="block text-sm font-semibold text-gray-800 dark:text-gray-200">Package manager</label>
-            <select id="list-repo-package-manager" name="package_manager" class="mt-2 block w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100">
-              <option value="">Any package manager</option>
-              {% for manager in package_manager_options %}
-                <option value="{{ manager.name }}" {% if request.GET.package_manager == manager.name %}selected{% endif %}>{{ manager.label }}{% if manager.count %} ({{ manager.count }}){% endif %}</option>
-              {% endfor %}
-            </select>
-          </div>
-
-          <div>
-            <label for="list-repo-min-stars" class="block text-sm font-semibold text-gray-800 dark:text-gray-200">Minimum stars</label>
-            <input
-              id="list-repo-min-stars"
-              type="number"
-              min="0"
-              name="min_stars"
-              value="{{ request.GET.min_stars }}"
-              placeholder="0"
-              class="mt-2 block w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 dark:placeholder:text-gray-500"
-            />
-          </div>
-
-          <div>
-            <label for="list-repo-updated-days" class="block text-sm font-semibold text-gray-800 dark:text-gray-200">Freshness</label>
-            <select id="list-repo-updated-days" name="updated_days" class="mt-2 block w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100">
-              <option value="">Updated any time</option>
-              <option value="30" {% if request.GET.updated_days == "30" %}selected{% endif %}>Updated in 30 days</option>
-              <option value="90" {% if request.GET.updated_days == "90" %}selected{% endif %}>Updated in 90 days</option>
-              <option value="365" {% if request.GET.updated_days == "365" %}selected{% endif %}>Updated in 1 year</option>
-            </select>
-          </div>
-
-          <div>
-            <label for="list-repo-min-age-years" class="block text-sm font-semibold text-gray-800 dark:text-gray-200">Repository age</label>
-            <select id="list-repo-min-age-years" name="min_age_years" class="mt-2 block w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100">
-              <option value="">Any age</option>
-              <option value="1" {% if request.GET.min_age_years == "1" %}selected{% endif %}>1+ years old</option>
-              <option value="3" {% if request.GET.min_age_years == "3" %}selected{% endif %}>3+ years old</option>
-              <option value="5" {% if request.GET.min_age_years == "5" %}selected{% endif %}>5+ years old</option>
-              <option value="10" {% if request.GET.min_age_years == "10" %}selected{% endif %}>10+ years old</option>
-            </select>
-            <p class="mt-2 text-xs leading-5 text-gray-500 dark:text-gray-400">Age filters use known first-commit dates and exclude repositories that have not synced that data yet.</p>
-          </div>
-
-          <div>
-            <label for="list-repo-archived" class="block text-sm font-semibold text-gray-800 dark:text-gray-200">Archive status</label>
-            <select id="list-repo-archived" name="archived" class="mt-2 block w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100">
-              <option value="">Archived or active</option>
-              <option value="no" {% if request.GET.archived == "no" %}selected{% endif %}>Active only</option>
-              <option value="yes" {% if request.GET.archived == "yes" %}selected{% endif %}>Archived only</option>
-            </select>
-          </div>
-
-          <div>
-            <label for="list-repo-ai-development" class="block text-sm font-semibold text-gray-800 dark:text-gray-200">AI development signals</label>
-            <select id="list-repo-ai-development" name="ai_development" class="mt-2 block w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100">
-              <option value="">AI dev signals: any</option>
-              <option value="yes" {% if request.GET.ai_development == "yes" %}selected{% endif %}>Has AI dev signals</option>
-              <option value="no" {% if request.GET.ai_development == "no" %}selected{% endif %}>No AI dev signals</option>
-            </select>
-          </div>
+          {% include "repos/_repository_filter_fields.html" %}
         </div>
 
         <div class="mt-4 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-          <a href="{{ awesome_list.get_absolute_url }}" class="inline-flex min-h-11 items-center justify-center rounded-xl border border-gray-300 bg-white px-5 py-2.5 text-sm font-semibold text-gray-900 shadow-sm transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 dark:hover:bg-gray-800">Reset</a>
+          <a href="{{ search_reset_url }}" class="inline-flex min-h-11 items-center justify-center rounded-xl border border-gray-300 bg-white px-5 py-2.5 text-sm font-semibold text-gray-900 shadow-sm transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 dark:hover:bg-gray-800">Reset</a>
           <button class="inline-flex min-h-11 items-center justify-center rounded-xl bg-green-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-green-700 dark:bg-green-500 dark:text-gray-950 dark:hover:bg-green-400">Apply</button>
         </div>
       </form>

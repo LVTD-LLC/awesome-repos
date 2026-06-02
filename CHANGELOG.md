@@ -55,6 +55,7 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Awesome: added experimental superuser-only repository newsletters with tracked commits, generated issues, RSS feeds, and email delivery.
 
 ### Changed
+- Awesome: unified repository search filters across global search, awesome-list repository search, and personal starred-repository search.
 - Awesome: added Settings to the account navbar, simplified Settings around GitHub imports and future repository update preferences, and moved awesome-list requests into the Lists page flow.
 - Awesome: compacted repository-detail AI development signals into summary badges and bounded config-path lists.
 - Awesome: GitHub signups now land on Settings so starred-repository imports stay off by default until the user clicks the import CTA.

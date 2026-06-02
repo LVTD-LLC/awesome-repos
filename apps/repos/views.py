@@ -132,6 +132,55 @@ def _ai_development_signal_summary(signals):
     }
 
 
+REPOSITORY_FILTER_PARAM_NAMES = (
+    "q",
+    "mode",
+    "list",
+    "language",
+    "topic",
+    "generated_tag",
+    "stack",
+    "package_manager",
+    "min_stars",
+    "updated_days",
+    "min_age_years",
+    "archived",
+    "ai_development",
+)
+REPOSITORY_SORT_LABELS = {
+    "stars": "Stars",
+    "forks": "Forks",
+    "recent": "Recently updated",
+    "created": "Recently created",
+    "oldest": "Oldest first commit",
+    "commits": "Commits",
+    "awesome": "Most list mentions",
+    "least_awesome": "Fewest list mentions",
+    "name": "Name",
+}
+REPOSITORY_FILTER_LABELS = {
+    "q": "Search",
+    "mode": "Mode",
+    "list": "List",
+    "language": "Language",
+    "topic": "Topic",
+    "generated_tag": "Tag",
+    "stack": "Stack",
+    "package_manager": "Package manager",
+    "min_stars": "Min stars",
+    "updated_days": "Updated",
+    "min_age_years": "Age",
+    "archived": "Archived",
+    "ai_development": "AI dev",
+    "sort": "Sort",
+}
+REPOSITORY_FILTER_VALUE_LABELS = {
+    "mode": {"semantic": "Semantic relevance"},
+    "archived": {"yes": "Archived only", "no": "Active only"},
+    "ai_development": {"yes": "Has signals", "no": "No signals"},
+}
+
+
 def _require_superuser(request):
     if not request.user.is_superuser:
         raise PermissionDenied("Only superusers can queue repository scans.")
@@ -284,6 +333,98 @@ def labeled_repository_value_counts(field_name: str, labeler, **kwargs) -> list[
     ]
 
 
+def repository_search_params(request):
+    params = request.GET.copy()
+    params.pop("page", None)
+    return params
+
+
+def repository_filters_applied(params, *, include_sort: bool = False) -> bool:
+    names = REPOSITORY_FILTER_PARAM_NAMES + (("sort",) if include_sort else ())
+    return any(params.get(name) for name in names)
+
+
+def active_repository_filter_chips(params) -> list[dict[str, str]]:
+    chips = []
+    for name in (*REPOSITORY_FILTER_PARAM_NAMES, "sort"):
+        value = (params.get(name) or "").strip()
+        if not value:
+            continue
+        if name == "updated_days":
+            value = f"{value} days"
+        elif name == "min_age_years":
+            value = f"{value}+ years"
+        elif name == "sort":
+            value = REPOSITORY_SORT_LABELS.get(value, value)
+        else:
+            value = REPOSITORY_FILTER_VALUE_LABELS.get(name, {}).get(value, value)
+        chips.append({"label": REPOSITORY_FILTER_LABELS[name], "value": value})
+    return chips
+
+
+def repository_filter_context(
+    *,
+    request,
+    base_queryset,
+    search_url: str,
+    reset_url: str,
+    awesome_lists=None,
+    awesome_list=None,
+    profile=None,
+    show_list_filter: bool = True,
+    filter_id_prefix: str = "repo-filter",
+):
+    params = repository_search_params(request)
+    if awesome_lists is None and show_list_filter:
+        awesome_lists = (
+            AwesomeList.objects.filter(is_active=True)
+            .annotate(repo_count=visible_awesome_list_item_count())
+            .order_by("name")
+        )
+    elif awesome_lists is None:
+        awesome_lists = []
+    return {
+        "params": params,
+        "querystring": params.urlencode(),
+        "filters_applied": repository_filters_applied(params),
+        "active_repository_filters": active_repository_filter_chips(params),
+        "awesome_lists": awesome_lists,
+        "languages": (
+            base_queryset.exclude(language="")
+            .values_list("language", flat=True)
+            .distinct()
+            .order_by("language")
+        ),
+        "topic_options": repository_json_value_counts(
+            "topics",
+            awesome_list=awesome_list,
+            profile=profile,
+        ),
+        "generated_tag_options": repository_json_value_counts(
+            "generated_tags",
+            awesome_list=awesome_list,
+            profile=profile,
+        ),
+        "stack_options": labeled_repository_value_counts(
+            "detected_stacks",
+            stack_label,
+            awesome_list=awesome_list,
+            profile=profile,
+        ),
+        "package_manager_options": labeled_repository_value_counts(
+            "package_managers",
+            package_manager_label,
+            awesome_list=awesome_list,
+            profile=profile,
+        ),
+        "filter_id_prefix": filter_id_prefix,
+        "show_list_filter": show_list_filter,
+        "show_search_mode": True,
+        "search_action_url": search_url,
+        "search_reset_url": reset_url,
+    }
+
+
 class RepositorySearchView(ListView):
     template_name = "repos/search.html"
     context_object_name = "repositories"
@@ -301,34 +442,17 @@ class RepositorySearchView(ListView):
         context = super().get_context_data(**kwargs)
         visible_repositories = visible_repository_queryset()
         search_url = reverse("repos:search")
-        context["awesome_lists"] = (
-            AwesomeList.objects.filter(is_active=True)
-            .annotate(repo_count=visible_awesome_list_item_count())
-            .order_by("name")
+        context.update(
+            repository_filter_context(
+                request=self.request,
+                base_queryset=visible_repositories,
+                search_url=search_url,
+                reset_url=search_url,
+                filter_id_prefix="repo-filter",
+            )
         )
-        context["languages"] = (
-            visible_repositories.exclude(language="")
-            .values_list("language", flat=True)
-            .distinct()
-            .order_by("language")
-        )
-        context["topic_options"] = repository_json_value_counts("topics")
-        context["generated_tag_options"] = repository_json_value_counts("generated_tags")
-        context["stack_options"] = labeled_repository_value_counts(
-            "detected_stacks",
-            stack_label,
-        )
-        context["package_manager_options"] = labeled_repository_value_counts(
-            "package_managers",
-            package_manager_label,
-        )
-        params = self.request.GET.copy()
-        params.pop("page", None)
-        context["querystring"] = params.urlencode()
         context["total_repositories"] = visible_repositories.count()
         context["total_lists"] = AwesomeList.objects.filter(is_active=True).count()
-        context["search_action_url"] = search_url
-        context["search_reset_url"] = search_url
         context["search_eyebrow"] = "Awesome-list intelligence for GitHub"
         context["search_title"] = "Search every repository hiding inside awesome lists."
         context["search_description"] = (
@@ -371,7 +495,7 @@ class UserStarredRepositorySearchView(LoginRequiredMixin, ListView):
         profile = self.get_profile()
         starred_repositories = self.starred_repository_queryset()
         search_url = reverse("repos:starred")
-        context["awesome_lists"] = (
+        awesome_lists = (
             AwesomeList.objects.filter(
                 is_active=True,
                 items__repository__starred_by_profiles__profile=profile,
@@ -386,34 +510,19 @@ class UserStarredRepositorySearchView(LoginRequiredMixin, ListView):
             .order_by("name")
             .distinct()
         )
-        context["languages"] = (
-            starred_repositories.exclude(language="")
-            .values_list("language", flat=True)
-            .distinct()
-            .order_by("language")
+        context.update(
+            repository_filter_context(
+                request=self.request,
+                base_queryset=starred_repositories,
+                search_url=search_url,
+                reset_url=search_url,
+                awesome_lists=awesome_lists,
+                profile=profile,
+                filter_id_prefix="repo-filter",
+            )
         )
-        context["topic_options"] = repository_json_value_counts("topics", profile=profile)
-        context["generated_tag_options"] = repository_json_value_counts(
-            "generated_tags",
-            profile=profile,
-        )
-        context["stack_options"] = labeled_repository_value_counts(
-            "detected_stacks",
-            stack_label,
-            profile=profile,
-        )
-        context["package_manager_options"] = labeled_repository_value_counts(
-            "package_managers",
-            package_manager_label,
-            profile=profile,
-        )
-        params = self.request.GET.copy()
-        params.pop("page", None)
-        context["querystring"] = params.urlencode()
         context["total_repositories"] = starred_repositories.count()
-        context["total_lists"] = context["awesome_lists"].count()
-        context["search_action_url"] = search_url
-        context["search_reset_url"] = search_url
+        context["total_lists"] = awesome_lists.count()
         context["search_eyebrow"] = "Your GitHub stars"
         context["search_title"] = "Search your starred repositories."
         context["search_description"] = (
@@ -680,42 +789,16 @@ class AwesomeListDetailView(DetailView):
             awesome_items__awesome_list=self.object
         )
         self.object.indexed_repo_count = all_list_repos.count()
-        params = self.request.GET.copy()
-        params.pop("page", None)
-        filter_names = (
-            "q",
-            "language",
-            "topic",
-            "generated_tag",
-            "stack",
-            "package_manager",
-            "min_stars",
-            "updated_days",
-            "min_age_years",
-            "archived",
-            "ai_development",
-        )
-        context["filters_applied"] = any(params.get(name) for name in filter_names)
-        context["querystring"] = params.urlencode()
-        context["languages"] = (
-            all_list_repos.exclude(language="")
-            .values_list("language", flat=True)
-            .distinct()
-            .order_by("language")
-        )
-        context["topic_options"] = repository_json_value_counts("topics", awesome_list=self.object)
-        context["generated_tag_options"] = repository_json_value_counts(
-            "generated_tags", awesome_list=self.object
-        )
-        context["stack_options"] = labeled_repository_value_counts(
-            "detected_stacks",
-            stack_label,
-            awesome_list=self.object,
-        )
-        context["package_manager_options"] = labeled_repository_value_counts(
-            "package_managers",
-            package_manager_label,
-            awesome_list=self.object,
+        context.update(
+            repository_filter_context(
+                request=self.request,
+                base_queryset=all_list_repos,
+                search_url=self.object.get_absolute_url(),
+                reset_url=self.object.get_absolute_url(),
+                awesome_list=self.object,
+                show_list_filter=False,
+                filter_id_prefix="list-repo",
+            )
         )
         context["repo_stats"] = all_list_repos.aggregate(
             total_stars=Sum("stars"),
