@@ -24,7 +24,12 @@ from sentry_sdk.integrations.redis import RedisIntegration
 from structlog_sentry import SentryProcessor
 
 from awesome_repos.logging_utils import scrubbing_callback
-from awesome_repos.sentry_utils import CustomLoggingIntegration, before_send
+from awesome_repos.sentry_utils import (
+    CustomLoggingIntegration,
+    before_send,
+    build_traces_sampler,
+    logging_level_from_env,
+)
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -46,13 +51,33 @@ if LOGFIRE_TOKEN:
     )
 
 SENTRY_DSN = env("SENTRY_DSN", default="")
+SENTRY_ENABLED = env.bool("SENTRY_ENABLED", default=bool(SENTRY_DSN) and ENVIRONMENT == "prod")
+SENTRY_ACTIVE = SENTRY_ENABLED and bool(SENTRY_DSN)
 SENTRY_RELEASE = env("SENTRY_RELEASE", default="")
 SENTRY_TRACES_SAMPLE_RATE = env.float("SENTRY_TRACES_SAMPLE_RATE", default=1.0)
+SENTRY_BACKGROUND_TRACES_SAMPLE_RATE = env.float(
+    "SENTRY_BACKGROUND_TRACES_SAMPLE_RATE",
+    default=0.1,
+)
 SENTRY_PROFILE_SESSION_SAMPLE_RATE = env.float("SENTRY_PROFILE_SESSION_SAMPLE_RATE", default=1.0)
 SENTRY_ENABLE_LOGS = env.bool("SENTRY_ENABLE_LOGS", default=True)
+SENTRY_BREADCRUMB_LEVEL = logging_level_from_env(
+    env("SENTRY_BREADCRUMB_LEVEL", default="INFO"),
+    logging.INFO,
+)
+SENTRY_EVENT_LEVEL = logging_level_from_env(
+    env("SENTRY_EVENT_LEVEL", default="ERROR"),
+    logging.ERROR,
+)
+SENTRY_LOGS_LEVEL = logging_level_from_env(
+    env("SENTRY_LOGS_LEVEL", default="WARNING"),
+    logging.WARNING,
+)
 SENTRY_SEND_DEFAULT_PII = env.bool("SENTRY_SEND_DEFAULT_PII", default=False)
 SENTRY_INCLUDE_LOCAL_VARIABLES = env.bool("SENTRY_INCLUDE_LOCAL_VARIABLES", default=False)
 SENTRY_MAX_BREADCRUMBS = env.int("SENTRY_MAX_BREADCRUMBS", default=100)
+SENTRY_DJANGO_MIDDLEWARE_SPANS = env.bool("SENTRY_DJANGO_MIDDLEWARE_SPANS", default=True)
+SENTRY_DJANGO_CACHE_SPANS = env.bool("SENTRY_DJANGO_CACHE_SPANS", default=True)
 
 
 # Quick-start development settings - unsuitable for production
@@ -531,11 +556,11 @@ structlog_processors = [
     # structlog.processors.format_exc_info,
 ]
 
-if SENTRY_DSN and ENVIRONMENT == "prod":
+if SENTRY_ACTIVE:
     structlog_processors.append(
         SentryProcessor(
-            event_level=logging.ERROR,
-            level=logging.INFO,
+            event_level=SENTRY_EVENT_LEVEL,
+            level=SENTRY_BREADCRUMB_LEVEL,
             active=True,
             as_context=True,
             tag_keys="__all__",
@@ -567,7 +592,7 @@ if ENVIRONMENT == "prod":
     LOGGING["loggers"]["awesome_repos"]["level"] = env("DJANGO_LOG_LEVEL", default="INFO")
     LOGGING["loggers"]["awesome_repos"]["handlers"].append("json_console")
 
-if SENTRY_DSN and ENVIRONMENT == "prod":
+if SENTRY_ACTIVE:
     Q_CLUSTER["error_reporter"]["sentry"] = {"dsn": SENTRY_DSN}
     sentry_sdk.init(
         debug=DEBUG,
@@ -575,15 +600,25 @@ if SENTRY_DSN and ENVIRONMENT == "prod":
         environment=ENVIRONMENT,
         release=SENTRY_RELEASE or None,
         send_default_pii=SENTRY_SEND_DEFAULT_PII,
-        traces_sample_rate=SENTRY_TRACES_SAMPLE_RATE,
+        traces_sampler=build_traces_sampler(
+            http_sample_rate=SENTRY_TRACES_SAMPLE_RATE,
+            background_sample_rate=SENTRY_BACKGROUND_TRACES_SAMPLE_RATE,
+        ),
         profile_session_sample_rate=SENTRY_PROFILE_SESSION_SAMPLE_RATE,
         profile_lifecycle="trace",
         enable_logs=SENTRY_ENABLE_LOGS,
         max_breadcrumbs=SENTRY_MAX_BREADCRUMBS,
         integrations=[
-            DjangoIntegration(),
+            DjangoIntegration(
+                middleware_spans=SENTRY_DJANGO_MIDDLEWARE_SPANS,
+                cache_spans=SENTRY_DJANGO_CACHE_SPANS,
+            ),
             RedisIntegration(),
-            CustomLoggingIntegration(level=logging.INFO, event_level=logging.ERROR),
+            CustomLoggingIntegration(
+                level=SENTRY_BREADCRUMB_LEVEL,
+                event_level=SENTRY_EVENT_LEVEL,
+                sentry_logs_level=SENTRY_LOGS_LEVEL,
+            ),
         ],
         before_send=before_send,
         attach_stacktrace=True,
