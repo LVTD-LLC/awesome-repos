@@ -45,10 +45,6 @@ def build_traces_sampler(
     background_sample_rate: float,
 ) -> Callable[[dict[str, Any]], float]:
     def traces_sampler(sampling_context: dict[str, Any]) -> float:
-        parent_sampled = sampling_context.get("parent_sampled")
-        if parent_sampled is not None:
-            return 1.0 if parent_sampled else 0.0
-
         transaction_context = sampling_context.get("transaction_context") or {}
         transaction_name = transaction_context.get("name") or ""
         transaction_op = transaction_context.get("op") or ""
@@ -57,6 +53,10 @@ def build_traces_sampler(
             return 0.0
         if any(transaction_name.startswith(prefix) for prefix in _IGNORED_TRANSACTION_PREFIXES):
             return 0.0
+
+        parent_sampled = sampling_context.get("parent_sampled")
+        if parent_sampled is not None:
+            return 1.0 if parent_sampled else 0.0
 
         if transaction_op.startswith("http") or transaction_name.startswith("/"):
             return http_sample_rate

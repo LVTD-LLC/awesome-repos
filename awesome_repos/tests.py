@@ -23,6 +23,20 @@ def test_sentry_traces_sampler_respects_parent_sampling_decision():
     assert sampler({"parent_sampled": False}) == 0.0
 
 
+def test_sentry_traces_sampler_drops_ignored_paths_before_parent_sampling():
+    sampler = build_traces_sampler(http_sample_rate=0.5, background_sample_rate=0.1)
+
+    assert (
+        sampler(
+            {
+                "parent_sampled": True,
+                "transaction_context": {"name": "/api/healthcheck", "op": "http.server"},
+            }
+        )
+        == 0.0
+    )
+
+
 def test_sentry_traces_sampler_drops_healthcheck_and_static_paths():
     sampler = build_traces_sampler(http_sample_rate=0.5, background_sample_rate=0.1)
 
