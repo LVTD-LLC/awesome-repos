@@ -1,10 +1,11 @@
 from dataclasses import dataclass
 
 from django.conf import settings
-
-from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.models.anthropic import AnthropicModel
 from pydantic_ai.models.google import GoogleModel
+from pydantic_ai.models.openai import OpenAIChatModel
+from pydantic_ai.providers.openai import OpenAIProvider
+
 
 @dataclass(frozen=True, slots=True)
 class PydanticAIModelSpec:
@@ -24,6 +25,15 @@ def build_model(*, provider: str, label: str):
 
     if provider == "openai":
         return OpenAIChatModel(model_name)
+
+    if provider == "openrouter":
+        return OpenAIChatModel(
+            model_name,
+            provider=OpenAIProvider(
+                base_url=settings.OPENROUTER_BASE_URL,
+                api_key=settings.OPENROUTER_API_KEY,
+            ),
+        )
 
     if provider == "anthropic":
         return AnthropicModel(model_name)

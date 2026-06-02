@@ -2,7 +2,7 @@ from django import forms
 from django.db.models import Q
 from django.utils.text import slugify
 
-from apps.repos.models import AwesomeList, AwesomeListRequest
+from apps.repos.models import AwesomeList, AwesomeListRequest, NewsletterCadence
 from apps.repos.services import parse_github_repo_url
 
 
@@ -86,3 +86,14 @@ class AwesomeListRequestForm(forms.ModelForm):
         if commit:
             request.save()
         return request
+
+
+class NewsletterSubscriptionForm(forms.Form):
+    email = forms.EmailField(label="Delivery email")
+    cadence = forms.ChoiceField(
+        choices=NewsletterCadence.choices,
+        initial=NewsletterCadence.WEEKLY,
+    )
+
+    def clean_email(self):
+        return self.cleaned_data["email"].strip().lower()

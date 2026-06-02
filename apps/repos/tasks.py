@@ -1,3 +1,4 @@
+from datetime import datetime
 from math import ceil
 
 from allauth.socialaccount.models import SocialToken
@@ -9,6 +10,15 @@ from django_q.tasks import async_task
 
 from apps.core.models import Profile
 from apps.repos.models import AwesomeList, Repository
+from apps.repos.newsletters import (
+    generate_due_newsletter_issues,
+    generate_repository_newsletter_issue,
+    newsletter_period_for_cadence,
+    poll_repository_commits,
+    poll_tracked_repositories,
+    send_issue_to_subscribers,
+    summarize_pending_commits,
+)
 from apps.repos.services import (
     GitHubTokenUnavailable,
     add_repository_to_awesome_list,
@@ -504,4 +514,93 @@ def tag_repositories_task(limit: int | None = None, *, force: bool = False):
         force=force,
         result=result,
     )
+    return result
+
+
+def poll_tracked_repository_commits_task(repository_id: int):
+    repository = Repository.objects.get(id=repository_id)
+    logger.info(
+        "repository_newsletter_commit_poll_task_started",
+        repository_id=repository_id,
+        repository_full_name=repository.full_name,
+    )
+    result = poll_repository_commits(repository)
+    logger.info(
+        "repository_newsletter_commit_poll_task_finished",
+        repository_id=repository_id,
+        repository_full_name=repository.full_name,
+        result=result,
+    )
+    return result
+
+
+def poll_tracked_repositories_task(limit: int | None = None):
+    result = poll_tracked_repositories(limit=limit)
+    logger.info("repository_newsletter_commit_poll_batch_finished", result=result)
+    return result
+
+
+def summarize_newsletter_commits_task(limit: int | None = None):
+    result = summarize_pending_commits(limit=limit)
+    logger.info("repository_newsletter_commit_summary_batch_finished", result=result)
+    return result
+
+
+def generate_repository_newsletter_issue_task(
+    repository_id: int,
+    cadence: str,
+    *,
+    reference_date: str | None = None,
+    send: bool = True,
+):
+    repository = Repository.objects.get(id=repository_id)
+    parsed_reference_date = (
+        datetime.fromisoformat(reference_date).date() if reference_date else None
+    )
+    period = newsletter_period_for_cadence(cadence, parsed_reference_date)
+    issue = generate_repository_newsletter_issue(
+        repository,
+        cadence=cadence,
+        period=period,
+    )
+    delivery_result = {"sent": 0}
+    if issue is not None and send:
+        delivery_result = send_issue_to_subscribers(issue)
+    result = {
+        "repository_id": repository_id,
+        "cadence": cadence,
+        "issue_id": issue.id if issue else None,
+        "sent": delivery_result.get("sent", 0),
+        "failed": delivery_result.get("failed", 0),
+    }
+    logger.info(
+        "repository_newsletter_issue_task_finished",
+        repository_id=repository_id,
+        repository_full_name=repository.full_name,
+        result=result,
+    )
+    return result
+
+
+def generate_weekly_newsletters_task(reference_date: str | None = None):
+    parsed_reference_date = (
+        datetime.fromisoformat(reference_date).date() if reference_date else None
+    )
+    result = generate_due_newsletter_issues(
+        cadence="weekly",
+        reference_date=parsed_reference_date,
+    )
+    logger.info("repository_weekly_newsletters_finished", result=result)
+    return result
+
+
+def generate_monthly_newsletters_task(reference_date: str | None = None):
+    parsed_reference_date = (
+        datetime.fromisoformat(reference_date).date() if reference_date else None
+    )
+    result = generate_due_newsletter_issues(
+        cadence="monthly",
+        reference_date=parsed_reference_date,
+    )
+    logger.info("repository_monthly_newsletters_finished", result=result)
     return result

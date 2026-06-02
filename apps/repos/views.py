@@ -1,12 +1,13 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.syndication.views import Feed
 from django.core.cache import cache
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
 from django.db import IntegrityError, transaction
 from django.db.models import Count, Max, Q, Sum
-from django.http import HttpResponse
+from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
 from django.utils.http import url_has_allowed_host_and_scheme
@@ -15,8 +16,20 @@ from django.views.generic import DetailView, FormView, ListView
 from django_q.tasks import async_task
 
 from apps.core.models import Profile
-from apps.repos.forms import AwesomeListRequestForm
-from apps.repos.models import AwesomeList, Repository, RepositoryLike
+from apps.repos.forms import AwesomeListRequestForm, NewsletterSubscriptionForm
+from apps.repos.models import (
+    AwesomeList,
+    NewsletterCadence,
+    NewsletterSubscription,
+    Repository,
+    RepositoryLike,
+    RepositoryNewsletterIssue,
+)
+from apps.repos.newsletters import (
+    disable_repository_newsletter_tracking,
+    unsubscribe_newsletter,
+    upsert_newsletter_subscription,
+)
 from apps.repos.search_services import (
     awesome_list_search_queryset,
     visible_awesome_list_item_count,
@@ -37,6 +50,7 @@ from apps.repos.stack_detection import package_manager_label, stack_label
 AWESOME_LIST_SCAN_TASK_GROUP = "Scan awesome list"
 MISSING_REPOSITORY_DISCOVERY_TASK_GROUP = "Manual awesome-list missing repo discovery"
 REPOSITORY_REFRESH_TASK_GROUP = "Refresh repositories"
+NEWSLETTER_COMMIT_POLL_TASK_GROUP = "Poll repository newsletter commits"
 AWESOME_LIST_REQUEST_RATE_LIMIT = 5
 AWESOME_LIST_REQUEST_RATE_LIMIT_WINDOW_SECONDS = 60 * 60
 AI_DEVELOPMENT_VISIBLE_PATH_LIMIT = 6
@@ -172,6 +186,49 @@ def queue_repository_rescan(request, owner: str, name: str):
         )
     )
     messages.success(request, f"Queued a rescan for {repository.full_name}.")
+    return redirect(repository.get_absolute_url())
+
+
+@login_required(login_url="account_login")
+@require_POST
+def upsert_repository_newsletter_subscription(request, owner: str, name: str):
+    _require_superuser(request)
+    repository = get_object_or_404(Repository, full_name=f"{owner}/{name}")
+    form = NewsletterSubscriptionForm(request.POST)
+    if not form.is_valid():
+        messages.error(request, "Choose a valid delivery email and cadence.")
+        return redirect(repository.get_absolute_url())
+
+    subscription = upsert_newsletter_subscription(
+        user=request.user,
+        repository=repository,
+        email=form.cleaned_data["email"],
+        cadence=form.cleaned_data["cadence"],
+    )
+    transaction.on_commit(
+        lambda: async_task(
+            "apps.repos.tasks.poll_tracked_repository_commits_task",
+            repository.id,
+            group=NEWSLETTER_COMMIT_POLL_TASK_GROUP,
+        )
+    )
+    messages.success(
+        request,
+        (
+            f"{repository.full_name} newsletter is tracking and will send "
+            f"{subscription.get_cadence_display().lower()} updates to {subscription.email}."
+        ),
+    )
+    return redirect(repository.get_absolute_url())
+
+
+@login_required(login_url="account_login")
+@require_POST
+def disable_repository_newsletter(request, owner: str, name: str):
+    _require_superuser(request)
+    repository = get_object_or_404(Repository, full_name=f"{owner}/{name}")
+    disable_repository_newsletter_tracking(repository)
+    messages.success(request, f"Stopped newsletter tracking for {repository.full_name}.")
     return redirect(repository.get_absolute_url())
 
 
@@ -483,7 +540,123 @@ class RepositoryDetailView(DetailView):
         context["ai_development_signal_summary"] = _ai_development_signal_summary(
             self.object.ai_development_signals
         )
+        context["newsletter_issues"] = self.object.newsletter_issues.filter(
+            published_at__isnull=False,
+        )[:5]
+        if self.request.user.is_superuser:
+            subscription = (
+                NewsletterSubscription.objects.filter(
+                    user=self.request.user,
+                    repository=self.object,
+                    is_active=True,
+                )
+                .order_by("-created_at")
+                .first()
+            )
+            context["newsletter_subscription"] = subscription
+            context["newsletter_form"] = NewsletterSubscriptionForm(
+                initial={
+                    "email": subscription.email if subscription else self.request.user.email,
+                    "cadence": subscription.cadence if subscription else NewsletterCadence.WEEKLY,
+                }
+            )
         return context
+
+
+class RepositoryNewsletterIssueListView(ListView):
+    template_name = "repos/newsletter_issue_list.html"
+    context_object_name = "issues"
+    paginate_by = 20
+
+    def dispatch(self, request, *args, **kwargs):
+        self.repository = get_object_or_404(
+            Repository,
+            full_name=f"{kwargs['owner']}/{kwargs['name']}",
+        )
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_queryset(self):
+        return self.repository.newsletter_issues.filter(published_at__isnull=False)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["repository"] = self.repository
+        return context
+
+
+class RepositoryNewsletterIssueDetailView(DetailView):
+    model = RepositoryNewsletterIssue
+    template_name = "repos/newsletter_issue_detail.html"
+    context_object_name = "issue"
+
+    def get_queryset(self):
+        return RepositoryNewsletterIssue.objects.filter(
+            repository__full_name=f"{self.kwargs['owner']}/{self.kwargs['name']}",
+            cadence=self.kwargs["cadence"],
+            published_at__isnull=False,
+        ).select_related("repository")
+
+    def get_object(self, queryset=None):
+        queryset = self.get_queryset() if queryset is None else queryset
+        return get_object_or_404(queryset, slug=self.kwargs["slug"])
+
+
+class RepositoryNewsletterFeed(Feed):
+    def get_object(self, request, owner: str, name: str, cadence: str):
+        if cadence not in NewsletterCadence.values:
+            raise Http404("Unknown newsletter cadence.")
+        repository = get_object_or_404(Repository, full_name=f"{owner}/{name}")
+        return repository, cadence
+
+    def title(self, obj):
+        repository, cadence = obj
+        return f"{repository.full_name} {cadence} newsletter"
+
+    def link(self, obj):
+        repository, _cadence = obj
+        return reverse(
+            "repos:newsletter_issue_list",
+            kwargs={"owner": repository.owner, "name": repository.name},
+        )
+
+    def description(self, obj):
+        repository, cadence = obj
+        return f"Generated {cadence} change updates for {repository.full_name}."
+
+    def items(self, obj):
+        repository, cadence = obj
+        return repository.newsletter_issues.filter(
+            cadence=cadence,
+            published_at__isnull=False,
+        )[:20]
+
+    def item_title(self, item):
+        return item.title
+
+    def item_description(self, item):
+        return item.content_html
+
+    def item_link(self, item):
+        return item.get_absolute_url()
+
+    def item_pubdate(self, item):
+        return item.published_at
+
+
+def newsletter_unsubscribe(request, token: str):
+    subscription = get_object_or_404(
+        NewsletterSubscription.objects.select_related("repository"),
+        unsubscribe_token=token,
+    )
+    if request.method == "POST":
+        unsubscribe_newsletter(subscription)
+        messages.success(request, "You have been unsubscribed from this repository newsletter.")
+        return redirect(subscription.repository.get_absolute_url())
+    return render(
+        request,
+        "repos/newsletter_unsubscribe.html",
+        {"subscription": subscription},
+    )
 
 
 class AwesomeListDetailView(DetailView):

@@ -12,4 +12,5 @@ class ProfileStates(models.TextChoices):
 
 class EmailType(models.TextChoices):
     EMAIL_CONFIRMATION = "EMAIL_CONFIRMATION", "Email Confirmation"
+    NEWSLETTER = "NEWSLETTER", "Newsletter"
     WELCOME = "WELCOME", "Welcome"

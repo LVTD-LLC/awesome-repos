@@ -18,6 +18,31 @@ urlpatterns = [
         name="repo_rescan",
     ),
     path(
+        "repos/<str:owner>/<str:name>/newsletter/",
+        views.upsert_repository_newsletter_subscription,
+        name="repo_newsletter_subscribe",
+    ),
+    path(
+        "repos/<str:owner>/<str:name>/newsletter/disable/",
+        views.disable_repository_newsletter,
+        name="repo_newsletter_disable",
+    ),
+    path(
+        "repos/<str:owner>/<str:name>/newsletters/",
+        views.RepositoryNewsletterIssueListView.as_view(),
+        name="newsletter_issue_list",
+    ),
+    path(
+        "repos/<str:owner>/<str:name>/newsletters/<str:cadence>/feed.xml",
+        views.RepositoryNewsletterFeed(),
+        name="newsletter_feed",
+    ),
+    path(
+        "repos/<str:owner>/<str:name>/newsletters/<str:cadence>/<slug:slug>/",
+        views.RepositoryNewsletterIssueDetailView.as_view(),
+        name="newsletter_issue_detail",
+    ),
+    path(
         "repos/<str:owner>/<str:name>/like/",
         views.toggle_repository_like,
         name="repo_like_toggle",
@@ -37,4 +62,9 @@ urlpatterns = [
     ),
     path("lists/request/", views.AwesomeListRequestView.as_view(), name="request_list"),
     path("lists/<slug:slug>/", views.AwesomeListDetailView.as_view(), name="list_detail"),
+    path(
+        "newsletters/unsubscribe/<str:token>/",
+        views.newsletter_unsubscribe,
+        name="newsletter_unsubscribe",
+    ),
 ]

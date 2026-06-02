@@ -1,0 +1,10 @@
+{{ issue.title }}
+
+{{ repository.full_name }} {{ issue.get_cadence_display|lower }} update
+{{ issue.period_start|date:"M d, Y" }} - {{ issue.period_end|date:"M d, Y" }}
+{{ issue.commit_count }} commit{{ issue.commit_count|pluralize }}
+
+{{ issue.content_markdown }}
+
+Read on Awesome: {{ issue_url }}
+Unsubscribe: {{ unsubscribe_url }}

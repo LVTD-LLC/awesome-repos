@@ -6,9 +6,13 @@ from apps.repos.models import (
     AwesomeList,
     AwesomeListItem,
     AwesomeListRequest,
+    NewsletterIssueDelivery,
+    NewsletterSubscription,
     Repository,
+    RepositoryCommit,
     RepositoryEmbedding,
     RepositoryLike,
+    RepositoryNewsletterIssue,
     RepositorySnapshot,
     UserStarredRepository,
 )
@@ -94,6 +98,7 @@ class RepositoryAdmin(admin.ModelAdmin):
         "is_archived",
         "uses_ai_for_development",
         "is_awesome_list_candidate",
+        "newsletter_tracking_enabled",
         "github_pushed_at",
         "awesome_count",
     )
@@ -107,6 +112,7 @@ class RepositoryAdmin(admin.ModelAdmin):
         "package_managers",
     )
     list_filter = (
+        "newsletter_tracking_enabled",
         "uses_ai_for_development",
         "is_awesome_list_candidate",
         "is_archived",
@@ -134,6 +140,9 @@ class RepositoryAdmin(admin.ModelAdmin):
         "generated_tags_source_hash",
         "generated_tags_synced_at",
         "generated_tags_last_error",
+        "newsletter_tracking_started_at",
+        "newsletter_tracking_last_polled_at",
+        "newsletter_tracking_last_error",
         "raw",
     )
 
@@ -220,3 +229,110 @@ class RepositoryEmbeddingAdmin(admin.ModelAdmin):
     list_display = ("repository", "model", "dimensions", "source_text_chars", "embedded_at")
     search_fields = ("repository__full_name", "model", "source_text_hash")
     readonly_fields = ("embedding", "source_text_hash", "source_text_chars", "embedded_at")
+
+
+@admin.register(NewsletterSubscription)
+class NewsletterSubscriptionAdmin(admin.ModelAdmin):
+    list_display = ("email", "repository", "cadence", "is_active", "unsubscribed_at", "user")
+    search_fields = ("email", "repository__full_name", "user__email", "user__username")
+    list_filter = ("cadence", "is_active", "created_at", "unsubscribed_at")
+    readonly_fields = ("unsubscribe_token", "created_at", "updated_at")
+
+
+@admin.register(RepositoryCommit)
+class RepositoryCommitAdmin(admin.ModelAdmin):
+    list_display = (
+        "repository",
+        "short_sha",
+        "branch",
+        "committed_at",
+        "additions",
+        "deletions",
+        "changed_files",
+        "summarized_at",
+    )
+    search_fields = ("repository__full_name", "sha", "message", "author_name", "author_login")
+    list_filter = ("branch", "patch_truncated", "summarized_at", "committed_at")
+    readonly_fields = (
+        "repository",
+        "sha",
+        "branch",
+        "message",
+        "html_url",
+        "api_url",
+        "author_name",
+        "author_email",
+        "author_login",
+        "authored_at",
+        "committer_name",
+        "committer_email",
+        "committer_login",
+        "committed_at",
+        "parent_shas",
+        "additions",
+        "deletions",
+        "changed_files",
+        "files",
+        "patch_truncated",
+        "raw_metadata",
+        "summary",
+        "summary_model",
+        "summary_source_hash",
+        "summarized_at",
+        "summary_last_error",
+        "created_at",
+        "updated_at",
+    )
+    date_hierarchy = "committed_at"
+
+    def short_sha(self, obj):
+        return obj.sha[:12]
+
+
+@admin.register(RepositoryNewsletterIssue)
+class RepositoryNewsletterIssueAdmin(admin.ModelAdmin):
+    list_display = (
+        "repository",
+        "cadence",
+        "period_start",
+        "period_end",
+        "commit_count",
+        "published_at",
+    )
+    search_fields = ("repository__full_name", "title", "content_markdown")
+    list_filter = ("cadence", "published_at", "period_start")
+    readonly_fields = (
+        "repository",
+        "cadence",
+        "period_start",
+        "period_end",
+        "slug",
+        "title",
+        "content_markdown",
+        "content_html",
+        "commit_count",
+        "published_at",
+        "generation_model",
+        "generation_source_hash",
+        "generated_at",
+        "generation_last_error",
+        "created_at",
+        "updated_at",
+    )
+    date_hierarchy = "period_start"
+
+
+@admin.register(NewsletterIssueDelivery)
+class NewsletterIssueDeliveryAdmin(admin.ModelAdmin):
+    list_display = ("issue", "subscription", "recipient_email", "sent_at", "created_at")
+    search_fields = ("recipient_email", "issue__repository__full_name", "subscription__email")
+    list_filter = ("sent_at", "created_at")
+    readonly_fields = (
+        "issue",
+        "subscription",
+        "recipient_email",
+        "sent_at",
+        "last_error",
+        "created_at",
+        "updated_at",
+    )

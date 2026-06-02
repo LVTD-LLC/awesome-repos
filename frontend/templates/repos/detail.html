@@ -49,6 +49,66 @@
       <div class="rounded-2xl bg-gray-50 p-4 dark:bg-gray-900"><dt class="text-sm text-gray-500">Language</dt><dd class="text-2xl font-bold">{{ repository.language|default:"—" }}</dd></div>
       <div class="rounded-2xl bg-gray-50 p-4 dark:bg-gray-900"><dt class="text-sm text-gray-500">Awesome lists</dt><dd class="text-2xl font-bold">{{ repository.awesome_list_count }}</dd></div>
     </dl>
+    {% if user.is_superuser %}
+      <section class="mt-8 rounded-2xl border border-green-200 bg-green-50 p-5 dark:border-green-900/70 dark:bg-green-950/20" aria-labelledby="newsletter-admin-heading">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <h2 id="newsletter-admin-heading" class="text-lg font-bold text-gray-950 dark:text-white">Newsletter tracking</h2>
+            <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">
+              {% if repository.newsletter_tracking_enabled %}
+                Tracking since {{ repository.newsletter_tracking_started_at|date:"Y-m-d H:i"|default:"—" }}.
+                {% if repository.newsletter_tracking_last_polled_at %}Last poll {{ repository.newsletter_tracking_last_polled_at|date:"Y-m-d H:i" }}.{% endif %}
+              {% else %}
+                Not tracking.
+              {% endif %}
+            </p>
+            {% if repository.newsletter_tracking_last_error %}
+              <p class="mt-2 text-sm font-medium text-red-700 dark:text-red-300">{{ repository.newsletter_tracking_last_error }}</p>
+            {% endif %}
+          </div>
+          <form method="post" action="{% url 'repos:repo_newsletter_subscribe' owner=repository.owner name=repository.name %}" class="grid gap-3 sm:grid-cols-[minmax(220px,1fr)_160px_auto]">
+            {% csrf_token %}
+            <label class="sr-only" for="id_email">Delivery email</label>
+            <input id="id_email" name="email" type="email" value="{{ newsletter_form.email.value|default_if_none:'' }}" class="min-h-11 rounded-xl border border-green-200 bg-white px-3 text-sm text-gray-900 focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500 dark:border-green-900 dark:bg-gray-950 dark:text-gray-100" placeholder="email@example.com" required>
+            <label class="sr-only" for="id_cadence">Cadence</label>
+            <select id="id_cadence" name="cadence" class="min-h-11 rounded-xl border border-green-200 bg-white px-3 text-sm text-gray-900 focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500 dark:border-green-900 dark:bg-gray-950 dark:text-gray-100">
+              {% for value,label in newsletter_form.fields.cadence.choices %}
+                <option value="{{ value }}" {% if newsletter_form.cadence.value == value %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+            <button type="submit" class="inline-flex min-h-11 items-center justify-center rounded-xl bg-green-600 px-4 text-sm font-semibold text-white hover:bg-green-700">
+              {% if newsletter_subscription %}Update{% else %}Subscribe{% endif %}
+            </button>
+          </form>
+        </div>
+        {% if repository.newsletter_tracking_enabled %}
+          <form method="post" action="{% url 'repos:repo_newsletter_disable' owner=repository.owner name=repository.name %}" class="mt-4">
+            {% csrf_token %}
+            <button type="submit" class="text-sm font-semibold text-red-700 hover:underline dark:text-red-300">Stop tracking</button>
+          </form>
+        {% endif %}
+      </section>
+    {% endif %}
+    {% if newsletter_issues %}
+      <section class="mt-8 border-t border-gray-200 pt-8 dark:border-gray-800" aria-labelledby="repository-newsletters-heading">
+        <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h2 id="repository-newsletters-heading" class="text-lg font-bold">Newsletters</h2>
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Latest generated repository updates.</p>
+          </div>
+          <a class="text-sm font-semibold text-green-700 hover:underline dark:text-green-300" href="{% url 'repos:newsletter_issue_list' owner=repository.owner name=repository.name %}">View all</a>
+        </div>
+        <div class="mt-5 grid gap-4 md:grid-cols-2">
+          {% for issue in newsletter_issues %}
+            <article class="rounded-2xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-900">
+              <div class="text-xs font-semibold uppercase tracking-wide text-green-700 dark:text-green-300">{{ issue.get_cadence_display }} · {{ issue.period_start|date:"M d, Y" }}</div>
+              <h3 class="mt-2 font-semibold text-gray-950 dark:text-white"><a class="hover:text-green-700 hover:underline" href="{{ issue.get_absolute_url }}">{{ issue.title }}</a></h3>
+              <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">{{ issue.commit_count }} commit{{ issue.commit_count|pluralize }}</p>
+            </article>
+          {% endfor %}
+        </div>
+      </section>
+    {% endif %}
     {% if similar_repositories %}
       <div class="mt-8 border-t border-gray-200 pt-8 dark:border-gray-800">
         <h2 class="text-lg font-bold">Similar repositories</h2>

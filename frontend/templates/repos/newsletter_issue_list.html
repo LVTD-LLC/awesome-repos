@@ -1,0 +1,30 @@
+{% extends "base_landing.html" %}
+{% block meta %}<title>{{ repository.full_name }} newsletters · Awesome</title>{% endblock meta %}
+{% block content %}
+<section class="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
+  <a href="{{ repository.get_absolute_url }}" class="text-sm font-semibold text-green-700 hover:underline">← Back to {{ repository.full_name }}</a>
+  <div class="mt-6">
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <div>
+        <h1 class="text-4xl font-bold">{{ repository.full_name }} newsletters</h1>
+        <p class="mt-3 text-gray-600 dark:text-gray-300">Generated change updates from tracked commits.</p>
+      </div>
+      <div class="flex gap-3 text-sm font-semibold">
+        <a class="text-green-700 hover:underline dark:text-green-300" href="{% url 'repos:newsletter_feed' owner=repository.owner name=repository.name cadence='weekly' %}">Weekly RSS</a>
+        <a class="text-green-700 hover:underline dark:text-green-300" href="{% url 'repos:newsletter_feed' owner=repository.owner name=repository.name cadence='monthly' %}">Monthly RSS</a>
+      </div>
+    </div>
+    <div class="mt-8 space-y-4">
+      {% for issue in issues %}
+        <article class="rounded-2xl border border-gray-200 p-5 dark:border-gray-800">
+          <div class="text-xs font-semibold uppercase tracking-wide text-green-700 dark:text-green-300">{{ issue.get_cadence_display }} · {{ issue.period_start|date:"M d, Y" }} – {{ issue.period_end|date:"M d, Y" }}</div>
+          <h2 class="mt-2 text-2xl font-bold"><a class="hover:text-green-700 hover:underline" href="{{ issue.get_absolute_url }}">{{ issue.title }}</a></h2>
+          <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">{{ issue.commit_count }} commit{{ issue.commit_count|pluralize }} · Published {{ issue.published_at|date:"M d, Y" }}</p>
+        </article>
+      {% empty %}
+        <p class="rounded-2xl border border-gray-200 p-5 text-gray-600 dark:border-gray-800 dark:text-gray-300">No newsletter issues have been published yet.</p>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endblock content %}
