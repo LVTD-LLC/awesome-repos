@@ -1,3 +1,4 @@
+import re
 import time
 
 import pytest
@@ -33,6 +34,11 @@ def assert_standard_ad_layout(content):
     assert content.count("utm_medium=side_ad") == 9
     assert "data-sponsor-modal-open" in content
     assert 'action="/sponsor/checkout/"' in content
+    assert re.search(
+        r'<form method="post" action="/sponsor/checkout/"[^>]*>\s*'
+        r'<input type="hidden" name="csrfmiddlewaretoken" value="[^"]+">',
+        content,
+    )
 
 
 def test_side_ad_slot_default_sponsor_email():

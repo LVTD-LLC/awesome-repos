@@ -80,6 +80,7 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Awesome: repository generated-tag prompts now include known language, GitHub topics, and AI-development signals.
 
 ### Fixed
+- Awesome: fixed the sponsor ad checkout form so it includes a CSRF token when rendered from side-ad rails.
 - Awesome: keep personal Starred and Liked nav links hidden from anonymous visitors.
 - Awesome: keep explicitly liked repositories visible in the personal liked page even when hidden from public catalog search.
 - Awesome: trapped keyboard focus inside the list-request and delete-account modals.

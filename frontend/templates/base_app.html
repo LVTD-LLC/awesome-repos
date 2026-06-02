@@ -105,7 +105,7 @@
         {% block content %}
         {% endblock content %}
       </div>
-      {% include "components/side_ad_rail.html" with side="right" position="Right" rail_class="xl:col-start-5 xl:row-start-1" sticky_class="top-24" rail_height_class="h-[calc(100vh-7rem)]" only %}
+      {% include "components/side_ad_rail.html" with side="right" position="Right" rail_class="xl:col-start-5 xl:row-start-1" sticky_class="top-24" rail_height_class="h-[calc(100vh-7rem)]" csrf_token=csrf_token only %}
     </div>
 
     <footer class="bg-white dark:bg-gray-950">
