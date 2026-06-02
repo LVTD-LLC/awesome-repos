@@ -2264,10 +2264,13 @@ def _order_repositories(qs, params):
     return qs.order_by(sort_map.get(sort, "-stars"), "full_name")
 
 
-def repository_search_queryset(params, queryset=None, *, allow_list_filter: bool = True):
-    first_snapshot = RepositorySnapshot.objects.filter(repository=models.OuterRef("pk")).order_by(
-        "captured_at", "id"
-    )
+def repository_search_queryset(
+    params,
+    queryset=None,
+    *,
+    allow_list_filter: bool = True,
+    include_snapshot_metrics: bool = True,
+):
     mention_count = (
         AwesomeListItem.objects.filter(repository=models.OuterRef("pk"))
         .values("repository")
@@ -2283,34 +2286,40 @@ def repository_search_queryset(params, queryset=None, *, allow_list_filter: bool
             ),
             models.Value(0),
         ),
-        snapshot_count=Count("snapshots", distinct=True),
-        first_snapshot_stars=models.Subquery(
-            first_snapshot.values("stars")[:1],
-            output_field=models.PositiveIntegerField(),
-        ),
-        first_snapshot_commit_count=models.Subquery(
-            first_snapshot.values("commit_count")[:1],
-            output_field=models.PositiveIntegerField(),
-        ),
-    ).annotate(
-        stars_since_first=models.Case(
-            models.When(
-                first_snapshot_stars__isnull=False,
-                then=models.F("stars") - models.F("first_snapshot_stars"),
-            ),
-            default=models.Value(0),
-            output_field=models.IntegerField(),
-        ),
-        commits_since_first=models.Case(
-            models.When(
-                commit_count__isnull=False,
-                first_snapshot_commit_count__isnull=False,
-                then=models.F("commit_count") - models.F("first_snapshot_commit_count"),
-            ),
-            default=models.Value(None),
-            output_field=models.IntegerField(),
-        ),
     )
+    if include_snapshot_metrics:
+        first_snapshot = RepositorySnapshot.objects.filter(
+            repository=models.OuterRef("pk")
+        ).order_by("captured_at", "id")
+        qs = qs.annotate(
+            snapshot_count=Count("snapshots", distinct=True),
+            first_snapshot_stars=models.Subquery(
+                first_snapshot.values("stars")[:1],
+                output_field=models.PositiveIntegerField(),
+            ),
+            first_snapshot_commit_count=models.Subquery(
+                first_snapshot.values("commit_count")[:1],
+                output_field=models.PositiveIntegerField(),
+            ),
+        ).annotate(
+            stars_since_first=models.Case(
+                models.When(
+                    first_snapshot_stars__isnull=False,
+                    then=models.F("stars") - models.F("first_snapshot_stars"),
+                ),
+                default=models.Value(0),
+                output_field=models.IntegerField(),
+            ),
+            commits_since_first=models.Case(
+                models.When(
+                    commit_count__isnull=False,
+                    first_snapshot_commit_count__isnull=False,
+                    then=models.F("commit_count") - models.F("first_snapshot_commit_count"),
+                ),
+                default=models.Value(None),
+                output_field=models.IntegerField(),
+            ),
+        )
     q = (params.get("q") or "").strip()
     semantic_search = False
     if q and (params.get("mode") or "").strip() == "semantic":
@@ -2330,6 +2339,7 @@ def awesome_list_repository_queryset(awesome_list: AwesomeList, params):
         params,
         queryset=visible_repository_queryset().filter(awesome_items__awesome_list=awesome_list),
         allow_list_filter=False,
+        include_snapshot_metrics=False,
     )
 
 

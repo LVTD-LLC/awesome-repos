@@ -44,6 +44,7 @@ from apps.repos.services import (
     attach_awesome_list_commit_count,
     awesome_list_history_chart_data,
     awesome_list_repository_history_chart_data,
+    awesome_list_repository_queryset,
     detect_ai_development_signals,
     detect_awesome_list_candidate,
     discover_missing_awesome_list_repositories,
@@ -3416,6 +3417,39 @@ def test_repository_search_filters_and_sorts():
 
     qs = repository_search_queryset({"q": "bsd"})
     assert list(qs) == [recent]
+
+
+@pytest.mark.django_db
+def test_awesome_list_repository_queryset_skips_snapshot_metrics():
+    awesome_list = AwesomeList.objects.create(
+        name="Awesome Django",
+        slug="awesome-django",
+        source_url="https://github.com/wsvincent/awesome-django",
+    )
+    repository = Repository.objects.create(
+        full_name="django/django",
+        owner="django",
+        name="django",
+        url="https://github.com/django/django",
+        stars=75,
+        commit_count=80,
+    )
+    AwesomeListItem.objects.create(awesome_list=awesome_list, repository=repository)
+    RepositorySnapshot.objects.create(
+        repository=repository,
+        captured_at=timezone.now() - timedelta(days=1),
+        stars=50,
+        commit_count=50,
+    )
+
+    search_result = repository_search_queryset({"q": "django"}).get()
+    list_result = awesome_list_repository_queryset(awesome_list, {"q": "django"}).get()
+
+    assert search_result.snapshot_count == 1
+    assert not hasattr(list_result, "snapshot_count")
+    assert "repos_repositorysnapshot" not in str(
+        awesome_list_repository_queryset(awesome_list, {"q": "django"}).query
+    )
 
 
 @pytest.mark.django_db
