@@ -22,5 +22,15 @@ urlpatterns = [
     path("delete-account/", views.delete_account, name="delete_account"),
     path("sponsor/checkout/", views.sponsor_checkout, name="sponsor_checkout"),
     path("sponsor/success/", views.sponsor_success, name="sponsor_success"),
+    path(
+        "highlighted-repo/checkout/",
+        views.highlighted_repo_checkout,
+        name="highlighted_repo_checkout",
+    ),
+    path(
+        "highlighted-repo/success/",
+        views.highlighted_repo_success,
+        name="highlighted_repo_success",
+    ),
     path("sponsor/stripe/webhook/", views.stripe_webhook, name="stripe_webhook"),
 ]

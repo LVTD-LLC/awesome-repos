@@ -1,10 +1,13 @@
+from datetime import timedelta
+
 from allauth.mfa import app_settings as mfa_app_settings
 from allauth.socialaccount.models import SocialApp
 from django.conf import settings
 from django.core.cache import cache
+from django.utils import timezone
 
 from apps.core.choices import ProfileStates
-from apps.core.models import SponsorAdPurchase
+from apps.core.models import HighlightedRepoPurchase, SponsorAdPurchase
 from awesome_repos.utils import get_awesome_repos_logger
 
 logger = get_awesome_repos_logger(__name__)
@@ -48,6 +51,29 @@ def active_sponsor_ad(request):
         cached_value = sponsor_ad if sponsor_ad is not None else no_active_ad
         cache.set(cache_key, cached_value, 60)
     return {"awesome_sponsor_ad": sponsor_ad}
+
+
+def active_highlighted_repo(request):
+    cache_key = "awesome:active_highlighted_repo"
+    cache_miss = object()
+    no_active_highlight = "__awesome_no_active_highlighted_repo__"
+    highlighted_repo = cache.get(cache_key, cache_miss)
+    if highlighted_repo == no_active_highlight:
+        return {"awesome_highlighted_repo": None}
+    if highlighted_repo is cache_miss:
+        highlighted_repo = (
+            HighlightedRepoPurchase.objects.filter(
+                status=HighlightedRepoPurchase.Status.ACTIVE,
+                details_submitted_at__gt=timezone.now() - timedelta(days=7),
+            )
+            .exclude(repo_full_name="")
+            .exclude(repo_url="")
+            .order_by("-details_submitted_at", "-updated_at")
+            .first()
+        )
+        cached_value = highlighted_repo if highlighted_repo is not None else no_active_highlight
+        cache.set(cache_key, cached_value, 60)
+    return {"awesome_highlighted_repo": highlighted_repo}
 
 
 def available_social_providers(request):

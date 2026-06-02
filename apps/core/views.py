@@ -25,12 +25,14 @@ from django.views.decorators.http import require_POST
 from django.views.generic import TemplateView
 from django_q.tasks import async_task
 
-from apps.core.forms import SponsorAdDetailsForm
-from apps.core.models import Profile, SponsorAdPurchase
+from apps.core.forms import HighlightedRepoDetailsForm, SponsorAdDetailsForm
+from apps.core.models import HighlightedRepoPurchase, Profile, SponsorAdPurchase
 from apps.core.payments import (
     StripeConfigurationError,
     StripeRequestError,
     create_ads_checkout_session,
+    create_highlighted_repo_checkout_session,
+    highlighted_repo_checkout_configured,
     retrieve_checkout_session,
     stripe_configured,
     verify_webhook_signature,
@@ -106,8 +108,59 @@ def notify_sponsor_payment(purchase):
     purchase.notification_sent_at = notification_time
 
 
+def _highlighted_repo_email_lines(purchase):
+    return [
+        "Someone just bought a 7-day highlighted repository placement on Awesome.",
+        "",
+        f"Buyer email: {purchase.buyer_email or 'Unknown'}",
+        f"Buyer name: {purchase.buyer_name or 'Unknown'}",
+        f"Amount: {purchase.amount_total / 100:.2f} {purchase.currency.upper()}",
+        f"Stripe checkout session: {purchase.stripe_checkout_session_id}",
+        f"Stripe payment intent: {purchase.stripe_payment_intent_id or 'Unknown'}",
+        f"Stripe customer: {purchase.stripe_customer_id or 'Unknown'}",
+        (
+            "Highlighted repo details form: "
+            f"{build_absolute_public_url(reverse('highlighted_repo_success'))}"
+            f"?session_id={purchase.stripe_checkout_session_id}"
+        ),
+    ]
+
+
+def notify_highlighted_repo_payment(purchase):
+    notification_time = timezone.now()
+    updated = HighlightedRepoPurchase.objects.filter(
+        Q(notification_sent_at__isnull=True),
+        id=purchase.id,
+    ).update(notification_sent_at=notification_time, updated_at=notification_time)
+    if not updated:
+        return
+
+    try:
+        send_mail(
+            subject="Awesome highlighted repo purchase paid",
+            message="\n".join(_highlighted_repo_email_lines(purchase)),
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[settings.AWESOME_ADS_NOTIFY_EMAIL],
+            fail_silently=False,
+        )
+    except Exception:
+        HighlightedRepoPurchase.objects.filter(id=purchase.id).update(notification_sent_at=None)
+        raise
+
+    purchase.notification_sent_at = notification_time
+
+
 def upsert_purchase_from_checkout_session(session):
     purchase, _created = SponsorAdPurchase.objects.get_or_create(
+        stripe_checkout_session_id=session["id"]
+    )
+    purchase.mark_paid_from_checkout_session(session)
+    purchase.save()
+    return purchase
+
+
+def upsert_highlighted_repo_from_checkout_session(session):
+    purchase, _created = HighlightedRepoPurchase.objects.get_or_create(
         stripe_checkout_session_id=session["id"]
     )
     purchase.mark_paid_from_checkout_session(session)
@@ -193,6 +246,90 @@ def sponsor_success(request):
     )
 
 
+@require_POST
+def highlighted_repo_checkout(request):
+    if not highlighted_repo_checkout_configured():
+        messages.error(request, "Highlighted repo checkout is not configured yet.")
+        return redirect("repos:search")
+
+    success_url = (
+        build_absolute_public_url(reverse("highlighted_repo_success"))
+        + "?session_id={CHECKOUT_SESSION_ID}"
+    )
+    cancel_url = build_absolute_public_url(reverse("repos:search"))
+    try:
+        session = create_highlighted_repo_checkout_session(
+            success_url=success_url,
+            cancel_url=cancel_url,
+            client_reference_id=str(request.user.id) if request.user.is_authenticated else "",
+        )
+    except (StripeConfigurationError, StripeRequestError) as exc:
+        logger.error("Highlighted repo checkout creation failed", error=str(exc), exc_info=True)
+        messages.error(request, "Could not start checkout. Please email rasul@lvtd.dev.")
+        return redirect("repos:search")
+
+    HighlightedRepoPurchase.objects.get_or_create(stripe_checkout_session_id=session["id"])
+    return redirect(session["url"])
+
+
+def highlighted_repo_success(request):
+    session_id = request.GET.get("session_id") or request.POST.get("session_id")
+    if not session_id:
+        return HttpResponseBadRequest("Missing checkout session.")
+
+    purchase = get_object_or_404(HighlightedRepoPurchase, stripe_checkout_session_id=session_id)
+    if request.method == "GET" and highlighted_repo_checkout_configured():
+        try:
+            purchase = upsert_highlighted_repo_from_checkout_session(
+                retrieve_checkout_session(session_id)
+            )
+            if purchase.status in {
+                HighlightedRepoPurchase.Status.PAID,
+                HighlightedRepoPurchase.Status.ACTIVE,
+            }:
+                try:
+                    notify_highlighted_repo_payment(purchase)
+                except Exception as exc:
+                    logger.error(
+                        "Highlighted repo payment notification failed on success page",
+                        session_id=session_id,
+                        error=str(exc),
+                        exc_info=True,
+                    )
+        except (StripeConfigurationError, StripeRequestError) as exc:
+            logger.warning(
+                "Highlighted repo checkout session refresh failed",
+                session_id=session_id,
+                error=str(exc),
+            )
+
+    if purchase.status == HighlightedRepoPurchase.Status.CHECKOUT_STARTED:
+        return HttpResponseForbidden("Payment is not complete yet.")
+
+    if request.method == "POST":
+        form = HighlightedRepoDetailsForm(request.POST, instance=purchase)
+        if form.is_valid():
+            purchase = form.save(commit=False)
+            purchase.mark_details_submitted()
+            purchase.save()
+            cache.delete("awesome:active_highlighted_repo")
+            messages.success(request, "Thanks — your highlighted repository details are saved.")
+            return redirect("repos:search")
+    else:
+        form = HighlightedRepoDetailsForm(instance=purchase)
+
+    return render(
+        request,
+        "pages/highlighted-repo-success.html",
+        {
+            "form": form,
+            "purchase": purchase,
+            "session_id": session_id,
+            "amount_dollars": purchase.amount_total / 100,
+        },
+    )
+
+
 @csrf_exempt
 @require_POST
 def stripe_webhook(request):
@@ -216,10 +353,21 @@ def stripe_webhook(request):
 
     if event.get("type") == "checkout.session.completed":
         session = event.get("data", {}).get("object", {})
-        if session.get("metadata", {}).get("app") == "awesome":
+        metadata = session.get("metadata", {})
+        if (
+            metadata.get("app") == "awesome"
+            and metadata.get("kind", "sponsor_ads") == "sponsor_ads"
+        ):
             purchase = upsert_purchase_from_checkout_session(session)
             if purchase.status in {SponsorAdPurchase.Status.PAID, SponsorAdPurchase.Status.ACTIVE}:
                 notify_sponsor_payment(purchase)
+        elif metadata.get("app") == "awesome" and metadata.get("kind") == "highlighted_repo":
+            purchase = upsert_highlighted_repo_from_checkout_session(session)
+            if purchase.status in {
+                HighlightedRepoPurchase.Status.PAID,
+                HighlightedRepoPurchase.Status.ACTIVE,
+            }:
+                notify_highlighted_repo_payment(purchase)
 
     return HttpResponse("ok")
 

@@ -1,0 +1,46 @@
+{% extends "base_landing.html" %}
+
+{% block content %}
+<div class="mx-auto max-w-3xl px-4 py-12 sm:px-6 lg:px-8">
+  <div class="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-950 sm:p-8">
+    <p class="app-label-caps text-amber-600 dark:text-amber-400">Payment received</p>
+    <h1 class="mt-3 text-3xl font-black tracking-tight text-gray-950 dark:text-white">Send us your highlighted repo details</h1>
+    <p class="mt-4 text-sm leading-6 text-gray-600 dark:text-gray-300">
+      Add the repository you want shown as the first highlighted card across Awesome repo list views for 7 days.
+    </p>
+
+    <div class="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-100">
+      Paid by {{ purchase.buyer_email|default:"your Stripe checkout email" }} for ${{ amount_dollars|floatformat:2 }} {{ purchase.currency|upper }}.
+    </div>
+
+    <form method="post" class="mt-8 space-y-6">
+      {% csrf_token %}
+      <input type="hidden" name="session_id" value="{{ session_id }}">
+
+      <div>
+        <label for="{{ form.repo_full_name.id_for_label }}" class="block text-sm font-bold text-gray-900 dark:text-gray-100">Repository full name</label>
+        {{ form.repo_full_name }}
+        <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">Use GitHub owner/repository format, for example LVTD-LLC/awesome.</p>
+        {% if form.repo_full_name.errors %}<p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ form.repo_full_name.errors|striptags }}</p>{% endif %}
+      </div>
+
+      <div>
+        <label for="{{ form.repo_url.id_for_label }}" class="block text-sm font-bold text-gray-900 dark:text-gray-100">Repository URL</label>
+        {{ form.repo_url }}
+        {% if form.repo_url.errors %}<p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ form.repo_url.errors|striptags }}</p>{% endif %}
+      </div>
+
+      <div>
+        <label for="{{ form.short_description.id_for_label }}" class="block text-sm font-bold text-gray-900 dark:text-gray-100">Short description</label>
+        {{ form.short_description }}
+        <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">Keep it under 220 characters. We’ll use this directly in the highlighted card.</p>
+        {% if form.short_description.errors %}<p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ form.short_description.errors|striptags }}</p>{% endif %}
+      </div>
+
+      <button type="submit" class="inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-amber-500 px-5 text-sm font-black text-gray-950 transition hover:bg-amber-400">
+        Save highlighted repo details
+      </button>
+    </form>
+  </div>
+</div>
+{% endblock content %}

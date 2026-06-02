@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from django.contrib.auth.models import User
 from django.db import models
 from django.utils import timezone
@@ -156,6 +158,73 @@ class SponsorAdPurchase(BaseModel):
     def mark_details_submitted(self):
         self.status = self.Status.ACTIVE
         self.details_submitted_at = timezone.now()
+
+
+class HighlightedRepoPurchase(BaseModel):
+    class Status(models.TextChoices):
+        CHECKOUT_STARTED = "checkout_started", "Checkout started"
+        PAID = "paid", "Paid"
+        ACTIVE = "active", "Active"
+
+    stripe_checkout_session_id = models.CharField(max_length=255, unique=True)
+    stripe_payment_intent_id = models.CharField(max_length=255, blank=True, default="")
+    stripe_customer_id = models.CharField(max_length=255, blank=True, default="")
+    amount_total = models.PositiveIntegerField(default=0)
+    currency = models.CharField(max_length=8, blank=True, default="usd")
+    buyer_email = models.EmailField(blank=True, default="")
+    buyer_name = models.CharField(max_length=255, blank=True, default="")
+    status = models.CharField(
+        max_length=32,
+        choices=Status.choices,
+        default=Status.CHECKOUT_STARTED,
+    )
+    notification_sent_at = models.DateTimeField(null=True, blank=True)
+    details_submitted_at = models.DateTimeField(null=True, blank=True)
+    repo_full_name = models.CharField(max_length=255, blank=True, default="")
+    repo_url = models.URLField(max_length=500, blank=True, default="")
+    short_description = models.CharField(max_length=220, blank=True, default="")
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return self.repo_full_name or self.buyer_email or self.stripe_checkout_session_id
+
+    @property
+    def active_until(self):
+        if not self.details_submitted_at:
+            return None
+        return self.details_submitted_at + timedelta(days=7)
+
+    @property
+    def is_within_active_window(self):
+        return bool(self.active_until and self.active_until > timezone.now())
+
+    def mark_paid_from_checkout_session(self, session):
+        customer = session.get("customer") or {}
+        customer_details = session.get("customer_details") or {}
+        payment_intent = session.get("payment_intent") or ""
+        if isinstance(payment_intent, dict):
+            self.stripe_payment_intent_id = payment_intent.get("id", "")
+        else:
+            self.stripe_payment_intent_id = payment_intent or ""
+        if isinstance(customer, dict):
+            self.stripe_customer_id = customer.get("id", "")
+        else:
+            self.stripe_customer_id = customer or ""
+        self.amount_total = session.get("amount_total") or self.amount_total
+        self.currency = session.get("currency") or self.currency
+        self.buyer_email = (
+            customer_details.get("email") or session.get("customer_email") or self.buyer_email
+        )
+        self.buyer_name = customer_details.get("name") or self.buyer_name
+        if session.get("payment_status") == "paid" and self.status == self.Status.CHECKOUT_STARTED:
+            self.status = self.Status.PAID
+
+    def mark_details_submitted(self):
+        self.status = self.Status.ACTIVE
+        if not self.details_submitted_at:
+            self.details_submitted_at = timezone.now()
 
 
 class EmailSent(BaseModel):

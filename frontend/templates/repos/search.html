@@ -242,6 +242,7 @@
   </div>
 
   <div class="space-y-4">
+    {% include "components/highlighted_repo_slot.html" %}
     {% for repo in repositories %}
       <article class="rounded-3xl border border-gray-200 p-5 transition hover:border-green-300 dark:border-gray-800 dark:hover:border-green-800">
         <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
@@ -300,4 +301,5 @@
     </nav>
   {% endif %}
 </section>
+{% include "components/highlighted_repo_modal.html" %}
 {% endblock content %}

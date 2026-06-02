@@ -244,3 +244,182 @@ class TestSponsorAdsCheckout:
         assert purchase.status == SponsorAdPurchase.Status.PAID
         assert purchase.buyer_email == "buyer@example.com"
         assert notified == [purchase.id]
+
+
+@pytest.mark.django_db
+class TestHighlightedRepoCheckout:
+    @override_settings(
+        STRIPE_SECRET_KEY="sk_test",
+        STRIPE_AWESOME_HIGHLIGHTED_REPO_PRICE_ID="price_highlighted",
+    )
+    def test_highlighted_checkout_payload_uses_highlighted_repo_product(self, monkeypatch):
+        from apps.core.payments import create_highlighted_repo_checkout_session
+
+        captured = {}
+
+        def fake_stripe_request(method, path, data):
+            captured.update({"method": method, "path": path, "data": data})
+            return {"id": "cs_test_highlight", "url": "https://checkout.stripe.com/c/pay"}
+
+        monkeypatch.setattr("apps.core.payments._stripe_request", fake_stripe_request)
+
+        create_highlighted_repo_checkout_session(
+            success_url="https://example.com/highlight/success",
+            cancel_url="/",
+        )
+
+        assert captured["path"] == "checkout/sessions"
+        assert captured["data"]["line_items[0][price]"] == "price_highlighted"
+        assert captured["data"]["metadata[kind]"] == "highlighted_repo"
+        assert captured["data"]["metadata[duration]"] == "7_days"
+
+    @override_settings(
+        STRIPE_SECRET_KEY="sk_test",
+        STRIPE_AWESOME_HIGHLIGHTED_REPO_PRICE_ID="price_highlighted",
+    )
+    def test_highlighted_checkout_creates_purchase_and_redirects_to_stripe(
+        self, client, monkeypatch
+    ):
+        from apps.core.models import HighlightedRepoPurchase
+
+        monkeypatch.setattr(
+            "apps.core.views.create_highlighted_repo_checkout_session",
+            lambda **kwargs: {"id": "cs_test_highlight", "url": "https://checkout.stripe.com/c/pay"},
+        )
+
+        response = client.post(reverse("highlighted_repo_checkout"))
+
+        assert response.status_code == 302
+        assert response.url == "https://checkout.stripe.com/c/pay"
+        assert HighlightedRepoPurchase.objects.filter(
+            stripe_checkout_session_id="cs_test_highlight"
+        ).exists()
+
+    def test_highlighted_success_form_saves_active_repo_details(self, client, monkeypatch):
+        from apps.core.models import HighlightedRepoPurchase
+
+        purchase = HighlightedRepoPurchase.objects.create(
+            stripe_checkout_session_id="cs_test_highlight_paid",
+            status=HighlightedRepoPurchase.Status.PAID,
+            buyer_email="buyer@example.com",
+            amount_total=50000,
+            currency="usd",
+        )
+        monkeypatch.setattr("apps.core.views.highlighted_repo_checkout_configured", lambda: False)
+
+        response = client.post(
+            reverse("highlighted_repo_success"),
+            {
+                "session_id": purchase.stripe_checkout_session_id,
+                "repo_full_name": "LVTD-LLC/awesome",
+                "repo_url": "https://github.com/LVTD-LLC/awesome",
+                "short_description": "Search every repo hiding inside awesome lists.",
+            },
+        )
+
+        assert response.status_code == 302
+        purchase.refresh_from_db()
+        assert purchase.status == HighlightedRepoPurchase.Status.ACTIVE
+        assert purchase.repo_full_name == "LVTD-LLC/awesome"
+        assert purchase.active_until is not None
+
+    def test_highlighted_success_form_does_not_reset_active_window(self, client, monkeypatch):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        from apps.core.models import HighlightedRepoPurchase
+
+        original_details_time = timezone.now() - timedelta(days=3)
+        purchase = HighlightedRepoPurchase.objects.create(
+            stripe_checkout_session_id="cs_test_highlight_active",
+            status=HighlightedRepoPurchase.Status.ACTIVE,
+            buyer_email="buyer@example.com",
+            amount_total=50000,
+            currency="usd",
+            repo_full_name="LVTD-LLC/awesome",
+            repo_url="https://github.com/LVTD-LLC/awesome",
+            short_description="Original placement.",
+            details_submitted_at=original_details_time,
+        )
+        monkeypatch.setattr("apps.core.views.highlighted_repo_checkout_configured", lambda: False)
+
+        response = client.post(
+            reverse("highlighted_repo_success"),
+            {
+                "session_id": purchase.stripe_checkout_session_id,
+                "repo_full_name": "LVTD-LLC/awesome",
+                "repo_url": "https://github.com/LVTD-LLC/awesome",
+                "short_description": "Updated copy without extending the placement.",
+            },
+        )
+
+        assert response.status_code == 302
+        purchase.refresh_from_db()
+        assert purchase.status == HighlightedRepoPurchase.Status.ACTIVE
+        assert purchase.short_description == "Updated copy without extending the placement."
+        assert purchase.details_submitted_at == original_details_time
+
+    def test_active_highlighted_repo_excludes_expired_purchase(self):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        from apps.core.context_processors import active_highlighted_repo
+        from apps.core.models import HighlightedRepoPurchase
+
+        cache.delete("awesome:active_highlighted_repo")
+        HighlightedRepoPurchase.objects.create(
+            stripe_checkout_session_id="cs_test_old_highlight",
+            status=HighlightedRepoPurchase.Status.ACTIVE,
+            repo_full_name="old/repo",
+            repo_url="https://github.com/old/repo",
+            short_description="Expired placement.",
+            details_submitted_at=timezone.now() - timedelta(days=8),
+        )
+
+        assert active_highlighted_repo(None) == {"awesome_highlighted_repo": None}
+
+    @override_settings(STRIPE_WEBHOOK_SECRET="whsec_test")
+    def test_webhook_routes_highlighted_repo_payment(self, client, monkeypatch):
+        from apps.core.models import HighlightedRepoPurchase, SponsorAdPurchase
+
+        event = {
+            "type": "checkout.session.completed",
+            "data": {
+                "object": {
+                    "id": "cs_test_highlight_paid",
+                    "payment_status": "paid",
+                    "amount_total": 50000,
+                    "currency": "usd",
+                    "customer_details": {"email": "buyer@example.com"},
+                    "metadata": {"app": "awesome", "kind": "highlighted_repo"},
+                }
+            },
+        }
+        monkeypatch.setattr(
+            "apps.core.views.verify_webhook_signature",
+            lambda *args, **kwargs: True,
+        )
+        notified = []
+        monkeypatch.setattr(
+            "apps.core.views.notify_highlighted_repo_payment",
+            lambda purchase: notified.append(purchase.id),
+        )
+
+        response = client.post(
+            reverse("stripe_webhook"),
+            data=json.dumps(event),
+            content_type="application/json",
+            HTTP_STRIPE_SIGNATURE="t=1,v1=ok",
+        )
+
+        assert response.status_code == 200
+        assert HighlightedRepoPurchase.objects.filter(
+            stripe_checkout_session_id="cs_test_highlight_paid",
+            status=HighlightedRepoPurchase.Status.PAID,
+        ).exists()
+        assert not SponsorAdPurchase.objects.filter(
+            stripe_checkout_session_id="cs_test_highlight_paid"
+        ).exists()
+        assert len(notified) == 1

@@ -1,7 +1,7 @@
 from allauth.account.forms import LoginForm, SignupForm
 from django import forms
 
-from apps.core.models import Profile, SponsorAdPurchase
+from apps.core.models import HighlightedRepoPurchase, Profile, SponsorAdPurchase
 from apps.core.utils import DivErrorList
 
 
@@ -49,6 +49,42 @@ class SponsorAdDetailsForm(forms.ModelForm):
         if logo and logo.size > 512 * 1024:
             raise forms.ValidationError("Upload a small logo under 512KB.")
         return logo
+
+
+class HighlightedRepoDetailsForm(forms.ModelForm):
+    repo_full_name = forms.CharField(
+        max_length=255,
+        required=True,
+        widget=forms.TextInput(attrs={"placeholder": "owner/repository", "class": "app-input"}),
+    )
+    repo_url = forms.URLField(
+        max_length=500,
+        required=True,
+        widget=forms.URLInput(
+            attrs={"placeholder": "https://github.com/owner/repository", "class": "app-input"}
+        ),
+    )
+    short_description = forms.CharField(
+        max_length=220,
+        required=True,
+        widget=forms.TextInput(
+            attrs={
+                "placeholder": "A short reason developers should check out this repository.",
+                "class": "app-input",
+                "maxlength": 220,
+            }
+        ),
+    )
+
+    class Meta:
+        model = HighlightedRepoPurchase
+        fields = ["repo_full_name", "repo_url", "short_description"]
+
+    def clean_repo_full_name(self):
+        repo_full_name = self.cleaned_data["repo_full_name"].strip()
+        if "/" not in repo_full_name:
+            raise forms.ValidationError("Use the GitHub owner/repository format.")
+        return repo_full_name
 
 
 class ProfileUpdateForm(forms.ModelForm):

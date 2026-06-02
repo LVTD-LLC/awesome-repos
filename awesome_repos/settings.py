@@ -154,6 +154,7 @@ TEMPLATES = [
                 "apps.core.context_processors.chatwoot_settings",
                 "apps.core.context_processors.available_social_providers",
                 "apps.core.context_processors.active_sponsor_ad",
+                "apps.core.context_processors.active_highlighted_repo",
                 "apps.pages.context_processors.referrer_banner",
             ],
         },
@@ -600,6 +601,10 @@ STRIPE_SECRET_KEY = env("STRIPE_SECRET_KEY", default="")
 STRIPE_WEBHOOK_SECRET = env("STRIPE_WEBHOOK_SECRET", default="")
 STRIPE_CONTEXT = env("STRIPE_CONTEXT", default="")
 STRIPE_AWESOME_ADS_PRICE_ID = env("STRIPE_AWESOME_ADS_PRICE_ID", default="")
+STRIPE_AWESOME_HIGHLIGHTED_REPO_PRICE_ID = env(
+    "STRIPE_AWESOME_HIGHLIGHTED_REPO_PRICE_ID",
+    default="",
+)
 AWESOME_ADS_NOTIFY_EMAIL = env("AWESOME_ADS_NOTIFY_EMAIL", default="rasul@lvtd.dev")
 
 

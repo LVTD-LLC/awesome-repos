@@ -142,6 +142,7 @@
       </form>
 
       <div class="space-y-3">
+        {% include "components/highlighted_repo_slot.html" %}
         {% for repo in page_obj %}
           <article class="rounded-2xl border border-gray-200 p-4 dark:border-gray-800">
             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -225,4 +226,5 @@
     </aside>
   </div>
 </section>
+{% include "components/highlighted_repo_modal.html" %}
 {% endblock content %}

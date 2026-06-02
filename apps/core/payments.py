@@ -21,6 +21,10 @@ def stripe_configured():
     return bool(settings.STRIPE_SECRET_KEY and settings.STRIPE_AWESOME_ADS_PRICE_ID)
 
 
+def highlighted_repo_checkout_configured():
+    return bool(settings.STRIPE_SECRET_KEY and settings.STRIPE_AWESOME_HIGHLIGHTED_REPO_PRICE_ID)
+
+
 def _stripe_headers():
     if not settings.STRIPE_SECRET_KEY:
         raise StripeConfigurationError("Stripe secret key is not configured.")
@@ -56,13 +60,15 @@ def _stripe_request(method, path, data=None):
         raise StripeRequestError(str(exc.reason)) from exc
 
 
-def create_ads_checkout_session(*, success_url, cancel_url, client_reference_id=""):
-    if not settings.STRIPE_AWESOME_ADS_PRICE_ID:
-        raise StripeConfigurationError("Stripe Awesome ads price ID is not configured.")
+def _create_checkout_session(
+    *, price_id, success_url, cancel_url, kind, duration, client_reference_id=""
+):
+    if not price_id:
+        raise StripeConfigurationError(f"Stripe price ID is not configured for {kind}.")
 
     payload = {
         "mode": "payment",
-        "line_items[0][price]": settings.STRIPE_AWESOME_ADS_PRICE_ID,
+        "line_items[0][price]": price_id,
         "line_items[0][quantity]": "1",
         "success_url": success_url,
         "cancel_url": cancel_url,
@@ -70,15 +76,37 @@ def create_ads_checkout_session(*, success_url, cancel_url, client_reference_id=
         "allow_promotion_codes": "false",
         "billing_address_collection": "auto",
         "metadata[app]": "awesome",
-        "metadata[kind]": "sponsor_ads",
-        "metadata[duration]": "1_month",
+        "metadata[kind]": kind,
+        "metadata[duration]": duration,
         "payment_intent_data[metadata][app]": "awesome",
-        "payment_intent_data[metadata][kind]": "sponsor_ads",
+        "payment_intent_data[metadata][kind]": kind,
     }
     if client_reference_id:
         payload["client_reference_id"] = client_reference_id
 
     return _stripe_request("POST", "checkout/sessions", payload)
+
+
+def create_ads_checkout_session(*, success_url, cancel_url, client_reference_id=""):
+    return _create_checkout_session(
+        price_id=settings.STRIPE_AWESOME_ADS_PRICE_ID,
+        success_url=success_url,
+        cancel_url=cancel_url,
+        kind="sponsor_ads",
+        duration="1_month",
+        client_reference_id=client_reference_id,
+    )
+
+
+def create_highlighted_repo_checkout_session(*, success_url, cancel_url, client_reference_id=""):
+    return _create_checkout_session(
+        price_id=settings.STRIPE_AWESOME_HIGHLIGHTED_REPO_PRICE_ID,
+        success_url=success_url,
+        cancel_url=cancel_url,
+        kind="highlighted_repo",
+        duration="7_days",
+        client_reference_id=client_reference_id,
+    )
 
 
 def retrieve_checkout_session(session_id):

@@ -1,0 +1,23 @@
+<article class="relative overflow-hidden rounded-3xl border border-amber-300 bg-amber-50 p-5 shadow-sm ring-1 ring-amber-200 dark:border-amber-700 dark:bg-amber-950/30 dark:ring-amber-900/70">
+  <div class="absolute right-4 top-4 rounded-full bg-amber-400 px-3 py-1 text-xs font-black uppercase tracking-wide text-gray-950">Highlighted</div>
+  {% if awesome_highlighted_repo %}
+    <div class="pr-28">
+      <p class="text-xs font-black uppercase tracking-wide text-amber-700 dark:text-amber-300">Promoted repository</p>
+      <a href="{{ awesome_highlighted_repo.repo_url }}" target="_blank" rel="noopener sponsored" class="mt-2 block text-xl font-black text-gray-950 hover:text-amber-700 dark:text-white dark:hover:text-amber-200">{{ awesome_highlighted_repo.repo_full_name }}</a>
+      <p class="mt-2 max-w-3xl text-sm leading-6 text-gray-700 dark:text-gray-200">{{ awesome_highlighted_repo.short_description }}</p>
+      <div class="mt-4 flex flex-wrap gap-2 text-xs font-semibold text-amber-900 dark:text-amber-100">
+        <span class="rounded-full bg-white/80 px-3 py-1 dark:bg-black/20">7-day placement</span>
+        {% if awesome_highlighted_repo.active_until %}<span class="rounded-full bg-white/80 px-3 py-1 dark:bg-black/20">active until {{ awesome_highlighted_repo.active_until|date:"Y-m-d" }}</span>{% endif %}
+      </div>
+    </div>
+  {% else %}
+    <div class="pr-28">
+      <p class="text-xs font-black uppercase tracking-wide text-amber-700 dark:text-amber-300">Open highlighted repo slot</p>
+      <h3 class="mt-2 text-xl font-black text-gray-950 dark:text-white">Put your repository first</h3>
+      <p class="mt-2 max-w-3xl text-sm leading-6 text-gray-700 dark:text-gray-200">Promote a GitHub repo at the top of Awesome repository list views for 7 days.</p>
+      <button type="button" data-highlighted-repo-modal-open class="mt-4 inline-flex min-h-11 items-center justify-center rounded-xl bg-gray-950 px-5 text-sm font-black text-white transition hover:bg-gray-800 dark:bg-white dark:text-gray-950 dark:hover:bg-gray-200">
+        Advertise highlighted repo
+      </button>
+    </div>
+  {% endif %}
+</article>
