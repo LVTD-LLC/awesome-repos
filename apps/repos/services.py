@@ -216,10 +216,6 @@ def github_repository_sync_token_pool() -> list[str]:
     return tokens
 
 
-def github_repository_sync_token_pool_size() -> int:
-    return len(github_repository_sync_token_pool())
-
-
 def github_repository_sync_token_from_pool(
     token_pool: list[str],
     index: int = 0,
