@@ -4718,7 +4718,7 @@ def test_search_page_humanizes_stars_and_hides_tracked_star_growth(client):
 
 
 @pytest.mark.django_db
-def test_search_page_renders_tracked_commit_growth(client):
+def test_search_page_hides_tracked_commit_growth(client):
     repo = Repository.objects.create(
         full_name="django/django",
         owner="django",
@@ -4745,7 +4745,9 @@ def test_search_page_renders_tracked_commit_growth(client):
     response = client.get(reverse("repos:search"), {"q": "framework"})
 
     assert response.status_code == 200
-    assert b"+20 commits tracked" in response.content
+    assert b"90 commits" in response.content
+    assert b"+20 commits tracked" not in response.content
+    assert b"commits tracked" not in response.content
 
 
 @pytest.mark.django_db
