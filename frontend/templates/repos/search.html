@@ -259,6 +259,7 @@
               <span class="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-800">{{ repo.awesome_count }} awesome list{{ repo.awesome_count|pluralize }}</span>
               {% if repo.commit_count != None %}<span class="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-800">{{ repo.commit_count }} commits</span>{% endif %}
               {% if repo.first_commit_at %}<span class="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-800">first commit {{ repo.first_commit_at|date:"Y-m-d" }}</span>{% endif %}
+              {% if is_personal_starred_search and repo.user_starred_at %}<span class="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-800">starred {{ repo.user_starred_at|date:"Y-m-d" }}</span>{% endif %}
               {% if repo.snapshot_count %}<span class="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-800">{{ repo.snapshot_count }} history point{{ repo.snapshot_count|pluralize }}</span>{% endif %}
               {% if repo.github_pushed_at %}<span class="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-800">updated {{ repo.github_pushed_at|date:"Y-m-d" }}</span>{% endif %}
             </div>
@@ -267,15 +268,6 @@
             {% include "repos/_repository_like_button.html" with repository=repo %}
             <div>
               <div class="text-2xl font-bold">★ {{ repo.stars|intcomma }}</div>
-              {% if repo.commits_since_first != None and repo.snapshot_count > 1 %}
-                {% if repo.commits_since_first > 0 %}
-                  <div class="text-sm font-semibold text-green-700 dark:text-green-400">+{{ repo.commits_since_first }} commits tracked</div>
-                {% elif repo.commits_since_first < 0 %}
-                  <div class="text-sm font-semibold text-red-600 dark:text-red-400">{{ repo.commits_since_first }} commits tracked</div>
-                {% else %}
-                  <div class="text-sm text-gray-500 dark:text-gray-400">0 commits tracked</div>
-                {% endif %}
-              {% endif %}
               <div class="mt-1 flex flex-wrap justify-start gap-x-3 gap-y-1 md:justify-end">
                 {% if repo.homepage_url and repo.homepage_url != repo.url %}
                   <a href="{{ repo.homepage_url }}" target="_blank" rel="noopener" class="text-sm font-semibold text-blue-700 hover:underline dark:text-blue-300">Website ↗</a>

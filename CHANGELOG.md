@@ -54,9 +54,11 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Awesome: store repository website links from GitHub metadata or description URLs and show them on repository pages.
 - Awesome: added experimental superuser-only repository newsletters with tracked commits, generated issues, RSS feeds, and email delivery.
 - Awesome: added repository search filters for detected frameworks, unmaintained repositories, tracked commit velocity, tracked star growth, and sort direction.
+- Awesome: added a recently-starred sort for personal GitHub starred repository search.
 
 ### Changed
 - Awesome: refined Sentry performance instrumentation with configurable HTTP/background trace sampling, Django middleware/cache spans, and separate breadcrumb/event/log levels.
+- Awesome: repository search results no longer show tracked commit-growth deltas.
 - Awesome: unified repository search filters across global search, awesome-list repository search, and personal starred-repository search.
 - Awesome: added Settings to the account navbar, simplified Settings around GitHub imports and future repository update preferences, and moved awesome-list requests into the Lists page flow.
 - Awesome: compacted repository-detail AI development signals into summary badges and bounded config-path lists.

@@ -6,8 +6,9 @@ import json
 import os
 import re
 import time
-from collections.abc import Collection
+from collections.abc import Collection, Mapping
 from datetime import UTC, datetime
+from typing import Literal
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode, urlparse
 from urllib.request import Request, urlopen
@@ -49,6 +50,8 @@ logger = get_awesome_repos_logger(__name__)
 # Process-local snapshot from the most recent GitHub response. Treat this as a
 # best-effort hint; callers must still handle actual 403/429 responses.
 _github_rate_limit_state: dict[str, str] = {}
+RepositorySortDirection = Literal["asc", "desc"]
+RepositorySortMap = Mapping[str, tuple[str, RepositorySortDirection]]
 GITHUB_API_VERSION = "2026-03-10"
 GITHUB_DEFAULT_ACCEPT = "application/vnd.github+json"
 GITHUB_STARRED_ACCEPT = "application/vnd.github.star+json"
@@ -2231,16 +2234,12 @@ def _apply_repository_state_filters(qs, params):
     min_stars = _positive_int_param(params, "min_stars")
     if min_stars is not None:
         qs = qs.filter(stars__gte=min_stars)
-    archived = params.get("archived")
-    if archived == "yes":
-        qs = qs.filter(is_archived=True)
-    elif archived == "no":
-        qs = qs.filter(is_archived=False)
-    ai_development = params.get("ai_development")
-    if ai_development == "yes":
-        qs = qs.filter(uses_ai_for_development=True)
-    elif ai_development == "no":
-        qs = qs.filter(uses_ai_for_development=False)
+    archived = {"yes": True, "no": False}.get(params.get("archived"))
+    if archived is not None:
+        qs = qs.filter(is_archived=archived)
+    ai_development = {"yes": True, "no": False}.get(params.get("ai_development"))
+    if ai_development is not None:
+        qs = qs.filter(uses_ai_for_development=ai_development)
     unmaintained_days = _positive_int_param(params, "unmaintained_days")
     updated_days = _positive_int_param(params, "updated_days")
     valid_unmaintained_days = (
@@ -2289,7 +2288,12 @@ def _sort_expression(field_name: str, direction: str):
     return field.desc(nulls_last=True)
 
 
-def _order_repositories(qs, params):
+def _order_repositories(
+    qs,
+    params,
+    *,
+    extra_sort_map: RepositorySortMap | None = None,
+):
     sort = params.get("sort") or "stars"
     sort_map = {
         "stars": ("stars", "desc"),
@@ -2305,6 +2309,9 @@ def _order_repositories(qs, params):
         "least_awesome": ("awesome_count", "asc"),
         "name": ("full_name", "asc"),
     }
+    if extra_sort_map:
+        for sort_key, sort_value in extra_sort_map.items():
+            sort_map.setdefault(sort_key, sort_value)
     field_name, default_direction = sort_map.get(sort, sort_map["stars"])
     direction = _sort_direction(params, default_direction)
     ordering = [_sort_expression(field_name, direction)]
@@ -2395,6 +2402,7 @@ def repository_search_queryset(
     *,
     allow_list_filter: bool = True,
     include_snapshot_metrics: bool = True,
+    extra_sort_map: RepositorySortMap | None = None,
 ):
     mention_count = (
         AwesomeListItem.objects.filter(repository=models.OuterRef("pk"))
@@ -2425,7 +2433,7 @@ def repository_search_queryset(
 
     if semantic_search:
         return qs.order_by("vector_distance", "-stars", "full_name")
-    return _order_repositories(qs, params)
+    return _order_repositories(qs, params, extra_sort_map=extra_sort_map)
 
 
 def awesome_list_repository_queryset(awesome_list: AwesomeList, params):

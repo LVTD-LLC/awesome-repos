@@ -56,6 +56,7 @@ from apps.repos.services import (
     fetch_repository_readme,
     fetch_repository_readme_data,
     fetch_repository_tree_items,
+    fetch_user_starred_repositories,
     github_rate_limit_status,
     import_starred_repositories_for_profile,
     is_same_repository_url_or_subpath,
@@ -645,6 +646,40 @@ def attach_github_token(profile, token="user-token", uid="12345"):
     return SocialToken.objects.create(account=account, token=token)
 
 
+def test_fetch_user_starred_repositories_requests_star_metadata(monkeypatch):
+    captured_requests = []
+
+    def fake_fetch_json_page(url, *, token=None, accept=None):
+        captured_requests.append({"url": url, "token": token, "accept": accept})
+        return (
+            [
+                {
+                    "starred_at": "2026-05-01T12:00:00Z",
+                    "repo": github_repo_payload("django/django"),
+                }
+            ],
+            "",
+        )
+
+    monkeypatch.setattr("apps.repos.services.fetch_json_page", fake_fetch_json_page)
+
+    starred_repositories = fetch_user_starred_repositories("user-star-token")
+
+    assert captured_requests == [
+        {
+            "url": "https://api.github.com/user/starred?per_page=100&page=1",
+            "token": "user-star-token",
+            "accept": "application/vnd.github.star+json",
+        }
+    ]
+    assert starred_repositories == [
+        {
+            "repository": github_repo_payload("django/django"),
+            "starred_at": datetime(2026, 5, 1, 12, tzinfo=UTC),
+        }
+    ]
+
+
 @pytest.mark.django_db
 def test_import_starred_repositories_links_existing_and_syncs_new_with_user_token(
     monkeypatch,
@@ -843,6 +878,71 @@ def test_starred_repository_search_is_scoped_to_current_user(
     assert "Search your starred repositories." in content
     assert "django/django" in content
     assert "encode/httpx" not in content
+
+
+@pytest.mark.django_db
+def test_starred_repository_search_sorts_by_starred_at(auth_client, profile):
+    newest = Repository.objects.create(
+        full_name="owner/newest",
+        owner="owner",
+        name="newest",
+        url="https://github.com/owner/newest",
+        stars=10,
+    )
+    oldest = Repository.objects.create(
+        full_name="owner/oldest",
+        owner="owner",
+        name="oldest",
+        url="https://github.com/owner/oldest",
+        stars=1000,
+    )
+    unknown = Repository.objects.create(
+        full_name="owner/unknown",
+        owner="owner",
+        name="unknown",
+        url="https://github.com/owner/unknown",
+        stars=5000,
+    )
+    UserStarredRepository.objects.create(
+        profile=profile,
+        repository=oldest,
+        starred_at=datetime(2026, 4, 1, 12, tzinfo=UTC),
+    )
+    UserStarredRepository.objects.create(
+        profile=profile,
+        repository=newest,
+        starred_at=datetime(2026, 5, 2, 12, tzinfo=UTC),
+    )
+    UserStarredRepository.objects.create(profile=profile, repository=unknown)
+
+    response = auth_client.get(reverse("repos:starred"), {"sort": "starred"})
+    content = response.content.decode()
+
+    assert response.status_code == 200
+    assert [repo.full_name for repo in response.context["page_obj"].object_list] == [
+        "owner/newest",
+        "owner/oldest",
+        "owner/unknown",
+    ]
+    assert "Sort: Recently starred" in content
+    assert "starred 2026-05-02" in content
+    assert "starred 2026-04-01" in content
+
+
+@pytest.mark.django_db
+def test_starred_sort_label_is_scoped_to_starred_search(client):
+    Repository.objects.create(
+        full_name="owner/repo",
+        owner="owner",
+        name="repo",
+        url="https://github.com/owner/repo",
+        stars=10,
+    )
+
+    response = client.get(reverse("repos:search"), {"sort": "starred"})
+
+    assert response.status_code == 200
+    assert "Sort: Recently starred" not in response.content.decode()
 
 
 @pytest.mark.django_db
@@ -3412,6 +3512,12 @@ def test_repository_search_filters_and_sorts():
     qs = repository_search_queryset({"sort": "forks"})
     assert list(qs) == [old, recent, unsynced]
 
+    qs = repository_search_queryset(
+        {"sort": "stars"},
+        extra_sort_map={"stars": ("full_name", "asc")},
+    )
+    assert list(qs) == [old, unsynced, recent]
+
     qs = repository_search_queryset({"sort": "least_awesome"})
     assert list(qs) == [old, unsynced, recent]
 
@@ -4612,7 +4718,7 @@ def test_search_page_humanizes_stars_and_hides_tracked_star_growth(client):
 
 
 @pytest.mark.django_db
-def test_search_page_renders_tracked_commit_growth(client):
+def test_search_page_hides_tracked_commit_growth(client):
     repo = Repository.objects.create(
         full_name="django/django",
         owner="django",
@@ -4639,7 +4745,9 @@ def test_search_page_renders_tracked_commit_growth(client):
     response = client.get(reverse("repos:search"), {"q": "framework"})
 
     assert response.status_code == 200
-    assert b"+20 commits tracked" in response.content
+    assert b"90 commits" in response.content
+    assert b"+20 commits tracked" not in response.content
+    assert b"commits tracked" not in response.content
 
 
 @pytest.mark.django_db
