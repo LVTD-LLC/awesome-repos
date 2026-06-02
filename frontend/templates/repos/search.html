@@ -259,6 +259,7 @@
               <span class="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-800">{{ repo.awesome_count }} awesome list{{ repo.awesome_count|pluralize }}</span>
               {% if repo.commit_count != None %}<span class="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-800">{{ repo.commit_count }} commits</span>{% endif %}
               {% if repo.first_commit_at %}<span class="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-800">first commit {{ repo.first_commit_at|date:"Y-m-d" }}</span>{% endif %}
+              {% if is_personal_starred_search and repo.user_starred_at %}<span class="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-800">starred {{ repo.user_starred_at|date:"Y-m-d" }}</span>{% endif %}
               {% if repo.snapshot_count %}<span class="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-800">{{ repo.snapshot_count }} history point{{ repo.snapshot_count|pluralize }}</span>{% endif %}
               {% if repo.github_pushed_at %}<span class="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-800">updated {{ repo.github_pushed_at|date:"Y-m-d" }}</span>{% endif %}
             </div>

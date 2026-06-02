@@ -175,6 +175,9 @@
   <label for="{{ filter_id_prefix }}-sort" class="block text-sm font-semibold text-gray-800 dark:text-gray-200">Sort</label>
   <select id="{{ filter_id_prefix }}-sort" name="sort" {% if show_search_mode %}x-bind:disabled="searchMode === 'semantic'"{% endif %} class="mt-2 block w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400 focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 disabled:dark:bg-gray-900 disabled:dark:text-gray-500" {% if show_search_mode and request.GET.mode == "semantic" %}disabled{% endif %}>
     <option value="stars" {% if request.GET.sort == "stars" or not request.GET.sort %}selected{% endif %}>Sort by stars</option>
+    {% if is_personal_starred_search %}
+      <option value="starred" {% if request.GET.sort == "starred" %}selected{% endif %}>Recently starred</option>
+    {% endif %}
     <option value="forks" {% if request.GET.sort == "forks" %}selected{% endif %}>Most forks</option>
     <option value="recent" {% if request.GET.sort == "recent" %}selected{% endif %}>Recently updated</option>
     <option value="created" {% if request.GET.sort == "created" %}selected{% endif %}>Recently created</option>
