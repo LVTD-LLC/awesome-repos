@@ -1,4 +1,4 @@
-<div>
+<div{% if search_field_class %} class="{{ search_field_class }}"{% endif %}>
   <label for="{{ filter_id_prefix }}-query" class="block text-sm font-semibold text-gray-800 dark:text-gray-200">Search</label>
   <input
     id="{{ filter_id_prefix }}-query"

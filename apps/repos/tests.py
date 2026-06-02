@@ -928,7 +928,7 @@ def test_starred_repository_search_uses_shared_repository_filters(auth_client, p
     assert "example/django-tool" not in content
     assert "Awesome Django (1)" in content
     assert "web-framework (1)" in content
-    assert "Sort: Forks" in content
+    assert "Sort: Most forks" in content
     assert response.context["page_obj"].paginator.count == 1
 
 
@@ -4848,6 +4848,7 @@ def test_awesome_list_detail_page_filters_repositories(client):
     assert "web-framework (1)" in content
     assert 'name="mode"' in content
     assert 'name="list"' not in content
+    assert 'class="md:col-span-2"' in content
     assert "List: awesome-python" not in content
     assert "Most forks" in content
     assert "Fewest awesome-list mentions" in content

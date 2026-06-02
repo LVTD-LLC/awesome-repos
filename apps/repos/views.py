@@ -148,14 +148,14 @@ REPOSITORY_FILTER_PARAM_NAMES = (
     "ai_development",
 )
 REPOSITORY_SORT_LABELS = {
-    "stars": "Stars",
-    "forks": "Forks",
+    "stars": "Sort by stars",
+    "forks": "Most forks",
     "recent": "Recently updated",
     "created": "Recently created",
     "oldest": "Oldest first commit",
-    "commits": "Commits",
-    "awesome": "Most list mentions",
-    "least_awesome": "Fewest list mentions",
+    "commits": "Most commits",
+    "awesome": "Most awesome-list mentions",
+    "least_awesome": "Fewest awesome-list mentions",
     "name": "Name",
 }
 REPOSITORY_FILTER_LABELS = {
@@ -372,6 +372,7 @@ def repository_filter_context(
     awesome_list=None,
     profile=None,
     show_list_filter: bool = True,
+    search_field_class: str = "",
     filter_id_prefix: str = "repo-filter",
 ):
     params = repository_search_params(request)
@@ -420,6 +421,7 @@ def repository_filter_context(
             profile=profile,
         ),
         "filter_id_prefix": filter_id_prefix,
+        "search_field_class": search_field_class,
         "show_list_filter": show_list_filter,
         "show_search_mode": True,
         "search_action_url": search_url,
@@ -799,6 +801,7 @@ class AwesomeListDetailView(DetailView):
                 reset_url=self.object.get_absolute_url(),
                 awesome_list=self.object,
                 show_list_filter=False,
+                search_field_class="md:col-span-2",
                 filter_id_prefix="list-repo",
             )
         )
