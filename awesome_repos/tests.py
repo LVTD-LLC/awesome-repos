@@ -8,6 +8,10 @@ def test_logging_level_from_env_accepts_known_names():
     assert logging_level_from_env(" ERROR ", logging.INFO) == logging.ERROR
 
 
+def test_logging_level_from_env_accepts_numeric_strings():
+    assert logging_level_from_env("30", logging.INFO) == 30
+
+
 def test_logging_level_from_env_falls_back_for_unknown_names():
     assert logging_level_from_env("not-a-level", logging.INFO) == logging.INFO
 
@@ -26,6 +30,9 @@ def test_sentry_traces_sampler_drops_healthcheck_and_static_paths():
         sampler({"transaction_context": {"name": "/api/healthcheck", "op": "http.server"}}) == 0.0
     )
     assert sampler({"transaction_context": {"name": "/static/app.css", "op": "http.server"}}) == 0.0
+    assert (
+        sampler({"transaction_context": {"name": "/media/photo.jpg", "op": "http.server"}}) == 0.0
+    )
 
 
 def test_sentry_traces_sampler_uses_route_specific_rates():

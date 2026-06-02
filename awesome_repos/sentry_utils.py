@@ -29,7 +29,11 @@ def before_send(event, hint):
 
 
 def logging_level_from_env(value: str, default: int) -> int:
-    level = logging.getLevelName(value.strip().upper())
+    stripped = value.strip()
+    if stripped.isdigit():
+        return int(stripped)
+
+    level = logging.getLevelName(stripped.upper())
     if isinstance(level, int):
         return level
     return default
