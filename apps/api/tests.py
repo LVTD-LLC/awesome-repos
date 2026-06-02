@@ -118,7 +118,9 @@ def test_repository_search_api_uses_existing_filters(client, profile):
         description="Python web framework",
         language="Python",
         stars=90000,
+        commit_count=150,
         first_commit_at=timezone.now() - timedelta(days=365 * 12),
+        github_pushed_at=timezone.now() - timedelta(days=400),
         topics=["django", "web"],
         generated_tags=["web-framework"],
         detected_stacks=["django"],
@@ -133,6 +135,12 @@ def test_repository_search_api_uses_existing_filters(client, profile):
                 "evidence": [{"path": "pyproject.toml", "dependency": "django"}],
             }
         ],
+    )
+    RepositorySnapshot.objects.create(
+        repository=django_repo,
+        captured_at=timezone.now() - timedelta(days=30),
+        stars=60000,
+        commit_count=100,
     )
     Repository.objects.create(
         full_name="expressjs/express",
@@ -153,10 +161,14 @@ def test_repository_search_api_uses_existing_filters(client, profile):
             "language": "Python",
             "min_stars": "100",
             "min_age_years": "10",
+            "min_velocity_percent": "40",
+            "min_liability_percent": "40",
+            "unmaintained_days": "365",
             "topic": "django",
-            "stack": "django",
+            "framework": "django",
             "package_manager": "poetry",
             "sort": "stars",
+            "sort_direction": "desc",
         },
         **_api_key_header(profile),
     )
@@ -171,6 +183,8 @@ def test_repository_search_api_uses_existing_filters(client, profile):
     assert payload["results"][0]["stack_signals"][0]["label"] == "Django"
     assert payload["results"][0]["awesome_count"] == 1
     assert payload["results"][0]["awesome_lists"][0]["slug"] == "awesome-django"
+    assert payload["results"][0]["stars_growth_percent"] == 50
+    assert payload["results"][0]["commits_growth_percent"] == 50
 
 
 @pytest.mark.django_db

@@ -92,6 +92,7 @@ def test_mcp_search_repositories_tool_uses_shared_search_service(client, profile
         language="Python",
         stars=90000,
         topics=["django", "web"],
+        detected_stacks=["django"],
     )
     Repository.objects.create(
         full_name="expressjs/express",
@@ -118,6 +119,7 @@ def test_mcp_search_repositories_tool_uses_shared_search_service(client, profile
                         "q": "framework",
                         "language": "Python",
                         "topic": "django",
+                        "framework": "django",
                     },
                 },
             }

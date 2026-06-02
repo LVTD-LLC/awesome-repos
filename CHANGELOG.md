@@ -53,6 +53,7 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Awesome: detect repository dependency manifests during sync, infer package managers and stacks such as Django, Next.js, Rails, and Axum, and expose stack/package-manager filters in the UI, API, and MCP search tools.
 - Awesome: store repository website links from GitHub metadata or description URLs and show them on repository pages.
 - Awesome: added experimental superuser-only repository newsletters with tracked commits, generated issues, RSS feeds, and email delivery.
+- Awesome: added repository search filters for detected frameworks, unmaintained repositories, tracked commit velocity, tracked star growth, and sort direction.
 
 ### Changed
 - Awesome: unified repository search filters across global search, awesome-list repository search, and personal starred-repository search.

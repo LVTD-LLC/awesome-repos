@@ -91,8 +91,10 @@ uv run python manage.py makemigrations --check --dry-run
 
 Authenticated API keys can read account and catalog data from the API. Repository
 search accepts filters such as `q`, `language`, `list`, `topic`,
-`generated_tag`, `stack`, `package_manager`, `min_stars`, `updated_days`,
-`min_age_years`, `archived`, `ai_development`, and `sort`.
+`generated_tag`, `framework`, `stack`, `package_manager`, `min_stars`,
+`updated_days`, `unmaintained_days`, `min_velocity_percent`,
+`min_liability_percent`, `min_age_years`, `archived`, `ai_development`,
+`sort`, and `sort_direction`.
 
 Repository detail responses include dependency-file stack detection, list
 membership, growth history, README content, and similar repositories.

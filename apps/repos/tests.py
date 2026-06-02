@@ -3453,6 +3453,74 @@ def test_awesome_list_repository_queryset_skips_snapshot_metrics():
 
 
 @pytest.mark.django_db
+def test_repository_search_filters_growth_unmaintained_and_sort_direction():
+    now = timezone.now()
+    fast = Repository.objects.create(
+        full_name="owner/fast",
+        owner="owner",
+        name="fast",
+        url="https://github.com/owner/fast",
+        stars=150,
+        commit_count=150,
+        github_pushed_at=now - timedelta(days=400),
+    )
+    slow = Repository.objects.create(
+        full_name="owner/slow",
+        owner="owner",
+        name="slow",
+        url="https://github.com/owner/slow",
+        stars=120,
+        commit_count=105,
+        github_pushed_at=now - timedelta(days=20),
+    )
+    unknown_baseline = Repository.objects.create(
+        full_name="owner/unknown-baseline",
+        owner="owner",
+        name="unknown-baseline",
+        url="https://github.com/owner/unknown-baseline",
+        stars=200,
+        commit_count=200,
+        github_pushed_at=now - timedelta(days=800),
+    )
+    RepositorySnapshot.objects.create(
+        repository=fast,
+        captured_at=now - timedelta(days=30),
+        stars=100,
+        commit_count=100,
+    )
+    RepositorySnapshot.objects.create(
+        repository=slow,
+        captured_at=now - timedelta(days=30),
+        stars=100,
+        commit_count=100,
+    )
+    RepositorySnapshot.objects.create(
+        repository=unknown_baseline,
+        captured_at=now - timedelta(days=30),
+        stars=0,
+        commit_count=0,
+    )
+
+    assert list(repository_search_queryset({"min_velocity_percent": "40"})) == [fast]
+    assert list(repository_search_queryset({"min_liability_percent": "30"})) == [fast]
+    assert list(repository_search_queryset({"unmaintained_days": "365"})) == [
+        unknown_baseline,
+        fast,
+    ]
+
+    repos = list(repository_search_queryset({"sort": "velocity"}))
+    assert repos == [fast, slow, unknown_baseline]
+    assert repos[0].commits_growth_percent == 50
+    assert repos[0].stars_growth_percent == 50
+    assert repos[2].commits_growth_percent is None
+    assert repos[2].stars_growth_percent is None
+
+    assert list(
+        repository_search_queryset({"sort": "stars", "sort_direction": "asc"})
+    ) == [slow, fast, unknown_baseline]
+
+
+@pytest.mark.django_db
 def test_repository_search_filters_by_topic_and_generated_tag():
     django_repo = Repository.objects.create(
         full_name="django/django",
@@ -3482,6 +3550,7 @@ def test_repository_search_filters_by_topic_and_generated_tag():
     assert list(repository_search_queryset({"topic": "django"})) == [django_repo]
     assert list(repository_search_queryset({"generated_tag": "server runtime"})) == [node_repo]
     assert list(repository_search_queryset({"stack": "django"})) == [django_repo]
+    assert list(repository_search_queryset({"framework": "express"})) == [node_repo]
     assert list(repository_search_queryset({"package_manager": "npm"})) == [node_repo]
     assert list(repository_search_queryset({"q": "orm"})) == [django_repo]
     assert list(repository_search_queryset({"q": "express"})) == [node_repo]
@@ -4221,6 +4290,9 @@ def test_search_page_renders(client):
     assert b"Open filters" in content
     assert b"Repository filters" in content
     assert b"Any GitHub topic" in content
+    assert b"Any detected framework" in content
+    assert b"Commit velocity" in content
+    assert b"Sort direction" in content
     assert b"django (1)" in content
     assert b'href="/?topic=django"' in content
     assert b"web-framework (1)" in content
@@ -4836,6 +4908,7 @@ def test_awesome_list_detail_page_filters_repositories(client):
         language="Python",
         topics=["django", "python"],
         generated_tags=["web-framework"],
+        detected_stacks=["django"],
         stars=80000,
         commit_count=90000,
         first_commit_at=timezone.now() - timedelta(days=365 * 12),
@@ -4851,6 +4924,7 @@ def test_awesome_list_detail_page_filters_repositories(client):
         language="JavaScript",
         topics=["javascript", "runtime"],
         generated_tags=["server-runtime"],
+        detected_stacks=["express"],
         stars=110000,
         commit_count=120000,
         first_commit_at=timezone.now() - timedelta(days=365 * 2),
@@ -4867,6 +4941,7 @@ def test_awesome_list_detail_page_filters_repositories(client):
             "language": "Python",
             "topic": "django",
             "generated_tag": "web-framework",
+            "framework": "django",
             "min_stars": "50",
             "updated_days": "30",
             "min_age_years": "10",
@@ -4883,6 +4958,7 @@ def test_awesome_list_detail_page_filters_repositories(client):
     assert "nodejs/node" not in content
     assert "first commit" in content
     assert "django (1)" in content
+    assert "Django (1)" in content
     assert "web-framework (1)" in content
     assert 'name="mode"' in content
     assert 'name="list"' not in content

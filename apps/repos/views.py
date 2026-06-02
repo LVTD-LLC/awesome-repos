@@ -137,13 +137,18 @@ REPOSITORY_FILTER_PARAM_NAMES = (
     "language",
     "topic",
     "generated_tag",
+    "framework",
     "stack",
     "package_manager",
     "min_stars",
     "updated_days",
+    "unmaintained_days",
     "min_age_years",
+    "min_velocity_percent",
+    "min_liability_percent",
     "archived",
     "ai_development",
+    "sort_direction",
 )
 REPOSITORY_SORT_LABELS = {
     "stars": "Sort by stars",
@@ -152,6 +157,8 @@ REPOSITORY_SORT_LABELS = {
     "created": "Recently created",
     "oldest": "Oldest first commit",
     "commits": "Most commits",
+    "velocity": "Commit velocity",
+    "liability": "Star growth",
     "awesome": "Most awesome-list mentions",
     "least_awesome": "Fewest awesome-list mentions",
     "name": "Name",
@@ -163,19 +170,25 @@ REPOSITORY_FILTER_LABELS = {
     "language": "Language",
     "topic": "Topic",
     "generated_tag": "Tag",
-    "stack": "Stack",
+    "framework": "Framework",
+    "stack": "Framework",
     "package_manager": "Package manager",
     "min_stars": "Min stars",
     "updated_days": "Updated",
+    "unmaintained_days": "Unmaintained",
     "min_age_years": "Age",
+    "min_velocity_percent": "Velocity",
+    "min_liability_percent": "Star growth",
     "archived": "Archived",
     "ai_development": "AI dev",
     "sort": "Sort",
+    "sort_direction": "Direction",
 }
 REPOSITORY_FILTER_VALUE_LABELS = {
     "mode": {"semantic": "Semantic relevance"},
     "archived": {"yes": "Archived only", "no": "Active only"},
     "ai_development": {"yes": "Has signals", "no": "No signals"},
+    "sort_direction": {"asc": "Ascending", "desc": "Descending"},
 }
 
 
@@ -350,8 +363,12 @@ def active_repository_filter_chips(params) -> list[dict[str, str]]:
             continue
         if name == "updated_days":
             value = f"{value} days"
+        elif name == "unmaintained_days":
+            value = f"{value}+ days"
         elif name == "min_age_years":
             value = f"{value}+ years"
+        elif name in {"min_velocity_percent", "min_liability_percent"}:
+            value = f"{value}%+"
         elif name == "sort":
             value = REPOSITORY_SORT_LABELS.get(value, value)
         else:

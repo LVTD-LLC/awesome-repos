@@ -172,6 +172,8 @@ class RepositorySummaryOut(Schema):
     snapshot_count: int | None
     stars_since_first: int | None
     commits_since_first: int | None
+    stars_growth_percent: float | None
+    commits_growth_percent: float | None
     github_created_at: datetime | None
     github_updated_at: datetime | None
     github_pushed_at: datetime | None

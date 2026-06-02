@@ -64,6 +64,10 @@ def register_tools(server: FastMCP) -> None:  # noqa: C901
             str,
             Field(description="AI-generated repository discovery tag filter."),
         ] = "",
+        framework: Annotated[
+            str,
+            Field(description="Detected framework slug filter; aliases the stack filter."),
+        ] = "",
         stack: Annotated[str, Field(description="Detected framework or stack slug filter.")] = "",
         package_manager: Annotated[
             str,
@@ -71,13 +75,25 @@ def register_tools(server: FastMCP) -> None:  # noqa: C901
         ] = "",
         min_stars: Annotated[int | None, Field(ge=0)] = None,
         updated_days: Annotated[int | None, Field(ge=1)] = None,
+        unmaintained_days: Annotated[int | None, Field(ge=1)] = None,
         min_age_years: Annotated[int | None, Field(ge=1)] = None,
+        min_velocity_percent: Annotated[int | None, Field(ge=0)] = None,
+        min_liability_percent: Annotated[int | None, Field(ge=0)] = None,
         archived: Annotated[str, Field(description="'yes', 'no', or blank.")] = "",
         ai_development: Annotated[str, Field(description="'yes', 'no', or blank.")] = "",
         sort: Annotated[
             str,
-            Field(description="Sort by stars, recent, created, oldest, commits, awesome, or name."),
+            Field(
+                description=(
+                    "Sort by stars, recent, created, oldest, commits, velocity, "
+                    "liability, awesome, or name."
+                ),
+            ),
         ] = "stars",
+        sort_direction: Annotated[
+            str,
+            Field(description="'asc', 'desc', or blank for the default direction per sort."),
+        ] = "",
         page: Annotated[int, Field(ge=1)] = 1,
         page_size: Annotated[int, Field(ge=1, le=100)] = 30,
     ) -> dict:
@@ -90,14 +106,19 @@ def register_tools(server: FastMCP) -> None:  # noqa: C901
                 language=language,
                 topic=topic,
                 generated_tag=generated_tag,
+                framework=framework,
                 stack=stack,
                 package_manager=package_manager,
                 min_stars=min_stars,
                 updated_days=updated_days,
+                unmaintained_days=unmaintained_days,
                 min_age_years=min_age_years,
+                min_velocity_percent=min_velocity_percent,
+                min_liability_percent=min_liability_percent,
                 archived=archived,
                 ai_development=ai_development,
                 sort=sort,
+                sort_direction=sort_direction,
                 page=page,
                 page_size=page_size,
             )
@@ -217,6 +238,10 @@ def register_tools(server: FastMCP) -> None:  # noqa: C901
             str,
             Field(description="AI-generated repository discovery tag filter."),
         ] = "",
+        framework: Annotated[
+            str,
+            Field(description="Detected framework slug filter; aliases the stack filter."),
+        ] = "",
         stack: Annotated[str, Field(description="Detected framework or stack slug filter.")] = "",
         package_manager: Annotated[
             str,
@@ -224,13 +249,25 @@ def register_tools(server: FastMCP) -> None:  # noqa: C901
         ] = "",
         min_stars: Annotated[int | None, Field(ge=0)] = None,
         updated_days: Annotated[int | None, Field(ge=1)] = None,
+        unmaintained_days: Annotated[int | None, Field(ge=1)] = None,
         min_age_years: Annotated[int | None, Field(ge=1)] = None,
+        min_velocity_percent: Annotated[int | None, Field(ge=0)] = None,
+        min_liability_percent: Annotated[int | None, Field(ge=0)] = None,
         archived: Annotated[str, Field(description="'yes', 'no', or blank.")] = "",
         ai_development: Annotated[str, Field(description="'yes', 'no', or blank.")] = "",
         sort: Annotated[
             str,
-            Field(description="Sort by stars, recent, created, oldest, commits, awesome, or name."),
+            Field(
+                description=(
+                    "Sort by stars, recent, created, oldest, commits, velocity, "
+                    "liability, awesome, or name."
+                ),
+            ),
         ] = "stars",
+        sort_direction: Annotated[
+            str,
+            Field(description="'asc', 'desc', or blank for the default direction per sort."),
+        ] = "",
         page: Annotated[int, Field(ge=1)] = 1,
         page_size: Annotated[int, Field(ge=1, le=100)] = 50,
     ) -> dict:
@@ -246,14 +283,19 @@ def register_tools(server: FastMCP) -> None:  # noqa: C901
                     language=language,
                     topic=topic,
                     generated_tag=generated_tag,
+                    framework=framework,
                     stack=stack,
                     package_manager=package_manager,
                     min_stars=min_stars,
                     updated_days=updated_days,
+                    unmaintained_days=unmaintained_days,
                     min_age_years=min_age_years,
+                    min_velocity_percent=min_velocity_percent,
+                    min_liability_percent=min_liability_percent,
                     archived=archived,
                     ai_development=ai_development,
                     sort=sort,
+                    sort_direction=sort_direction,
                     page=page,
                     page_size=page_size,
                 )
