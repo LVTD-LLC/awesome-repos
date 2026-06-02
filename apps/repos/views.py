@@ -352,11 +352,12 @@ def labeled_repository_value_counts(field_name: str, labeler, **kwargs) -> list[
     ]
 
 
-def public_repository_filter_options(base_queryset) -> dict:
+def public_repository_filter_options() -> dict:
     options = cache.get(PUBLIC_REPOSITORY_FILTER_OPTIONS_CACHE_KEY)
     if options is not None:
         return options
 
+    base_queryset = visible_repository_queryset()
     options = {
         "awesome_lists": list(
             AwesomeList.objects.filter(is_active=True)
@@ -561,7 +562,7 @@ class RepositorySearchView(ListView):
         context["object_list"] = context["repositories"]
         context["page_obj"].object_list = context["repositories"]
         visible_repositories = visible_repository_queryset()
-        filter_options = public_repository_filter_options(visible_repositories)
+        filter_options = public_repository_filter_options()
         search_url = reverse("repos:search")
         context.update(
             repository_filter_context(

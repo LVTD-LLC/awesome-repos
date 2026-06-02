@@ -73,7 +73,6 @@ from apps.repos.services import (
     sync_repository_stack_detection,
     update_awesome_list_metadata,
     upsert_repository_from_github,
-    visible_repository_queryset,
 )
 from apps.repos.stack_detection import (
     dependency_file_candidates,
@@ -3620,21 +3619,85 @@ def test_public_repository_filter_options_are_cached():
         )
         AwesomeListItem.objects.create(awesome_list=active_list, repository=repo)
 
-        visible_repositories = visible_repository_queryset()
-        first_options = public_repository_filter_options(visible_repositories)
+        first_options = public_repository_filter_options()
 
         assert first_options["languages"] == ["Python"]
         assert first_options["awesome_lists"][0].repo_count == 1
         assert first_options["topic_options"] == [{"name": "django", "count": 1}]
 
         with CaptureQueriesContext(connection) as queries:
-            cached_options = public_repository_filter_options(visible_repositories)
+            cached_options = public_repository_filter_options()
 
         assert len(queries) == 0
         assert cached_options["languages"] == ["Python"]
         assert [awesome_list.id for awesome_list in cached_options["awesome_lists"]] == [
             active_list.id
         ]
+    finally:
+        cache.clear()
+
+
+@pytest.mark.django_db
+@override_settings(CACHES=LOC_MEM_CACHES)
+@pytest.mark.parametrize("model_name", ["repository", "awesome_list", "awesome_list_item"])
+def test_public_repository_filter_options_cache_invalidates_on_catalog_changes(model_name):
+    cache.clear()
+    try:
+        if model_name == "awesome_list_item":
+            active_list = AwesomeList.objects.create(
+                name="Awesome Django",
+                slug="awesome-django",
+                source_url="https://github.com/wsvincent/awesome-django",
+            )
+            repo = Repository.objects.create(
+                full_name="django/django",
+                owner="django",
+                name="django",
+                url="https://github.com/django/django",
+                description="The Web framework",
+                language="Python",
+                stars=75,
+            )
+
+        public_repository_filter_options()
+        with CaptureQueriesContext(connection) as queries:
+            public_repository_filter_options()
+
+        assert len(queries) == 0
+
+        if model_name == "repository":
+            Repository.objects.create(
+                full_name="django/django",
+                owner="django",
+                name="django",
+                url="https://github.com/django/django",
+                description="The Web framework",
+                language="Python",
+                stars=75,
+            )
+        elif model_name == "awesome_list":
+            AwesomeList.objects.create(
+                name="Awesome Django",
+                slug="awesome-django",
+                source_url="https://github.com/wsvincent/awesome-django",
+            )
+        else:
+            AwesomeListItem.objects.create(awesome_list=active_list, repository=repo)
+
+        with CaptureQueriesContext(connection) as queries:
+            updated_options = public_repository_filter_options()
+
+        assert len(queries) > 0
+        if model_name == "repository":
+            assert updated_options["languages"] == ["Python"]
+            assert updated_options["total_repositories"] == 1
+        elif model_name == "awesome_list":
+            assert updated_options["total_lists"] == 1
+            assert [awesome_list.name for awesome_list in updated_options["awesome_lists"]] == [
+                "Awesome Django"
+            ]
+        else:
+            assert updated_options["awesome_lists"][0].repo_count == 1
     finally:
         cache.clear()
 
