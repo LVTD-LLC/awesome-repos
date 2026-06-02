@@ -1,4 +1,5 @@
 import json
+from urllib.error import URLError
 
 import pytest
 from django.core.cache import cache
@@ -30,6 +31,19 @@ class TestSponsorAdsCheckout:
         assert captured["path"] == "checkout/sessions"
         assert captured["data"]["customer_creation"] == "always"
         assert "customer_update[name]" not in captured["data"]
+
+
+    @override_settings(STRIPE_SECRET_KEY="sk_test", STRIPE_AWESOME_ADS_PRICE_ID="price_test")
+    def test_checkout_wraps_stripe_network_errors(self, monkeypatch):
+        from apps.core.payments import StripeRequestError
+
+        def raise_network_error(*args, **kwargs):
+            raise URLError("dns failure")
+
+        monkeypatch.setattr("apps.core.payments.urlopen", raise_network_error)
+
+        with pytest.raises(StripeRequestError, match="dns failure"):
+            create_ads_checkout_session(success_url="https://example.com/success", cancel_url="/")
 
     @override_settings(STRIPE_SECRET_KEY="sk_test", STRIPE_AWESOME_ADS_PRICE_ID="price_test")
     def test_checkout_creates_purchase_and_redirects_to_stripe(self, client, monkeypatch):
