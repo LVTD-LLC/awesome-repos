@@ -885,6 +885,49 @@ def test_starred_repository_search_is_scoped_to_current_user(
 
 
 @pytest.mark.django_db
+def test_starred_repository_search_skips_full_snapshot_metrics(
+    auth_client,
+    profile,
+    monkeypatch,
+):
+    from apps.repos import views as repo_views
+
+    repo = Repository.objects.create(
+        full_name="django/django",
+        owner="django",
+        name="django",
+        url="https://github.com/django/django",
+        description="The Web framework",
+        language="Python",
+        stars=75,
+    )
+    UserStarredRepository.objects.create(profile=profile, repository=repo)
+    RepositorySnapshot.objects.create(
+        repository=repo,
+        captured_at=timezone.now() - timedelta(days=1),
+        stars=50,
+    )
+    original_repository_search_queryset = repo_views.repository_search_queryset
+    calls = []
+
+    def capture_repository_search_queryset(params, *args, **kwargs):
+        calls.append(kwargs.get("include_snapshot_metrics"))
+        return original_repository_search_queryset(params, *args, **kwargs)
+
+    monkeypatch.setattr(
+        repo_views,
+        "repository_search_queryset",
+        capture_repository_search_queryset,
+    )
+
+    response = auth_client.get(reverse("repos:starred"))
+
+    assert response.status_code == 200
+    assert calls == [False]
+    assert b"1 history point" in response.content
+
+
+@pytest.mark.django_db
 def test_starred_repository_search_sorts_by_starred_at(auth_client, profile):
     newest = Repository.objects.create(
         full_name="owner/newest",
