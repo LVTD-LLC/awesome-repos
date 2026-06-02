@@ -70,10 +70,21 @@ def _try_reserve_daily_missing_repository_slot(daily_limit: int) -> bool:
     return used <= daily_limit
 
 
-def _available_repository_refresh_limit(refresh_limit: int, min_remaining: int | None) -> int:
+def _repository_sync_pool_size(pool_size: int | None = None) -> int:
+    if pool_size is not None:
+        return pool_size
+    return github_repository_sync_token_pool_size()
+
+
+def _available_repository_refresh_limit(
+    refresh_limit: int,
+    min_remaining: int | None,
+    *,
+    pool_size: int | None = None,
+) -> int:
     if min_remaining is None or refresh_limit <= 0:
         return refresh_limit
-    if github_repository_sync_token_pool_size() > 1:
+    if _repository_sync_pool_size(pool_size) > 1:
         return refresh_limit
 
     if github_rate_limit_remaining() is None:
@@ -85,10 +96,14 @@ def _available_repository_refresh_limit(refresh_limit: int, min_remaining: int |
     return min(refresh_limit, max(0, remaining - min_remaining))
 
 
-def _github_refresh_budget_exhausted(min_remaining: int | None) -> bool:
+def _github_refresh_budget_exhausted(
+    min_remaining: int | None,
+    *,
+    pool_size: int | None = None,
+) -> bool:
     if min_remaining is None:
         return False
-    if github_repository_sync_token_pool_size() > 1:
+    if _repository_sync_pool_size(pool_size) > 1:
         return False
 
     # Rate-limit state is process-local and only populated after a GitHub response.
@@ -412,13 +427,10 @@ def refresh_repository_task(
         repository_full_name=full_name,
     )
     try:
-        if github_access_token:
-            refreshed = Repository.sync_from_source(
-                full_name,
-                github_access_token=github_access_token,
-            )
-        else:
-            refreshed = Repository.sync_from_source(full_name)
+        refreshed = Repository.sync_from_source(
+            full_name,
+            github_access_token=github_access_token,
+        )
         logger.info(
             "repository_refresh_task_finished",
             requested_repository_id=repository_id,
@@ -474,13 +486,18 @@ def refresh_repositories_task(
         "id",
         "full_name",
     )
-    refresh_limit = _available_repository_refresh_limit(refresh_limit, min_remaining)
+    sync_token_pool = github_repository_sync_token_pool()
+    sync_token_pool_size = len(sync_token_pool)
+    refresh_limit = _available_repository_refresh_limit(
+        refresh_limit,
+        min_remaining,
+        pool_size=sync_token_pool_size,
+    )
     queryset = queryset[:refresh_limit]
 
     queued = []
-    sync_token_pool = github_repository_sync_token_pool()
     for repository_id, full_name in queryset.iterator():
-        if _github_refresh_budget_exhausted(min_remaining):
+        if _github_refresh_budget_exhausted(min_remaining, pool_size=sync_token_pool_size):
             logger.warning(
                 "repository_refresh_stopped_for_rate_limit_budget",
                 remaining=github_rate_limit_remaining(),

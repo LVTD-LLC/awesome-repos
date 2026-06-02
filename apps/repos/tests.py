@@ -3409,7 +3409,7 @@ def test_refresh_repository_task_updates_single_repository(monkeypatch):
     )
     refreshed = []
 
-    def fake_sync_from_source(full_name):
+    def fake_sync_from_source(full_name, *, github_access_token=None):
         refreshed.append(full_name)
         return repository
 
@@ -3515,7 +3515,7 @@ def test_refresh_repository_task_logs_and_reraises_failures(monkeypatch):
 
     dummy_logger = DummyLogger()
 
-    def fake_sync_from_source(full_name):
+    def fake_sync_from_source(full_name, *, github_access_token=None):
         raise RuntimeError(f"could not refresh {full_name}")
 
     monkeypatch.setattr("apps.repos.tasks.logger", dummy_logger)
@@ -3712,7 +3712,14 @@ def test_refresh_repositories_task_assigns_sync_tokens_and_uses_pool_budget(
     queued = []
 
     monkeypatch.setattr("apps.repos.tasks.github_rate_limit_remaining", lambda: 0)
-    monkeypatch.setattr("apps.repos.tasks.github_repository_sync_token_pool_size", lambda: 2)
+
+    def fail_pool_size_lookup():
+        raise AssertionError("refresh fanout should use the preloaded token pool size")
+
+    monkeypatch.setattr(
+        "apps.repos.tasks.github_repository_sync_token_pool_size",
+        fail_pool_size_lookup,
+    )
     monkeypatch.setattr(
         "apps.repos.tasks.github_repository_sync_token_pool",
         lambda: ["primary-token", "user-token"],
@@ -3780,7 +3787,7 @@ def test_refresh_repository_task_stops_on_rate_limit_error(monkeypatch):
         url="https://github.com/owner/stale",
     )
 
-    def fail_sync_from_source(full_name):
+    def fail_sync_from_source(full_name, *, github_access_token=None):
         raise GitHubAPIError(
             "403 Forbidden | rate_limit_remaining=0",
             status_code=403,

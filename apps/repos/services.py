@@ -1916,8 +1916,7 @@ def discover_missing_awesome_list_repositories(
     awesome_list: AwesomeList, limit: int | None = None
 ) -> dict:
     full_name = awesome_list.repo_full_name or parse_github_repo_url(awesome_list.source_url)
-    sync_token_pool = github_repository_sync_token_pool()
-    list_sync_token = github_repository_sync_token_from_pool(sync_token_pool, 0)
+    list_sync_token = github_repository_sync_token_for_index(0)
     logger.info(
         "awesome_list_missing_repo_discovery_started",
         awesome_list_id=awesome_list.id,
