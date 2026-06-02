@@ -946,16 +946,13 @@ def attach_awesome_list_commit_count(
 
     try:
         first_commit_at = None
-        kwargs = {}
-        if token:
-            kwargs["token"] = token
         if existing_first_commit_at is not None:
-            commit_count = fetch_github_commit_count(full_name, default_branch, **kwargs)
+            commit_count = fetch_github_commit_count(full_name, default_branch, token=token)
         else:
             commit_count, first_commit_at = fetch_github_commit_count_and_first_commit_at(
                 full_name,
                 default_branch,
-                **kwargs,
+                token=token,
             )
         meta["commits_count"] = commit_count
         if first_commit_at is not None:
@@ -2015,10 +2012,10 @@ def add_repository_to_awesome_list(
     repo = Repository.objects.filter(full_name=repo_full_name).first()
     repository_created = repo is None
     if repo is None:
-        kwargs = {}
-        if github_access_token:
-            kwargs["github_access_token"] = github_access_token
-        repo = upsert_repository_from_github(repo_full_name, **kwargs)
+        repo = upsert_repository_from_github(
+            repo_full_name,
+            github_access_token=github_access_token,
+        )
 
     _, link_created = AwesomeListItem.objects.get_or_create(
         awesome_list=awesome_list,

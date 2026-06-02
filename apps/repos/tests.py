@@ -1617,8 +1617,8 @@ def test_fetch_github_commit_count_requires_default_branch(monkeypatch):
 def test_attach_awesome_list_commit_count_is_explicit_about_commit_fetch(monkeypatch):
     calls = []
 
-    def fake_fetch_commit_activity(full_name, default_branch):
-        calls.append((full_name, default_branch))
+    def fake_fetch_commit_activity(full_name, default_branch, *, token=None):
+        calls.append((full_name, default_branch, token))
         return 456, datetime(2008, 4, 10, tzinfo=UTC)
 
     monkeypatch.setattr(
@@ -1629,7 +1629,7 @@ def test_attach_awesome_list_commit_count_is_explicit_about_commit_fetch(monkeyp
 
     attach_awesome_list_commit_count("owner/repo", meta)
 
-    assert calls == [("owner/repo", "trunk")]
+    assert calls == [("owner/repo", "trunk", None)]
     assert meta["commits_count"] == 456
     assert meta["first_commit_at"] == datetime(2008, 4, 10, tzinfo=UTC)
 
@@ -2401,7 +2401,7 @@ def test_enqueue_missing_repositories_for_awesome_list_task_assigns_sync_tokens(
             "apps.repos.tasks.add_missing_repository_to_awesome_list_task",
             (awesome_list.id, "django/django"),
             {
-                "github_access_token": "primary-token",
+                "github_token_index": 0,
                 "group": "Add missing awesome-list repos",
             },
         ),
@@ -2409,7 +2409,7 @@ def test_enqueue_missing_repositories_for_awesome_list_task_assigns_sync_tokens(
             "apps.repos.tasks.add_missing_repository_to_awesome_list_task",
             (awesome_list.id, "encode/httpx"),
             {
-                "github_access_token": "user-token",
+                "github_token_index": 1,
                 "group": "Add missing awesome-list repos",
             },
         ),
@@ -2538,7 +2538,7 @@ def test_add_missing_repository_to_awesome_list_task_persists_last_error(monkeyp
         source_url="https://github.com/wsvincent/awesome-django",
     )
 
-    def fail_add_repository(awesome_list, repo_full_name):
+    def fail_add_repository(awesome_list, repo_full_name, *, github_access_token=None):
         raise RuntimeError(f"GitHub failed for {repo_full_name}")
 
     monkeypatch.setattr("apps.repos.tasks.add_repository_to_awesome_list", fail_add_repository)
@@ -2573,13 +2573,17 @@ def test_add_missing_repository_to_awesome_list_task_passes_sync_token(monkeypat
         }
 
     monkeypatch.setattr("apps.repos.tasks.add_repository_to_awesome_list", fake_add_repository)
+    monkeypatch.setattr(
+        "apps.repos.tasks.github_repository_sync_token_for_index",
+        lambda index: "user-token",
+    )
 
     from apps.repos.tasks import add_missing_repository_to_awesome_list_task
 
     result = add_missing_repository_to_awesome_list_task(
         awesome_list.id,
         "django/django",
-        github_access_token="user-token",
+        github_token_index=3,
     )
 
     assert result["repository"] == "django/django"
@@ -3425,7 +3429,7 @@ def test_refresh_repository_task_updates_single_repository(monkeypatch):
 
 
 @pytest.mark.django_db
-def test_refresh_repository_task_passes_sync_token(monkeypatch):
+def test_refresh_repository_task_resolves_sync_token_index(monkeypatch):
     repository = Repository.objects.create(
         full_name="django/django",
         owner="django",
@@ -3443,11 +3447,15 @@ def test_refresh_repository_task_passes_sync_token(monkeypatch):
         "apps.repos.tasks.Repository.sync_from_source",
         staticmethod(fake_sync_from_source),
     )
+    monkeypatch.setattr(
+        "apps.repos.tasks.github_repository_sync_token_for_index",
+        lambda index: "user-token",
+    )
 
     result = refresh_repository_task(
         repository.id,
         repository.full_name,
-        github_access_token="user-token",
+        github_token_index=3,
     )
 
     assert captured == {
@@ -3710,19 +3718,18 @@ def test_refresh_repositories_task_assigns_sync_tokens_and_uses_pool_budget(
         last_synced_at=timezone.now() - timedelta(days=1),
     )
     queued = []
+    pool_calls = 0
 
     monkeypatch.setattr("apps.repos.tasks.github_rate_limit_remaining", lambda: 0)
 
-    def fail_pool_size_lookup():
-        raise AssertionError("refresh fanout should use the preloaded token pool size")
+    def fake_token_pool():
+        nonlocal pool_calls
+        pool_calls += 1
+        return ["primary-token", "user-token"]
 
     monkeypatch.setattr(
-        "apps.repos.tasks.github_repository_sync_token_pool_size",
-        fail_pool_size_lookup,
-    )
-    monkeypatch.setattr(
         "apps.repos.tasks.github_repository_sync_token_pool",
-        lambda: ["primary-token", "user-token"],
+        fake_token_pool,
     )
 
     def fake_async_task(func_path, repository_id, full_name, **kwargs):
@@ -3739,20 +3746,21 @@ def test_refresh_repositories_task_assigns_sync_tokens_and_uses_pool_budget(
             "apps.repos.tasks.refresh_repository_task",
             stale.id,
             "owner/stale",
-            {"github_access_token": "primary-token", "group": "Refresh repositories"},
+            {"github_token_index": 0, "group": "Refresh repositories"},
             f"task-{stale.id}",
         ),
         (
             "apps.repos.tasks.refresh_repository_task",
             fresh.id,
             "owner/fresh",
-            {"github_access_token": "user-token", "group": "Refresh repositories"},
+            {"github_token_index": 1, "group": "Refresh repositories"},
             f"task-{fresh.id}",
         ),
     ]
     assert result["queued"] == 2
     assert result["limit"] == 2
     assert result["rate_limit_remaining"] == 0
+    assert pool_calls == 1
 
 
 @pytest.mark.django_db
