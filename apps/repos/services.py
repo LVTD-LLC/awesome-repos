@@ -186,7 +186,10 @@ def github_user_tokens_for_repository_sync() -> list[str]:
     tokens = []
     seen = set()
     queryset = (
-        SocialToken.objects.filter(account__provider="github")
+        SocialToken.objects.filter(
+            account__provider="github",
+            account__user__profile__github_starred_repos_import_enabled=True,
+        )
         .exclude(token="")
         .filter(models.Q(expires_at__isnull=True) | models.Q(expires_at__gt=now))
         .order_by("id")

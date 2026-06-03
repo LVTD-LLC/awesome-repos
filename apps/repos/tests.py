@@ -2630,6 +2630,8 @@ def test_github_repository_sync_token_pool_keeps_configured_token_first(
 ):
     settings.GITHUB_REPOSITORY_SYNC_USE_USER_TOKENS = True
     monkeypatch.setenv("GITHUB_TOKEN", "primary-token")
+    profile.github_starred_repos_import_enabled = True
+    profile.save(update_fields=["github_starred_repos_import_enabled", "updated_at"])
     attach_github_token(profile, token="user-token-a", uid="github-a")
     attach_github_token(profile, token="primary-token", uid="github-duplicate-primary")
 
@@ -2638,7 +2640,16 @@ def test_github_repository_sync_token_pool_keeps_configured_token_first(
         email="other@example.com",
         password="password123",
     )
+    other_user.profile.github_starred_repos_import_enabled = True
+    other_user.profile.save(update_fields=["github_starred_repos_import_enabled", "updated_at"])
     attach_github_token(other_user.profile, token="user-token-b", uid="github-b")
+
+    opted_out_user = django_user_model.objects.create_user(
+        username="opted-out-sync",
+        email="opted-out-sync@example.com",
+        password="password123",
+    )
+    attach_github_token(opted_out_user.profile, token="opted-out-token", uid="github-opted-out")
 
     expired_account = SocialAccount.objects.create(
         user=profile.user,
