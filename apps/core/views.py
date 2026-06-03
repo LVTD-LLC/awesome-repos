@@ -32,7 +32,9 @@ from apps.core.payments import (
     StripeRequestError,
     create_ads_checkout_session,
     create_highlighted_repo_checkout_session,
+    create_remove_ads_checkout_session,
     highlighted_repo_checkout_configured,
+    remove_ads_checkout_configured,
     retrieve_checkout_session,
     stripe_configured,
     verify_webhook_signature,
@@ -168,6 +170,37 @@ def upsert_highlighted_repo_from_checkout_session(session):
     return purchase
 
 
+def enable_remove_ads_for_checkout_session(session, expected_user_id=None):
+    metadata = session.get("metadata", {})
+    if metadata.get("app") != "awesome" or metadata.get("kind") != "remove_ads":
+        return None
+
+    if session.get("payment_status") != "paid":
+        return None
+
+    client_reference_id = session.get("client_reference_id")
+    if not client_reference_id:
+        return None
+
+    try:
+        user_id = int(client_reference_id)
+    except (TypeError, ValueError):
+        return None
+
+    if expected_user_id is not None and user_id != expected_user_id:
+        return None
+
+    profile = Profile.objects.filter(user_id=user_id).first()
+    if profile is None:
+        return None
+
+    if not profile.remove_ads:
+        profile.remove_ads = True
+        profile.save(update_fields=["remove_ads", "updated_at"])
+
+    return profile
+
+
 @require_POST
 def sponsor_checkout(request):
     if not stripe_configured():
@@ -272,6 +305,37 @@ def highlighted_repo_checkout(request):
     return redirect(session["url"])
 
 
+@login_required
+@require_POST
+def remove_ads_checkout(request):
+    profile, _created = Profile.objects.get_or_create(user=request.user)
+    if profile.remove_ads:
+        messages.success(request, "Ads are already removed for your account.")
+        return redirect("settings")
+
+    if not remove_ads_checkout_configured():
+        messages.error(request, "Remove Ads checkout is not configured yet.")
+        return redirect("settings")
+
+    success_url = (
+        build_absolute_public_url(reverse("settings"))
+        + "?remove_ads=success&session_id={CHECKOUT_SESSION_ID}"
+    )
+    cancel_url = build_absolute_public_url(reverse("settings"))
+    try:
+        session = create_remove_ads_checkout_session(
+            success_url=success_url,
+            cancel_url=cancel_url,
+            client_reference_id=str(request.user.id),
+        )
+    except (StripeConfigurationError, StripeRequestError) as exc:
+        logger.error("Remove Ads checkout creation failed", error=str(exc), exc_info=True)
+        messages.error(request, "Could not start checkout. Please try again shortly.")
+        return redirect("settings")
+
+    return redirect(session["url"])
+
+
 def highlighted_repo_success(request):
     session_id = request.GET.get("session_id") or request.POST.get("session_id")
     if not session_id:
@@ -368,6 +432,8 @@ def stripe_webhook(request):
                 HighlightedRepoPurchase.Status.ACTIVE,
             }:
                 notify_highlighted_repo_payment(purchase)
+        elif metadata.get("app") == "awesome" and metadata.get("kind") == "remove_ads":
+            enable_remove_ads_for_checkout_session(session)
 
     return HttpResponse("ok")
 
@@ -416,6 +482,33 @@ class UserSettingsView(LoginRequiredMixin, TemplateView):
         context["github_starred_last_imported_at"] = profile.github_starred_repos_last_imported_at
         context["github_starred_last_error"] = profile.github_starred_repos_last_error
         context["liked_repository_count"] = RepositoryLike.objects.filter(user=user).count()
+        context["remove_ads_enabled"] = profile.remove_ads
+        context["remove_ads_checkout_configured"] = remove_ads_checkout_configured()
+        if self.request.GET.get("remove_ads") == "success":
+            session_id = self.request.GET.get("session_id", "")
+            if session_id and remove_ads_checkout_configured():
+                try:
+                    enable_remove_ads_for_checkout_session(
+                        retrieve_checkout_session(session_id),
+                        expected_user_id=user.id,
+                    )
+                    profile.refresh_from_db()
+                    context["remove_ads_enabled"] = profile.remove_ads
+                except (StripeConfigurationError, StripeRequestError) as exc:
+                    logger.warning(
+                        "Remove Ads checkout session refresh failed",
+                        session_id=session_id,
+                        error=str(exc),
+                    )
+
+            if profile.remove_ads:
+                messages.success(self.request, "Ads are removed for your account.")
+            else:
+                messages.success(
+                    self.request,
+                    "Thanks — your payment is processing. "
+                    "Ads will disappear once Stripe confirms it.",
+                )
 
         return context
 

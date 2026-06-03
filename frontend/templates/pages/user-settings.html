@@ -155,6 +155,38 @@
       </div>
 
       <aside class="space-y-6">
+        <section class="app-card p-6" aria-labelledby="remove-ads-heading">
+          <div class="flex items-start justify-between gap-4">
+            <div>
+              <h2 id="remove-ads-heading" class="text-lg font-bold text-gray-950 dark:text-white">Remove ads</h2>
+              <p class="app-text-muted mt-2 text-sm leading-6">
+                Hide side ads and highlighted repository placements from your Awesome account. One-time purchase.
+              </p>
+            </div>
+            <span class="inline-flex shrink-0 rounded-full px-3 py-1 text-sm font-semibold {% if remove_ads_enabled %}bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-200{% else %}bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200{% endif %}">
+              {% if remove_ads_enabled %}Active{% else %}$4{% endif %}
+            </span>
+          </div>
+          <div class="mt-5">
+            {% if remove_ads_enabled %}
+              <p class="rounded-xl bg-green-50 p-4 text-sm font-semibold text-green-800 dark:bg-green-950/40 dark:text-green-100">
+                Ads are removed for this account.
+              </p>
+            {% elif remove_ads_checkout_configured %}
+              <form method="post" action="{% url 'remove_ads_checkout' %}">
+                {% csrf_token %}
+                <button type="submit" class="app-button-primary w-full">
+                  Remove ads for $4
+                </button>
+              </form>
+            {% else %}
+              <button type="button" disabled aria-disabled="true" class="app-button-secondary w-full">
+                Remove Ads checkout unavailable
+              </button>
+            {% endif %}
+          </div>
+        </section>
+
         <section class="app-card p-6" aria-labelledby="account-settings-heading">
           <h2 id="account-settings-heading" class="text-lg font-bold text-gray-950 dark:text-white">Account</h2>
           <dl class="mt-5 space-y-4">

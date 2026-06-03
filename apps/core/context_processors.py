@@ -34,7 +34,24 @@ def chatwoot_settings(request):
     }
 
 
+def user_has_removed_ads(request):
+    if not getattr(request, "user", None) or not request.user.is_authenticated:
+        return False
+
+    try:
+        return bool(request.user.profile.remove_ads)
+    except Exception:
+        return False
+
+
+def ads_removed(request):
+    return {"ads_removed": user_has_removed_ads(request)}
+
+
 def active_sponsor_ad(request):
+    if user_has_removed_ads(request):
+        return {"awesome_sponsor_ad": None}
+
     cache_key = "awesome:active_sponsor_ad"
     cache_miss = object()
     no_active_ad = "__awesome_no_active_sponsor_ad__"
@@ -54,6 +71,9 @@ def active_sponsor_ad(request):
 
 
 def active_highlighted_repo(request):
+    if user_has_removed_ads(request):
+        return {"awesome_highlighted_repo": None}
+
     cache_key = "awesome:active_highlighted_repo"
     cache_miss = object()
     no_active_highlight = "__awesome_no_active_highlighted_repo__"

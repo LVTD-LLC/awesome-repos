@@ -21,6 +21,7 @@ urlpatterns = [
     path("resend-confirmation/", views.resend_confirmation_email, name="resend_confirmation"),
     path("delete-account/", views.delete_account, name="delete_account"),
     path("sponsor/checkout/", views.sponsor_checkout, name="sponsor_checkout"),
+    path("remove-ads/checkout/", views.remove_ads_checkout, name="remove_ads_checkout"),
     path("sponsor/success/", views.sponsor_success, name="sponsor_success"),
     path(
         "highlighted-repo/checkout/",

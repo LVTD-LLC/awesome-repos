@@ -25,6 +25,10 @@ def highlighted_repo_checkout_configured():
     return bool(settings.STRIPE_SECRET_KEY and settings.STRIPE_AWESOME_HIGHLIGHTED_REPO_PRICE_ID)
 
 
+def remove_ads_checkout_configured():
+    return bool(settings.STRIPE_SECRET_KEY and settings.STRIPE_AWESOME_REMOVE_ADS_PRICE_ID)
+
+
 def _stripe_headers():
     if not settings.STRIPE_SECRET_KEY:
         raise StripeConfigurationError("Stripe secret key is not configured.")
@@ -105,6 +109,17 @@ def create_highlighted_repo_checkout_session(*, success_url, cancel_url, client_
         cancel_url=cancel_url,
         kind="highlighted_repo",
         duration="7_days",
+        client_reference_id=client_reference_id,
+    )
+
+
+def create_remove_ads_checkout_session(*, success_url, cancel_url, client_reference_id=""):
+    return _create_checkout_session(
+        price_id=settings.STRIPE_AWESOME_REMOVE_ADS_PRICE_ID,
+        success_url=success_url,
+        cancel_url=cancel_url,
+        kind="remove_ads",
+        duration="lifetime",
         client_reference_id=client_reference_id,
     )
 
