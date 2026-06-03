@@ -58,6 +58,8 @@ from apps.repos.services import (
     fetch_repository_tree_items,
     fetch_user_starred_repositories,
     github_rate_limit_status,
+    github_repository_sync_token_for_index,
+    github_repository_sync_token_pool,
     import_starred_repositories_for_profile,
     is_same_repository_url_or_subpath,
     minimum_age_cutoff,
@@ -457,7 +459,7 @@ def test_sync_awesome_list_stores_list_activity_metadata(monkeypatch):
         lambda *args, **kwargs: (350, datetime(2015, 1, 2, tzinfo=UTC)),
     )
 
-    def fake_upsert(full_name, *, active_source_full_names=None):
+    def fake_upsert(full_name, *, active_source_full_names=None, github_access_token=None):
         owner, name = full_name.split("/", 1)
         return Repository.objects.create(
             full_name=full_name,
@@ -499,6 +501,62 @@ def test_sync_awesome_list_stores_list_activity_metadata(monkeypatch):
     assert snapshot.readme_repository_count == 2
     assert snapshot.default_branch == "main"
     assert snapshot.first_commit_at == datetime(2015, 1, 2, tzinfo=UTC)
+
+
+@pytest.mark.django_db
+def test_sync_awesome_list_uses_sync_tokens_for_list_and_repositories(monkeypatch):
+    awesome_list = AwesomeList.objects.create(
+        name="Awesome Django",
+        slug="awesome-django",
+        source_url="https://github.com/wsvincent/awesome-django",
+        repo_full_name="wsvincent/awesome-django",
+    )
+    captured = {"readme": [], "commit_count": [], "upserts": []}
+    markdown = "- [Django](https://github.com/django/django)"
+
+    monkeypatch.setattr(
+        "apps.repos.services.github_repository_sync_token_pool",
+        lambda: ["primary-token", "user-token"],
+    )
+
+    def fake_fetch_awesome_readme(full_name, *, token=None):
+        captured["readme"].append((full_name, token))
+        return markdown, github_awesome_list_payload(full_name)
+
+    def fake_attach_commit_count(
+        full_name,
+        meta,
+        *,
+        existing_first_commit_at=None,
+        token=None,
+    ):
+        captured["commit_count"].append((full_name, token))
+
+    def fake_upsert(full_name, *, active_source_full_names=None, github_access_token=None):
+        captured["upserts"].append((full_name, github_access_token))
+        owner, name = full_name.split("/", 1)
+        return Repository.objects.create(
+            full_name=full_name,
+            owner=owner,
+            name=name,
+            url=f"https://github.com/{full_name}",
+        )
+
+    monkeypatch.setattr("apps.repos.services.fetch_awesome_readme", fake_fetch_awesome_readme)
+    monkeypatch.setattr(
+        "apps.repos.services.attach_awesome_list_commit_count",
+        fake_attach_commit_count,
+    )
+    monkeypatch.setattr("apps.repos.services.upsert_repository_from_github", fake_upsert)
+
+    result = sync_awesome_list(awesome_list)
+
+    assert result["synced"] == 1
+    assert captured == {
+        "readme": [("wsvincent/awesome-django", "primary-token")],
+        "commit_count": [("wsvincent/awesome-django", "primary-token")],
+        "upserts": [("django/django", "user-token")],
+    }
 
 
 @pytest.mark.django_db
@@ -1602,8 +1660,8 @@ def test_fetch_github_commit_count_requires_default_branch(monkeypatch):
 def test_attach_awesome_list_commit_count_is_explicit_about_commit_fetch(monkeypatch):
     calls = []
 
-    def fake_fetch_commit_activity(full_name, default_branch):
-        calls.append((full_name, default_branch))
+    def fake_fetch_commit_activity(full_name, default_branch, *, token=None):
+        calls.append((full_name, default_branch, token))
         return 456, datetime(2008, 4, 10, tzinfo=UTC)
 
     monkeypatch.setattr(
@@ -1614,7 +1672,7 @@ def test_attach_awesome_list_commit_count_is_explicit_about_commit_fetch(monkeyp
 
     attach_awesome_list_commit_count("owner/repo", meta)
 
-    assert calls == [("owner/repo", "trunk")]
+    assert calls == [("owner/repo", "trunk", None)]
     assert meta["commits_count"] == 456
     assert meta["first_commit_at"] == datetime(2008, 4, 10, tzinfo=UTC)
 
@@ -2342,6 +2400,66 @@ def test_enqueue_missing_repositories_for_awesome_list_task_queues_missing_repos
 
 
 @pytest.mark.django_db
+def test_enqueue_missing_repositories_for_awesome_list_task_assigns_sync_tokens(monkeypatch):
+    awesome_list = AwesomeList.objects.create(
+        name="Awesome Python",
+        slug="awesome-python",
+        source_url="https://github.com/vinta/awesome-python",
+    )
+    queued = []
+
+    monkeypatch.setattr(
+        "apps.repos.tasks.AwesomeList.discover_missing_repositories_from_source",
+        lambda awesome_list, limit=None: {
+            "awesome_list": awesome_list.slug,
+            "discovered": 2,
+            "missing": ["django/django", "encode/httpx"],
+            "missing_count": 2,
+            "linked_existing": 0,
+            "skipped_existing": 0,
+        },
+    )
+    monkeypatch.setattr(
+        "apps.repos.tasks._try_reserve_daily_missing_repository_slot",
+        lambda daily_limit: True,
+    )
+    monkeypatch.setattr(
+        "apps.repos.tasks.github_repository_sync_token_pool",
+        lambda: ["primary-token", "user-token"],
+    )
+
+    def fake_async_task(func_path, *args, **kwargs):
+        queued.append((func_path, args, kwargs))
+        return f"task-{len(queued)}"
+
+    monkeypatch.setattr("apps.repos.tasks.async_task", fake_async_task)
+
+    from apps.repos.tasks import enqueue_missing_repositories_for_awesome_list_task
+
+    result = enqueue_missing_repositories_for_awesome_list_task(awesome_list.id)
+
+    assert result["queued"] == 2
+    assert queued == [
+        (
+            "apps.repos.tasks.add_missing_repository_to_awesome_list_task",
+            (awesome_list.id, "django/django"),
+            {
+                "github_token_index": 0,
+                "group": "Add missing awesome-list repos",
+            },
+        ),
+        (
+            "apps.repos.tasks.add_missing_repository_to_awesome_list_task",
+            (awesome_list.id, "encode/httpx"),
+            {
+                "github_token_index": 1,
+                "group": "Add missing awesome-list repos",
+            },
+        ),
+    ]
+
+
+@pytest.mark.django_db
 def test_enqueue_missing_repositories_for_awesome_list_task_truncates_logged_ids(
     monkeypatch,
 ):
@@ -2463,7 +2581,7 @@ def test_add_missing_repository_to_awesome_list_task_persists_last_error(monkeyp
         source_url="https://github.com/wsvincent/awesome-django",
     )
 
-    def fail_add_repository(awesome_list, repo_full_name):
+    def fail_add_repository(awesome_list, repo_full_name, *, github_access_token=None):
         raise RuntimeError(f"GitHub failed for {repo_full_name}")
 
     monkeypatch.setattr("apps.repos.tasks.add_repository_to_awesome_list", fail_add_repository)
@@ -2475,6 +2593,48 @@ def test_add_missing_repository_to_awesome_list_task_persists_last_error(monkeyp
 
     awesome_list.refresh_from_db()
     assert awesome_list.last_error == "GitHub failed for django/django"
+
+
+@pytest.mark.django_db
+def test_add_missing_repository_to_awesome_list_task_passes_sync_token(monkeypatch):
+    awesome_list = AwesomeList.objects.create(
+        name="Awesome Django",
+        slug="awesome-django",
+        source_url="https://github.com/wsvincent/awesome-django",
+    )
+    captured = {}
+
+    def fake_add_repository(awesome_list, repo_full_name, *, github_access_token=None):
+        captured["awesome_list"] = awesome_list
+        captured["repo_full_name"] = repo_full_name
+        captured["github_access_token"] = github_access_token
+        return {
+            "awesome_list": awesome_list.slug,
+            "repository": repo_full_name,
+            "repository_created": True,
+            "link_created": True,
+        }
+
+    monkeypatch.setattr("apps.repos.tasks.add_repository_to_awesome_list", fake_add_repository)
+    monkeypatch.setattr(
+        "apps.repos.tasks.github_repository_sync_token_for_index",
+        lambda index: "user-token",
+    )
+
+    from apps.repos.tasks import add_missing_repository_to_awesome_list_task
+
+    result = add_missing_repository_to_awesome_list_task(
+        awesome_list.id,
+        "django/django",
+        github_token_index=3,
+    )
+
+    assert result["repository"] == "django/django"
+    assert captured == {
+        "awesome_list": awesome_list,
+        "repo_full_name": "django/django",
+        "github_access_token": "user-token",
+    }
 
 
 @pytest.mark.django_db
@@ -2502,6 +2662,72 @@ def test_fetch_json_uses_github_token(monkeypatch):
     assert fetch_json("https://api.github.com/repos/example/example") == {"ok": True}
     headers = {k.lower(): v for k, v in captured["headers"].items()}
     assert headers["authorization"] == "Bearer ghp_test_token"
+
+
+@pytest.mark.django_db
+def test_github_repository_sync_token_pool_keeps_configured_token_first(
+    monkeypatch,
+    settings,
+    profile,
+    django_user_model,
+):
+    settings.GITHUB_REPOSITORY_SYNC_USE_USER_TOKENS = True
+    monkeypatch.setenv("GITHUB_TOKEN", "primary-token")
+    profile.github_starred_repos_import_enabled = True
+    profile.save(update_fields=["github_starred_repos_import_enabled", "updated_at"])
+    attach_github_token(profile, token="user-token-a", uid="github-a")
+    attach_github_token(profile, token="primary-token", uid="github-duplicate-primary")
+
+    other_user = django_user_model.objects.create_user(
+        username="other",
+        email="other@example.com",
+        password="password123",
+    )
+    other_user.profile.github_starred_repos_import_enabled = True
+    other_user.profile.save(update_fields=["github_starred_repos_import_enabled", "updated_at"])
+    attach_github_token(other_user.profile, token="user-token-b", uid="github-b")
+
+    opted_out_user = django_user_model.objects.create_user(
+        username="opted-out-sync",
+        email="opted-out-sync@example.com",
+        password="password123",
+    )
+    attach_github_token(opted_out_user.profile, token="opted-out-token", uid="github-opted-out")
+
+    expired_account = SocialAccount.objects.create(
+        user=profile.user,
+        provider="github",
+        uid="github-expired",
+    )
+    SocialToken.objects.create(
+        account=expired_account,
+        token="expired-token",
+        expires_at=timezone.now() - timedelta(minutes=5),
+    )
+
+    assert github_repository_sync_token_pool() == [
+        "primary-token",
+        "user-token-a",
+        "user-token-b",
+    ]
+    assert github_repository_sync_token_for_index(0) == "primary-token"
+    assert github_repository_sync_token_for_index(1) == "user-token-a"
+    assert github_repository_sync_token_for_index(2) == "user-token-b"
+    assert github_repository_sync_token_for_index(3) == "primary-token"
+
+
+@pytest.mark.django_db
+def test_github_repository_sync_token_pool_can_disable_user_tokens(
+    monkeypatch,
+    settings,
+    profile,
+):
+    settings.GITHUB_REPOSITORY_SYNC_USE_USER_TOKENS = False
+    monkeypatch.setenv("GITHUB_TOKEN", "primary-token")
+    attach_github_token(profile, token="user-token-a", uid="github-a")
+
+    assert github_repository_sync_token_pool() == ["primary-token"]
+    assert github_repository_sync_token_for_index(1) == "primary-token"
 
 
 def test_github_rate_limit_status_formats_core_limit(monkeypatch):
@@ -3241,7 +3467,7 @@ def test_refresh_repository_task_updates_single_repository(monkeypatch):
     )
     refreshed = []
 
-    def fake_sync_from_source(full_name):
+    def fake_sync_from_source(full_name, *, github_access_token=None):
         refreshed.append(full_name)
         return repository
 
@@ -3253,6 +3479,43 @@ def test_refresh_repository_task_updates_single_repository(monkeypatch):
     result = refresh_repository_task(repository.id, repository.full_name)
 
     assert refreshed == ["django/django"]
+    assert result == {"repository_id": repository.id, "full_name": "django/django"}
+
+
+@pytest.mark.django_db
+def test_refresh_repository_task_resolves_sync_token_index(monkeypatch):
+    repository = Repository.objects.create(
+        full_name="django/django",
+        owner="django",
+        name="django",
+        url="https://github.com/django/django",
+    )
+    captured = {}
+
+    def fake_sync_from_source(full_name, *, github_access_token=None):
+        captured["full_name"] = full_name
+        captured["github_access_token"] = github_access_token
+        return repository
+
+    monkeypatch.setattr(
+        "apps.repos.tasks.Repository.sync_from_source",
+        staticmethod(fake_sync_from_source),
+    )
+    monkeypatch.setattr(
+        "apps.repos.tasks.github_repository_sync_token_for_index",
+        lambda index: "user-token",
+    )
+
+    result = refresh_repository_task(
+        repository.id,
+        repository.full_name,
+        github_token_index=3,
+    )
+
+    assert captured == {
+        "full_name": "django/django",
+        "github_access_token": "user-token",
+    }
     assert result == {"repository_id": repository.id, "full_name": "django/django"}
 
 
@@ -3314,7 +3577,7 @@ def test_refresh_repository_task_logs_and_reraises_failures(monkeypatch):
 
     dummy_logger = DummyLogger()
 
-    def fake_sync_from_source(full_name):
+    def fake_sync_from_source(full_name, *, github_access_token=None):
         raise RuntimeError(f"could not refresh {full_name}")
 
     monkeypatch.setattr("apps.repos.tasks.logger", dummy_logger)
@@ -3364,6 +3627,7 @@ def test_refresh_repositories_defaults_to_full_sync(monkeypatch):
         *,
         include_readme=True,
         active_source_full_names=None,
+        github_access_token=None,
     ):
         refreshed.append((full_name, include_readme, active_source_full_names))
         return repository
@@ -3377,6 +3641,60 @@ def test_refresh_repositories_defaults_to_full_sync(monkeypatch):
 
     assert result == {"synced": 1, "failure_count": 0, "failures": []}
     assert refreshed == [("owner/project", True, set())]
+
+
+@pytest.mark.django_db
+def test_refresh_repositories_assigns_sync_tokens(monkeypatch):
+    repositories = [
+        Repository.objects.create(
+            full_name="owner/one",
+            owner="owner",
+            name="one",
+            url="https://github.com/owner/one",
+        ),
+        Repository.objects.create(
+            full_name="owner/two",
+            owner="owner",
+            name="two",
+            url="https://github.com/owner/two",
+        ),
+    ]
+    refreshed = []
+
+    monkeypatch.setattr(
+        "apps.repos.services.github_repository_sync_token_pool",
+        lambda: ["primary-token", "user-token"],
+    )
+
+    def fake_upsert_repository_from_github(
+        full_name,
+        *,
+        include_readme=True,
+        active_source_full_names=None,
+        github_access_token=None,
+    ):
+        refreshed.append(
+            (
+                full_name,
+                include_readme,
+                active_source_full_names,
+                github_access_token,
+            )
+        )
+        return next(repository for repository in repositories if repository.full_name == full_name)
+
+    monkeypatch.setattr(
+        "apps.repos.services.upsert_repository_from_github",
+        fake_upsert_repository_from_github,
+    )
+
+    result = refresh_repositories(queryset=Repository.objects.order_by("full_name"))
+
+    assert result == {"synced": 2, "failure_count": 0, "failures": []}
+    assert refreshed == [
+        ("owner/one", True, set(), "primary-token"),
+        ("owner/two", True, set(), "user-token"),
+    ]
 
 
 @pytest.mark.django_db
@@ -3434,6 +3752,72 @@ def test_refresh_repositories_task_refreshes_oldest_repositories(monkeypatch):
 
 
 @pytest.mark.django_db
+def test_refresh_repositories_task_assigns_sync_tokens_and_uses_pool_budget(
+    monkeypatch,
+    settings,
+):
+    settings.GITHUB_REPOSITORY_REFRESH_MIN_RATE_LIMIT_REMAINING = 1000
+    stale = Repository.objects.create(
+        full_name="owner/stale",
+        owner="owner",
+        name="stale",
+        url="https://github.com/owner/stale",
+        last_synced_at=timezone.now() - timedelta(days=7),
+    )
+    fresh = Repository.objects.create(
+        full_name="owner/fresh",
+        owner="owner",
+        name="fresh",
+        url="https://github.com/owner/fresh",
+        last_synced_at=timezone.now() - timedelta(days=1),
+    )
+    queued = []
+    pool_calls = 0
+
+    monkeypatch.setattr("apps.repos.tasks.github_rate_limit_remaining", lambda: 0)
+
+    def fake_token_pool():
+        nonlocal pool_calls
+        pool_calls += 1
+        return ["primary-token", "user-token"]
+
+    monkeypatch.setattr(
+        "apps.repos.tasks.github_repository_sync_token_pool",
+        fake_token_pool,
+    )
+
+    def fake_async_task(func_path, repository_id, full_name, **kwargs):
+        task_id = f"task-{repository_id}"
+        queued.append((func_path, repository_id, full_name, kwargs, task_id))
+        return task_id
+
+    monkeypatch.setattr("apps.repos.tasks.async_task", fake_async_task)
+
+    result = refresh_repositories_task(limit=2)
+
+    assert queued == [
+        (
+            "apps.repos.tasks.refresh_repository_task",
+            stale.id,
+            "owner/stale",
+            {"github_token_index": 0, "group": "Refresh repositories"},
+            f"task-{stale.id}",
+        ),
+        (
+            "apps.repos.tasks.refresh_repository_task",
+            fresh.id,
+            "owner/fresh",
+            {"github_token_index": 1, "group": "Refresh repositories"},
+            f"task-{fresh.id}",
+        ),
+    ]
+    assert result["queued"] == 2
+    assert result["limit"] == 2
+    assert result["rate_limit_remaining"] == 0
+    assert pool_calls == 1
+
+
+@pytest.mark.django_db
 def test_refresh_repositories_task_stops_before_reserved_rate_limit(monkeypatch, settings):
     settings.GITHUB_REPOSITORY_REFRESH_MIN_RATE_LIMIT_REMAINING = 1000
     Repository.objects.create(
@@ -3465,7 +3849,7 @@ def test_refresh_repository_task_stops_on_rate_limit_error(monkeypatch):
         url="https://github.com/owner/stale",
     )
 
-    def fail_sync_from_source(full_name):
+    def fail_sync_from_source(full_name, *, github_access_token=None):
         raise GitHubAPIError(
             "403 Forbidden | rate_limit_remaining=0",
             status_code=403,
