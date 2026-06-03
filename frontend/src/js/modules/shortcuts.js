@@ -260,7 +260,7 @@ function buildHelpDialog(shortcuts, state) {
 
   const backdrop = document.createElement("div");
   backdrop.className = "absolute inset-0 h-full w-full cursor-default bg-gray-950/45 backdrop-blur-sm";
-  backdrop.dataset.shortcutsClose = "";
+  backdrop.dataset.shortcutsBackdrop = "";
   backdrop.setAttribute("aria-hidden", "true");
   backdrop.addEventListener("click", () => closeHelpDialog(state));
 
