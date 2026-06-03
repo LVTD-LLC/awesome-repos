@@ -12,6 +12,7 @@ from django.contrib import admin as django_admin
 from django.core.cache import cache
 from django.core.management import call_command
 from django.db import IntegrityError, connection
+from django.http import QueryDict
 from django.template import Context, Template
 from django.test import override_settings
 from django.test.utils import CaptureQueriesContext
@@ -98,6 +99,7 @@ from apps.repos.tasks import (
 from apps.repos.views import (
     awesome_list_directory_totals,
     public_repository_filter_options,
+    repository_filter_remove_querystring,
     repository_json_value_counts,
 )
 
@@ -1033,8 +1035,8 @@ def test_starred_repository_search_uses_shared_repository_filters(auth_client, p
     assert "example/django-tool" not in content
     assert "Awesome Django (1)" in content
     assert "web-framework (1)" in content
-    assert "Sort: Most forks" in content
-    assert 'aria-label="Remove Sort filter: Most forks"' in content
+    assert "Sort: Forks" in content
+    assert 'aria-label="Remove Sort filter: Forks"' in content
     assert 'aria-label="Remove Framework filter: django"' in content
     framework_chip = re.search(
         r'<a\s+href="([^"]*)"\s+class="[^"]*"\s+aria-label="Remove Framework filter: django"',
@@ -1043,6 +1045,21 @@ def test_starred_repository_search_uses_shared_repository_filters(auth_client, p
     assert framework_chip is not None
     assert "stack=django" not in framework_chip.group(1)
     assert response.context["page_obj"].paginator.count == 1
+
+
+def test_repository_filter_remove_querystring_resets_page_and_coupled_params():
+    params = QueryDict(
+        "page=2&q=django&language=Python&framework=django&stack=django&sort=forks"
+    )
+
+    querystring = repository_filter_remove_querystring(params, "framework")
+
+    assert "page=2" not in querystring
+    assert "framework=django" not in querystring
+    assert "stack=django" not in querystring
+    assert "q=django" in querystring
+    assert "language=Python" in querystring
+    assert "sort=forks" in querystring
 
 
 def stub_repository_readme(monkeypatch, content="# Django\n"):

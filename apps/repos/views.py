@@ -172,17 +172,17 @@ REPOSITORY_ADVANCED_FILTER_PARAM_NAMES = (
     "ai_development",
 )
 REPOSITORY_SORT_LABELS = {
-    "stars": "Sort by stars",
-    "forks": "Most forks",
+    "stars": "Stars",
+    "forks": "Forks",
     "recent": "Recently updated",
     "created": "Recently created",
     "oldest": "Oldest first commit",
-    "commits": "Most commits",
+    "commits": "Commits",
     "velocity": "Commit velocity",
     "star_growth": "Star growth",
     "liability": "Star growth",
-    "awesome": "Most awesome-list mentions",
-    "least_awesome": "Fewest awesome-list mentions",
+    "awesome": "Awesome-list mentions",
+    "least_awesome": "Fewest list mentions",
     "name": "Name",
 }
 REPOSITORY_FILTER_LABELS = {
@@ -441,6 +441,7 @@ def repository_advanced_filters_applied(params) -> bool:
 
 def repository_filter_remove_querystring(params, name: str) -> str:
     next_params = params.copy()
+    next_params.pop("page", None)
     names_to_remove = {name}
     if name in {"framework", "stack"}:
         names_to_remove.update({"framework", "stack"})
