@@ -1,201 +1,244 @@
-<div{% if search_field_class %} class="{{ search_field_class }}"{% endif %}>
-  <label for="{{ filter_id_prefix }}-query" class="block text-sm font-semibold text-gray-800 dark:text-gray-200">Search</label>
-  <input
-    id="{{ filter_id_prefix }}-query"
-    name="q"
-    value="{{ request.GET.q }}"
-    placeholder="Name, description, license, language, topics, tags, stacks"
-    class="mt-2 block w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 dark:placeholder:text-gray-500"
-    x-ref="repositorySearch"
-  />
-</div>
+{% with control_class="mt-2 block w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 shadow-sm placeholder:text-gray-500 focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 dark:placeholder:text-gray-400" label_class="block text-sm font-semibold text-gray-800 dark:text-gray-200" %}
+  <div class="space-y-5">
+    <div class="grid gap-4 lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)] lg:items-end">
+      <div class="{% if search_field_class %}{{ search_field_class }} {% endif %}min-w-0">
+        <label for="{{ filter_id_prefix }}-query" class="{{ label_class }}">Search repositories</label>
+        <input
+          id="{{ filter_id_prefix }}-query"
+          name="q"
+          value="{{ request.GET.q }}"
+          placeholder="Name, description, language, topic, tag, stack"
+          class="{{ control_class }} min-h-12 text-base"
+          x-ref="repositorySearch"
+        />
+      </div>
 
-{% if show_search_mode %}
-  <div>
-    <label for="{{ filter_id_prefix }}-mode" class="block text-sm font-semibold text-gray-800 dark:text-gray-200">Search mode</label>
-    <select id="{{ filter_id_prefix }}-mode" name="mode" aria-label="Search mode" x-model="searchMode" class="mt-2 block w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100">
-      <option value="" {% if request.GET.mode != "semantic" %}selected{% endif %}>Keyword match</option>
-      <option value="semantic" {% if request.GET.mode == "semantic" %}selected{% endif %}>Semantic relevance</option>
-    </select>
+      {% if show_search_mode %}
+        <fieldset>
+          <legend class="{{ label_class }}">Search mode</legend>
+          <div class="mt-2 grid min-h-12 grid-cols-2 rounded-xl border border-gray-300 bg-white p-1 text-sm shadow-sm dark:border-gray-700 dark:bg-gray-950">
+            <label class="flex cursor-pointer items-center justify-center rounded-lg px-3 py-2 font-semibold text-gray-700 transition has-[:checked]:bg-gray-900 has-[:checked]:text-white dark:text-gray-200 dark:has-[:checked]:bg-white dark:has-[:checked]:text-gray-950">
+              <input type="radio" name="mode" value="" class="sr-only" x-model="searchMode" {% if request.GET.mode != "semantic" %}checked{% endif %} />
+              Keyword
+            </label>
+            <label class="flex cursor-pointer items-center justify-center rounded-lg px-3 py-2 font-semibold text-gray-700 transition has-[:checked]:bg-gray-900 has-[:checked]:text-white dark:text-gray-200 dark:has-[:checked]:bg-white dark:has-[:checked]:text-gray-950">
+              <input type="radio" name="mode" value="semantic" class="sr-only" x-model="searchMode" {% if request.GET.mode == "semantic" %}checked{% endif %} />
+              Semantic
+            </label>
+          </div>
+        </fieldset>
+      {% endif %}
+    </div>
+
+    <div>
+      <div class="mb-3 flex items-baseline justify-between gap-3">
+        <div class="text-base font-bold text-gray-950 dark:text-white">Tune results</div>
+        <p class="hidden text-sm text-gray-500 dark:text-gray-400 sm:block">The controls most people need first.</p>
+      </div>
+      <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {% if show_list_filter %}
+          <div>
+            <label for="{{ filter_id_prefix }}-list" class="{{ label_class }}">Awesome list</label>
+            <select id="{{ filter_id_prefix }}-list" name="list" class="{{ control_class }}">
+              <option value="">Any list</option>
+              {% for awesome_list in awesome_lists %}
+                <option value="{{ awesome_list.slug }}" {% if request.GET.list == awesome_list.slug %}selected{% endif %}>{{ awesome_list.name }}{% if awesome_list.repo_count %} ({{ awesome_list.repo_count }}){% endif %}</option>
+              {% endfor %}
+            </select>
+          </div>
+        {% endif %}
+
+        <div>
+          <label for="{{ filter_id_prefix }}-language" class="{{ label_class }}">Language</label>
+          <select id="{{ filter_id_prefix }}-language" name="language" class="{{ control_class }}">
+            <option value="">Any language</option>
+            {% for language in languages %}
+              <option value="{{ language }}" {% if request.GET.language == language %}selected{% endif %}>{{ language }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div>
+          <label for="{{ filter_id_prefix }}-updated-days" class="{{ label_class }}">Freshness</label>
+          <select id="{{ filter_id_prefix }}-updated-days" name="updated_days" class="{{ control_class }}">
+            <option value="">Updated any time</option>
+            <option value="30" {% if request.GET.updated_days == "30" %}selected{% endif %}>Updated in 30 days</option>
+            <option value="90" {% if request.GET.updated_days == "90" %}selected{% endif %}>Updated in 90 days</option>
+            <option value="365" {% if request.GET.updated_days == "365" %}selected{% endif %}>Updated in 1 year</option>
+          </select>
+        </div>
+
+        <div>
+          <label for="{{ filter_id_prefix }}-sort" class="{{ label_class }}">Sort</label>
+          <select id="{{ filter_id_prefix }}-sort" name="sort" {% if show_search_mode %}x-bind:disabled="searchMode === 'semantic'"{% endif %} class="{{ control_class }} disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400 disabled:dark:bg-gray-900 disabled:dark:text-gray-500" {% if show_search_mode and request.GET.mode == "semantic" %}disabled{% endif %}>
+            <option value="stars" {% if request.GET.sort == "stars" or not request.GET.sort %}selected{% endif %}>Stars</option>
+            {% if is_personal_starred_search %}
+              <option value="starred" {% if request.GET.sort == "starred" %}selected{% endif %}>Recently starred</option>
+            {% endif %}
+            <option value="forks" {% if request.GET.sort == "forks" %}selected{% endif %}>Forks</option>
+            <option value="recent" {% if request.GET.sort == "recent" %}selected{% endif %}>Recently updated</option>
+            <option value="created" {% if request.GET.sort == "created" %}selected{% endif %}>Recently created</option>
+            <option value="oldest" {% if request.GET.sort == "oldest" %}selected{% endif %}>Oldest first commit</option>
+            <option value="commits" {% if request.GET.sort == "commits" %}selected{% endif %}>Commits</option>
+            <option value="velocity" {% if request.GET.sort == "velocity" %}selected{% endif %}>Commit velocity</option>
+            <option value="star_growth" {% if request.GET.sort == "star_growth" or request.GET.sort == "liability" %}selected{% endif %}>Star growth</option>
+            <option value="awesome" {% if request.GET.sort == "awesome" %}selected{% endif %}>Awesome-list mentions</option>
+            <option value="least_awesome" {% if request.GET.sort == "least_awesome" %}selected{% endif %}>Fewest list mentions</option>
+            <option value="name" {% if request.GET.sort == "name" %}selected{% endif %}>Name</option>
+          </select>
+        </div>
+
+        <div>
+          <label for="{{ filter_id_prefix }}-sort-direction" class="{{ label_class }}">Direction</label>
+          <select id="{{ filter_id_prefix }}-sort-direction" name="sort_direction" {% if show_search_mode %}x-bind:disabled="searchMode === 'semantic'"{% endif %} class="{{ control_class }} disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400 disabled:dark:bg-gray-900 disabled:dark:text-gray-500" {% if show_search_mode and request.GET.mode == "semantic" %}disabled{% endif %}>
+            <option value="" {% if not request.GET.sort_direction %}selected{% endif %}>Default for sort</option>
+            <option value="desc" {% if request.GET.sort_direction == "desc" %}selected{% endif %}>Descending</option>
+            <option value="asc" {% if request.GET.sort_direction == "asc" %}selected{% endif %}>Ascending</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <details class="group rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-950"{% if advanced_repository_filters_applied %} open{% endif %}>
+      <summary class="flex cursor-pointer list-none items-center justify-between gap-4 px-4 py-3 text-left marker:hidden">
+        <span>
+          <span class="block text-base font-bold text-gray-950 dark:text-white">More filters</span>
+          <span class="mt-0.5 block text-sm text-gray-500 dark:text-gray-400">Topics, generated tags, stack, age, archive status, and growth.</span>
+        </span>
+        <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-gray-200 text-lg font-semibold text-gray-600 transition group-open:rotate-45 dark:border-gray-700 dark:text-gray-300" aria-hidden="true">+</span>
+      </summary>
+
+      <div class="border-t border-gray-200 px-4 py-4 dark:border-gray-800">
+        <div class="grid gap-6 xl:grid-cols-3">
+          <fieldset class="space-y-4">
+            <legend class="text-sm font-bold text-gray-950 dark:text-white">Ecosystem</legend>
+            <div>
+              <label for="{{ filter_id_prefix }}-topic" class="{{ label_class }}">GitHub topic</label>
+              <select id="{{ filter_id_prefix }}-topic" name="topic" class="{{ control_class }}">
+                <option value="">Any GitHub topic</option>
+                {% for topic in topic_options %}
+                  <option value="{{ topic.name }}" {% if request.GET.topic == topic.name %}selected{% endif %}>{{ topic.name }}{% if topic.count %} ({{ topic.count }}){% endif %}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div>
+              <label for="{{ filter_id_prefix }}-generated-tag" class="{{ label_class }}">Generated tag</label>
+              <select id="{{ filter_id_prefix }}-generated-tag" name="generated_tag" class="{{ control_class }}">
+                <option value="">Any generated tag</option>
+                {% for tag in generated_tag_options %}
+                  <option value="{{ tag.name }}" {% if request.GET.generated_tag == tag.name %}selected{% endif %}>{{ tag.name }}{% if tag.count %} ({{ tag.count }}){% endif %}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div>
+              <label for="{{ filter_id_prefix }}-framework" class="{{ label_class }}">Framework or stack</label>
+              <select id="{{ filter_id_prefix }}-framework" name="framework" class="{{ control_class }}">
+                <option value="">Any detected framework</option>
+                {% for stack in stack_options %}
+                  <option value="{{ stack.name }}" {% if request.GET.framework == stack.name or request.GET.stack == stack.name %}selected{% endif %}>{{ stack.label }}{% if stack.count %} ({{ stack.count }}){% endif %}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div>
+              <label for="{{ filter_id_prefix }}-package-manager" class="{{ label_class }}">Package manager</label>
+              <select id="{{ filter_id_prefix }}-package-manager" name="package_manager" class="{{ control_class }}">
+                <option value="">Any package manager</option>
+                {% for manager in package_manager_options %}
+                  <option value="{{ manager.name }}" {% if request.GET.package_manager == manager.name %}selected{% endif %}>{{ manager.label }}{% if manager.count %} ({{ manager.count }}){% endif %}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </fieldset>
+
+          <fieldset class="space-y-4 border-t border-gray-200 pt-5 dark:border-gray-800 xl:border-l xl:border-t-0 xl:pl-6 xl:pt-0">
+            <legend class="text-sm font-bold text-gray-950 dark:text-white">Health</legend>
+            <div>
+              <label for="{{ filter_id_prefix }}-min-stars" class="{{ label_class }}">Minimum stars</label>
+              <input
+                id="{{ filter_id_prefix }}-min-stars"
+                type="number"
+                min="0"
+                name="min_stars"
+                value="{{ request.GET.min_stars }}"
+                placeholder="0"
+                class="{{ control_class }}"
+              />
+            </div>
+
+            <div>
+              <label for="{{ filter_id_prefix }}-min-age-years" class="{{ label_class }}">Repository age</label>
+              <select id="{{ filter_id_prefix }}-min-age-years" name="min_age_years" class="{{ control_class }}">
+                <option value="">Any age</option>
+                <option value="1" {% if request.GET.min_age_years == "1" %}selected{% endif %}>1+ years old</option>
+                <option value="3" {% if request.GET.min_age_years == "3" %}selected{% endif %}>3+ years old</option>
+                <option value="5" {% if request.GET.min_age_years == "5" %}selected{% endif %}>5+ years old</option>
+                <option value="10" {% if request.GET.min_age_years == "10" %}selected{% endif %}>10+ years old</option>
+              </select>
+              <p class="mt-2 text-xs leading-5 text-gray-500 dark:text-gray-400">Uses known first-commit dates.</p>
+            </div>
+
+            <div>
+              <label for="{{ filter_id_prefix }}-archived" class="{{ label_class }}">Archive status</label>
+              <select id="{{ filter_id_prefix }}-archived" name="archived" class="{{ control_class }}">
+                <option value="">Archived or active</option>
+                <option value="no" {% if request.GET.archived == "no" %}selected{% endif %}>Active only</option>
+                <option value="yes" {% if request.GET.archived == "yes" %}selected{% endif %}>Archived only</option>
+              </select>
+            </div>
+
+            <div>
+              <label for="{{ filter_id_prefix }}-ai-development" class="{{ label_class }}">AI development signals</label>
+              <select id="{{ filter_id_prefix }}-ai-development" name="ai_development" class="{{ control_class }}">
+                <option value="">Any AI dev signal state</option>
+                <option value="yes" {% if request.GET.ai_development == "yes" %}selected{% endif %}>Has AI dev signals</option>
+                <option value="no" {% if request.GET.ai_development == "no" %}selected{% endif %}>No AI dev signals</option>
+              </select>
+            </div>
+          </fieldset>
+
+          <fieldset class="space-y-4 border-t border-gray-200 pt-5 dark:border-gray-800 xl:border-l xl:border-t-0 xl:pl-6 xl:pt-0">
+            <legend class="text-sm font-bold text-gray-950 dark:text-white">Momentum</legend>
+            <div>
+              <label for="{{ filter_id_prefix }}-unmaintained-days" class="{{ label_class }}">Unmaintained for</label>
+              <select id="{{ filter_id_prefix }}-unmaintained-days" name="unmaintained_days" class="{{ control_class }}">
+                <option value="">Any maintenance status</option>
+                <option value="180" {% if request.GET.unmaintained_days == "180" %}selected{% endif %}>No pushes in 6 months</option>
+                <option value="365" {% if request.GET.unmaintained_days == "365" %}selected{% endif %}>No pushes in 1 year</option>
+                <option value="730" {% if request.GET.unmaintained_days == "730" %}selected{% endif %}>No pushes in 2 years</option>
+              </select>
+            </div>
+
+            <div>
+              <label for="{{ filter_id_prefix }}-min-velocity-percent" class="{{ label_class }}">Commit velocity</label>
+              <input
+                id="{{ filter_id_prefix }}-min-velocity-percent"
+                type="number"
+                min="0"
+                name="min_velocity_percent"
+                value="{{ request.GET.min_velocity_percent }}"
+                placeholder="Minimum percent gain"
+                class="{{ control_class }}"
+              />
+            </div>
+
+            <div>
+              <label for="{{ filter_id_prefix }}-min-star-growth-percent" class="{{ label_class }}">Star growth</label>
+              <input
+                id="{{ filter_id_prefix }}-min-star-growth-percent"
+                type="number"
+                min="0"
+                name="min_star_growth_percent"
+                value="{% if request.GET.min_star_growth_percent %}{{ request.GET.min_star_growth_percent }}{% else %}{{ request.GET.min_liability_percent }}{% endif %}"
+                placeholder="Minimum percent gain"
+                class="{{ control_class }}"
+              />
+            </div>
+          </fieldset>
+        </div>
+      </div>
+    </details>
   </div>
-{% endif %}
-
-{% if show_list_filter %}
-  <div>
-    <label for="{{ filter_id_prefix }}-list" class="block text-sm font-semibold text-gray-800 dark:text-gray-200">Awesome list</label>
-    <select id="{{ filter_id_prefix }}-list" name="list" class="mt-2 block w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100">
-      <option value="">Any list</option>
-      {% for awesome_list in awesome_lists %}
-        <option value="{{ awesome_list.slug }}" {% if request.GET.list == awesome_list.slug %}selected{% endif %}>{{ awesome_list.name }}{% if awesome_list.repo_count %} ({{ awesome_list.repo_count }}){% endif %}</option>
-      {% endfor %}
-    </select>
-  </div>
-{% endif %}
-
-<div>
-  <label for="{{ filter_id_prefix }}-language" class="block text-sm font-semibold text-gray-800 dark:text-gray-200">Language</label>
-  <select id="{{ filter_id_prefix }}-language" name="language" class="mt-2 block w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100">
-    <option value="">Any language</option>
-    {% for language in languages %}
-      <option value="{{ language }}" {% if request.GET.language == language %}selected{% endif %}>{{ language }}</option>
-    {% endfor %}
-  </select>
-</div>
-
-<div>
-  <label for="{{ filter_id_prefix }}-topic" class="block text-sm font-semibold text-gray-800 dark:text-gray-200">GitHub topic</label>
-  <select id="{{ filter_id_prefix }}-topic" name="topic" class="mt-2 block w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100">
-    <option value="">Any GitHub topic</option>
-    {% for topic in topic_options %}
-      <option value="{{ topic.name }}" {% if request.GET.topic == topic.name %}selected{% endif %}>{{ topic.name }}{% if topic.count %} ({{ topic.count }}){% endif %}</option>
-    {% endfor %}
-  </select>
-</div>
-
-<div>
-  <label for="{{ filter_id_prefix }}-generated-tag" class="block text-sm font-semibold text-gray-800 dark:text-gray-200">Generated tag</label>
-  <select id="{{ filter_id_prefix }}-generated-tag" name="generated_tag" class="mt-2 block w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100">
-    <option value="">Any generated tag</option>
-    {% for tag in generated_tag_options %}
-      <option value="{{ tag.name }}" {% if request.GET.generated_tag == tag.name %}selected{% endif %}>{{ tag.name }}{% if tag.count %} ({{ tag.count }}){% endif %}</option>
-    {% endfor %}
-  </select>
-</div>
-
-<div>
-  <label for="{{ filter_id_prefix }}-framework" class="block text-sm font-semibold text-gray-800 dark:text-gray-200">Framework</label>
-  <select id="{{ filter_id_prefix }}-framework" name="framework" class="mt-2 block w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100">
-    <option value="">Any detected framework</option>
-    {% for stack in stack_options %}
-      <option value="{{ stack.name }}" {% if request.GET.framework == stack.name or request.GET.stack == stack.name %}selected{% endif %}>{{ stack.label }}{% if stack.count %} ({{ stack.count }}){% endif %}</option>
-    {% endfor %}
-  </select>
-</div>
-
-<div>
-  <label for="{{ filter_id_prefix }}-package-manager" class="block text-sm font-semibold text-gray-800 dark:text-gray-200">Package manager</label>
-  <select id="{{ filter_id_prefix }}-package-manager" name="package_manager" class="mt-2 block w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100">
-    <option value="">Any package manager</option>
-    {% for manager in package_manager_options %}
-      <option value="{{ manager.name }}" {% if request.GET.package_manager == manager.name %}selected{% endif %}>{{ manager.label }}{% if manager.count %} ({{ manager.count }}){% endif %}</option>
-    {% endfor %}
-  </select>
-</div>
-
-<div>
-  <label for="{{ filter_id_prefix }}-min-stars" class="block text-sm font-semibold text-gray-800 dark:text-gray-200">Minimum stars</label>
-  <input
-    id="{{ filter_id_prefix }}-min-stars"
-    type="number"
-    min="0"
-    name="min_stars"
-    value="{{ request.GET.min_stars }}"
-    placeholder="0"
-    class="mt-2 block w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 dark:placeholder:text-gray-500"
-  />
-</div>
-
-<div>
-  <label for="{{ filter_id_prefix }}-min-velocity-percent" class="block text-sm font-semibold text-gray-800 dark:text-gray-200">Commit velocity</label>
-  <input
-    id="{{ filter_id_prefix }}-min-velocity-percent"
-    type="number"
-    min="0"
-    name="min_velocity_percent"
-    value="{{ request.GET.min_velocity_percent }}"
-    placeholder="Minimum % gain"
-    class="mt-2 block w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 dark:placeholder:text-gray-500"
-  />
-</div>
-
-<div>
-  <label for="{{ filter_id_prefix }}-min-star-growth-percent" class="block text-sm font-semibold text-gray-800 dark:text-gray-200">Star growth</label>
-  <input
-    id="{{ filter_id_prefix }}-min-star-growth-percent"
-    type="number"
-    min="0"
-    name="min_star_growth_percent"
-    value="{% if request.GET.min_star_growth_percent %}{{ request.GET.min_star_growth_percent }}{% else %}{{ request.GET.min_liability_percent }}{% endif %}"
-    placeholder="Minimum % gain"
-    class="mt-2 block w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 dark:placeholder:text-gray-500"
-  />
-</div>
-
-<div>
-  <label for="{{ filter_id_prefix }}-updated-days" class="block text-sm font-semibold text-gray-800 dark:text-gray-200">Freshness</label>
-  <select id="{{ filter_id_prefix }}-updated-days" name="updated_days" class="mt-2 block w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100">
-    <option value="">Updated any time</option>
-    <option value="30" {% if request.GET.updated_days == "30" %}selected{% endif %}>Updated in 30 days</option>
-    <option value="90" {% if request.GET.updated_days == "90" %}selected{% endif %}>Updated in 90 days</option>
-    <option value="365" {% if request.GET.updated_days == "365" %}selected{% endif %}>Updated in 1 year</option>
-  </select>
-</div>
-
-<div>
-  <label for="{{ filter_id_prefix }}-unmaintained-days" class="block text-sm font-semibold text-gray-800 dark:text-gray-200">Unmaintained for</label>
-  <select id="{{ filter_id_prefix }}-unmaintained-days" name="unmaintained_days" class="mt-2 block w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100">
-    <option value="">Any maintenance status</option>
-    <option value="180" {% if request.GET.unmaintained_days == "180" %}selected{% endif %}>No pushes in 6 months</option>
-    <option value="365" {% if request.GET.unmaintained_days == "365" %}selected{% endif %}>No pushes in 1 year</option>
-    <option value="730" {% if request.GET.unmaintained_days == "730" %}selected{% endif %}>No pushes in 2 years</option>
-  </select>
-</div>
-
-<div>
-  <label for="{{ filter_id_prefix }}-min-age-years" class="block text-sm font-semibold text-gray-800 dark:text-gray-200">Repository age</label>
-  <select id="{{ filter_id_prefix }}-min-age-years" name="min_age_years" class="mt-2 block w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100">
-    <option value="">Any age</option>
-    <option value="1" {% if request.GET.min_age_years == "1" %}selected{% endif %}>1+ years old</option>
-    <option value="3" {% if request.GET.min_age_years == "3" %}selected{% endif %}>3+ years old</option>
-    <option value="5" {% if request.GET.min_age_years == "5" %}selected{% endif %}>5+ years old</option>
-    <option value="10" {% if request.GET.min_age_years == "10" %}selected{% endif %}>10+ years old</option>
-  </select>
-  <p class="mt-2 text-xs leading-5 text-gray-500 dark:text-gray-400">Age filters use known first-commit dates and exclude repositories that have not synced that data yet.</p>
-</div>
-
-<div>
-  <label for="{{ filter_id_prefix }}-archived" class="block text-sm font-semibold text-gray-800 dark:text-gray-200">Archive status</label>
-  <select id="{{ filter_id_prefix }}-archived" name="archived" class="mt-2 block w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100">
-    <option value="">Archived or active</option>
-    <option value="no" {% if request.GET.archived == "no" %}selected{% endif %}>Active only</option>
-    <option value="yes" {% if request.GET.archived == "yes" %}selected{% endif %}>Archived only</option>
-  </select>
-</div>
-
-<div>
-  <label for="{{ filter_id_prefix }}-ai-development" class="block text-sm font-semibold text-gray-800 dark:text-gray-200">AI development signals</label>
-  <select id="{{ filter_id_prefix }}-ai-development" name="ai_development" class="mt-2 block w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100">
-    <option value="">AI dev signals: any</option>
-    <option value="yes" {% if request.GET.ai_development == "yes" %}selected{% endif %}>Has AI dev signals</option>
-    <option value="no" {% if request.GET.ai_development == "no" %}selected{% endif %}>No AI dev signals</option>
-  </select>
-</div>
-
-<div>
-  <label for="{{ filter_id_prefix }}-sort" class="block text-sm font-semibold text-gray-800 dark:text-gray-200">Sort</label>
-  <select id="{{ filter_id_prefix }}-sort" name="sort" {% if show_search_mode %}x-bind:disabled="searchMode === 'semantic'"{% endif %} class="mt-2 block w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400 focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 disabled:dark:bg-gray-900 disabled:dark:text-gray-500" {% if show_search_mode and request.GET.mode == "semantic" %}disabled{% endif %}>
-    <option value="stars" {% if request.GET.sort == "stars" or not request.GET.sort %}selected{% endif %}>Sort by stars</option>
-    {% if is_personal_starred_search %}
-      <option value="starred" {% if request.GET.sort == "starred" %}selected{% endif %}>Recently starred</option>
-    {% endif %}
-    <option value="forks" {% if request.GET.sort == "forks" %}selected{% endif %}>Most forks</option>
-    <option value="recent" {% if request.GET.sort == "recent" %}selected{% endif %}>Recently updated</option>
-    <option value="created" {% if request.GET.sort == "created" %}selected{% endif %}>Recently created</option>
-    <option value="oldest" {% if request.GET.sort == "oldest" %}selected{% endif %}>Oldest first commit</option>
-    <option value="commits" {% if request.GET.sort == "commits" %}selected{% endif %}>Most commits</option>
-    <option value="velocity" {% if request.GET.sort == "velocity" %}selected{% endif %}>Commit velocity</option>
-    <option value="star_growth" {% if request.GET.sort == "star_growth" or request.GET.sort == "liability" %}selected{% endif %}>Star growth</option>
-    <option value="awesome" {% if request.GET.sort == "awesome" %}selected{% endif %}>Most awesome-list mentions</option>
-    <option value="least_awesome" {% if request.GET.sort == "least_awesome" %}selected{% endif %}>Fewest awesome-list mentions</option>
-    <option value="name" {% if request.GET.sort == "name" %}selected{% endif %}>Name</option>
-  </select>
-</div>
-
-<div>
-  <label for="{{ filter_id_prefix }}-sort-direction" class="block text-sm font-semibold text-gray-800 dark:text-gray-200">Sort direction</label>
-  <select id="{{ filter_id_prefix }}-sort-direction" name="sort_direction" {% if show_search_mode %}x-bind:disabled="searchMode === 'semantic'"{% endif %} class="mt-2 block w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400 focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 disabled:dark:bg-gray-900 disabled:dark:text-gray-500" {% if show_search_mode and request.GET.mode == "semantic" %}disabled{% endif %}>
-    <option value="" {% if not request.GET.sort_direction %}selected{% endif %}>Default direction</option>
-    <option value="desc" {% if request.GET.sort_direction == "desc" %}selected{% endif %}>Descending</option>
-    <option value="asc" {% if request.GET.sort_direction == "asc" %}selected{% endif %}>Ascending</option>
-  </select>
-</div>
+{% endwith %}

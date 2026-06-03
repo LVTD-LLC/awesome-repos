@@ -12,6 +12,7 @@ from django.contrib import admin as django_admin
 from django.core.cache import cache
 from django.core.management import call_command
 from django.db import IntegrityError, connection
+from django.http import QueryDict
 from django.template import Context, Template
 from django.test import override_settings
 from django.test.utils import CaptureQueriesContext
@@ -100,6 +101,7 @@ from apps.repos.tasks import (
 from apps.repos.views import (
     awesome_list_directory_totals,
     public_repository_filter_options,
+    repository_filter_remove_querystring,
     repository_json_value_counts,
 )
 
@@ -1134,8 +1136,38 @@ def test_starred_repository_search_uses_shared_repository_filters(auth_client, p
     assert "example/django-tool" not in content
     assert "Awesome Django (1)" in content
     assert "web-framework (1)" in content
-    assert "Sort: Most forks" in content
+    assert "Sort: Forks" in content
+    assert 'aria-label="Remove Sort filter: Forks"' in content
+    assert 'aria-label="Remove Framework filter: django"' in content
+    framework_chip = re.search(
+        r'<a\s+href="([^"]*)"\s+class="[^"]*"\s+aria-label="Remove Framework filter: django"',
+        content,
+    )
+    assert framework_chip is not None
+    assert "stack=django" not in framework_chip.group(1)
     assert response.context["page_obj"].paginator.count == 1
+
+
+def test_repository_filter_remove_querystring_resets_page_and_coupled_params():
+    params = QueryDict(
+        "page=2&q=django&language=Python&framework=django&stack=django&sort=forks&sort_direction=asc"
+    )
+
+    querystring = repository_filter_remove_querystring(params, "framework")
+
+    assert "page=2" not in querystring
+    assert "framework=django" not in querystring
+    assert "stack=django" not in querystring
+    assert "q=django" in querystring
+    assert "language=Python" in querystring
+    assert "sort=forks" in querystring
+    assert "sort_direction=asc" in querystring
+
+    sort_querystring = repository_filter_remove_querystring(params, "sort")
+
+    assert "sort=forks" not in sort_querystring
+    assert "sort_direction=asc" not in sort_querystring
+    assert "q=django" in sort_querystring
 
 
 def stub_repository_readme(monkeypatch, content="# Django\n"):
@@ -4996,12 +5028,13 @@ def test_search_page_renders(client):
     content = response.content
     assert response.status_code == 200
     assert b"django/django" in content
-    assert b"Open filters" in content
-    assert b"Repository filters" in content
+    assert b"Find repositories" in content
+    assert b"Tune results" in content
+    assert b"More filters" in content
     assert b"Any GitHub topic" in content
     assert b"Any detected framework" in content
     assert b"Commit velocity" in content
-    assert b"Sort direction" in content
+    assert b"Direction" in content
     assert b"django (1)" in content
     assert b'href="/?topic=django"' in content
     assert b"web-framework (1)" in content
@@ -5231,7 +5264,7 @@ def test_repository_search_is_root_page(client):
 
     assert reverse("repos:search") == "/"
     assert response.status_code == 200
-    assert b"Search every repository hiding inside awesome lists." in response.content
+    assert b"Search awesome repositories" in response.content
     assert b"Browse awesome lists" in response.content
     assert b"Request a list" in response.content
 
@@ -5252,7 +5285,7 @@ def test_search_page_exposes_semantic_search_filter(client):
     content = response.content.decode()
     assert 'name="mode"' in content
     assert 'x-model="searchMode"' in content
-    assert '<option value="semantic" selected>Semantic relevance</option>' in content
+    assert re.search(r'<input\b[^>]*name="mode"[^>]*value="semantic"[^>]*checked', content)
 
     sort_select = re.search(r'<select\b[^>]*\bname="sort"[^>]*>', content)
     assert sort_select is not None
@@ -5676,10 +5709,10 @@ def test_awesome_list_detail_page_filters_repositories(client):
     assert "web-framework (1)" in content
     assert 'name="mode"' in content
     assert 'name="list"' not in content
-    assert 'class="md:col-span-2"' in content
+    assert 'class="md:col-span-2 lg:col-span-1 min-w-0"' in content
     assert "List: awesome-python" not in content
-    assert "Most forks" in content
-    assert "Fewest awesome-list mentions" in content
+    assert "Forks" in content
+    assert "Fewest list mentions" in content
     assert "Search: django" in content
     assert "Mode: Semantic relevance" not in content
     assert "list=awesome-python" not in response.context["querystring"]
