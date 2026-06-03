@@ -140,7 +140,7 @@ def test_landing_page_shows_github_button_for_anonymous_users(client, settings):
     assert "brand/awesome-repos-mark.svg" in content
     assert "brand/apple-touch-icon.png" in content
     assert "brand/awesome-repos-social.png" in content
-    assert "Search every repository hiding inside awesome lists." in content
+    assert "Search awesome repositories" in content
     assert "Browse awesome lists" in content
     # GitHub is the sole auth entry point; the old email-based buttons are gone.
     assert "Continue with GitHub" in content

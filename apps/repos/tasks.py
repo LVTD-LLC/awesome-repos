@@ -24,6 +24,8 @@ from apps.repos.services import (
     add_repository_to_awesome_list,
     github_rate_limit_remaining,
     github_rate_limit_status,
+    github_repository_sync_token_for_index,
+    github_repository_sync_token_pool,
     import_starred_repositories_for_profile,
     is_github_rate_limit_error,
 )
@@ -67,8 +69,15 @@ def _try_reserve_daily_missing_repository_slot(daily_limit: int) -> bool:
     return used <= daily_limit
 
 
-def _available_repository_refresh_limit(refresh_limit: int, min_remaining: int | None) -> int:
+def _available_repository_refresh_limit(
+    refresh_limit: int,
+    min_remaining: int | None,
+    *,
+    pool_size: int,
+) -> int:
     if min_remaining is None or refresh_limit <= 0:
+        return refresh_limit
+    if pool_size > 1:
         return refresh_limit
 
     if github_rate_limit_remaining() is None:
@@ -80,8 +89,14 @@ def _available_repository_refresh_limit(refresh_limit: int, min_remaining: int |
     return min(refresh_limit, max(0, remaining - min_remaining))
 
 
-def _github_refresh_budget_exhausted(min_remaining: int | None) -> bool:
+def _github_refresh_budget_exhausted(
+    min_remaining: int | None,
+    *,
+    pool_size: int,
+) -> bool:
     if min_remaining is None:
+        return False
+    if pool_size > 1:
         return False
 
     # Rate-limit state is process-local and only populated after a GitHub response.
@@ -179,16 +194,21 @@ def enqueue_missing_repositories_for_awesome_list_task(
         result = awesome_list.discover_missing_repositories_from_source(limit=limit)
         task_ids = []
         budget_exhausted = False
+        sync_token_pool = github_repository_sync_token_pool()
+        has_sync_tokens = bool(sync_token_pool)
         for repo_full_name in result["missing"]:
             if not _try_reserve_daily_missing_repository_slot(resolved_daily_limit):
                 budget_exhausted = True
                 break
+            task_kwargs = {"group": "Add missing awesome-list repos"}
+            if has_sync_tokens:
+                task_kwargs["github_token_index"] = len(task_ids)
             task_ids.append(
                 async_task(
                     "apps.repos.tasks.add_missing_repository_to_awesome_list_task",
                     awesome_list.id,
                     repo_full_name,
-                    group="Add missing awesome-list repos",
+                    **task_kwargs,
                 )
             )
 
@@ -221,7 +241,13 @@ def enqueue_missing_repositories_for_awesome_list_task(
         raise
 
 
-def add_missing_repository_to_awesome_list_task(awesome_list_id: int, repo_full_name: str):
+def add_missing_repository_to_awesome_list_task(
+    awesome_list_id: int,
+    repo_full_name: str,
+    *,
+    github_token_index: int | None = None,
+    github_access_token: str | None = None,
+):
     awesome_list = AwesomeList.objects.get(id=awesome_list_id)
     try:
         logger.info(
@@ -230,7 +256,13 @@ def add_missing_repository_to_awesome_list_task(awesome_list_id: int, repo_full_
             awesome_list_slug=awesome_list.slug,
             repo_full_name=repo_full_name,
         )
-        result = add_repository_to_awesome_list(awesome_list, repo_full_name)
+        if github_access_token is None and github_token_index is not None:
+            github_access_token = github_repository_sync_token_for_index(github_token_index)
+        result = add_repository_to_awesome_list(
+            awesome_list,
+            repo_full_name,
+            github_access_token=github_access_token,
+        )
         logger.info(
             "awesome_list_missing_repo_add_task_finished",
             awesome_list_id=awesome_list_id,
@@ -380,15 +412,22 @@ def refresh_repository_task(
     full_name: str,
     *,
     include_readme: bool | None = None,
+    github_token_index: int | None = None,
+    github_access_token: str | None = None,
 ):
-    # Keep include_readme in the signature so older queued jobs still deserialize.
+    # Keep legacy kwargs in the signature so older queued jobs still deserialize.
     logger.info(
         "repository_refresh_task_started",
         repository_id=repository_id,
         repository_full_name=full_name,
     )
     try:
-        refreshed = Repository.sync_from_source(full_name)
+        if github_access_token is None and github_token_index is not None:
+            github_access_token = github_repository_sync_token_for_index(github_token_index)
+        refreshed = Repository.sync_from_source(
+            full_name,
+            github_access_token=github_access_token,
+        )
         logger.info(
             "repository_refresh_task_finished",
             requested_repository_id=repository_id,
@@ -444,12 +483,19 @@ def refresh_repositories_task(
         "id",
         "full_name",
     )
-    refresh_limit = _available_repository_refresh_limit(refresh_limit, min_remaining)
+    sync_token_pool = github_repository_sync_token_pool()
+    sync_token_pool_size = len(sync_token_pool)
+    refresh_limit = _available_repository_refresh_limit(
+        refresh_limit,
+        min_remaining,
+        pool_size=sync_token_pool_size,
+    )
     queryset = queryset[:refresh_limit]
 
     queued = []
+    has_sync_tokens = bool(sync_token_pool)
     for repository_id, full_name in queryset.iterator():
-        if _github_refresh_budget_exhausted(min_remaining):
+        if _github_refresh_budget_exhausted(min_remaining, pool_size=sync_token_pool_size):
             logger.warning(
                 "repository_refresh_stopped_for_rate_limit_budget",
                 remaining=github_rate_limit_remaining(),
@@ -459,11 +505,14 @@ def refresh_repositories_task(
             )
             break
 
+        task_kwargs = {"group": "Refresh repositories"}
+        if has_sync_tokens:
+            task_kwargs["github_token_index"] = len(queued)
         task_id = async_task(
             "apps.repos.tasks.refresh_repository_task",
             repository_id,
             full_name,
-            group="Refresh repositories",
+            **task_kwargs,
         )
         queued.append(
             {

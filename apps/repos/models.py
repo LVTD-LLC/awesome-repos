@@ -220,10 +220,15 @@ class Repository(BaseModel):
         return reverse("repos:repo_detail", kwargs={"owner": self.owner, "name": self.name})
 
     @classmethod
-    def sync_from_source(cls, full_name: str) -> Repository:
+    def sync_from_source(
+        cls,
+        full_name: str,
+        *,
+        github_access_token: str | None = None,
+    ) -> Repository:
         from apps.repos.services import upsert_repository_from_github
 
-        return upsert_repository_from_github(full_name)
+        return upsert_repository_from_github(full_name, github_access_token=github_access_token)
 
 
 class RepositorySnapshot(BaseModel):

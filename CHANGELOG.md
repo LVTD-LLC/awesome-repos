@@ -17,6 +17,7 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 ## [Unreleased]
 ### Added
 - Awesome: added a $4 one-time Remove Ads Stripe checkout from Settings, backed by a profile flag that hides side ads and highlighted repository placements after payment.
+- Awesome: added experimental keyboard shortcuts for site navigation, search focus, theme toggling, and an in-app shortcut reference.
 - Awesome: added one-time Stripe checkout onboarding for $1,000 sponsor ads, including a TrustMRR-style modal, post-payment notification email, and paid ad-details submission flow.
 - Awesome: added optional Chatwoot live-chat widget support configured with `CHATWOOT_BASE_URL` and `CHATWOOT_WEBSITE_TOKEN`.
 - Awesome: added local logo assets and wired the navbar, favicon, touch icon, README, and base social metadata to the new branding.
@@ -50,6 +51,7 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Awesome: added a management command to backfill first-commit dates for existing awesome-list and repository rows.
 - Awesome: detect awesome-list repositories during repository sync and hide them from normal repository browse/search surfaces.
 - Awesome: added opt-in GitHub starred repository imports with a personal starred-repo search surface and daily user-token refreshes.
+- Awesome: use valid stored GitHub OAuth tokens as a background repository sync pool after the primary `GITHUB_TOKEN`.
 - Awesome: added a liked repositories page for authenticated users.
 - Awesome: detect repository dependency manifests during sync, infer package managers and stacks such as Django, Next.js, Rails, and Axum, and expose stack/package-manager filters in the UI, API, and MCP search tools.
 - Awesome: store repository website links from GitHub metadata or description URLs and show them on repository pages.

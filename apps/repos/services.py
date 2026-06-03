@@ -178,6 +178,63 @@ def github_token() -> str:
     )
 
 
+def github_user_tokens_for_repository_sync() -> list[str]:
+    if not getattr(settings, "GITHUB_REPOSITORY_SYNC_USE_USER_TOKENS", True):
+        return []
+
+    now = timezone.now()
+    tokens = []
+    seen = set()
+    queryset = (
+        SocialToken.objects.filter(
+            account__provider="github",
+            account__user__profile__github_starred_repos_import_enabled=True,
+        )
+        .exclude(token="")
+        .filter(models.Q(expires_at__isnull=True) | models.Q(expires_at__gt=now))
+        .order_by("id")
+        .values_list("token", flat=True)
+    )
+    for token in queryset:
+        if token in seen:
+            continue
+        seen.add(token)
+        tokens.append(token)
+    return tokens
+
+
+def github_repository_sync_token_pool() -> list[str]:
+    tokens = []
+    seen = set()
+    primary_token = github_token()
+    if primary_token:
+        tokens.append(primary_token)
+        seen.add(primary_token)
+
+    for token in github_user_tokens_for_repository_sync():
+        if token in seen:
+            continue
+        tokens.append(token)
+        seen.add(token)
+    return tokens
+
+
+def github_repository_sync_token_from_pool(
+    token_pool: list[str],
+    index: int = 0,
+) -> str | None:
+    if not token_pool:
+        return None
+    return token_pool[index % len(token_pool)]
+
+
+def github_repository_sync_token_for_index(index: int = 0) -> str | None:
+    return github_repository_sync_token_from_pool(
+        github_repository_sync_token_pool(),
+        index,
+    )
+
+
 def github_headers(
     *,
     token: str | None = None,
@@ -858,13 +915,13 @@ def readme_candidate_urls(full_name: str, default_branch: str):
         yield filename, raw_readme_url(full_name, default_branch, filename)
 
 
-def fetch_awesome_readme(full_name: str) -> tuple[str, dict]:
-    repo_meta = fetch_json(f"https://api.github.com/repos/{full_name}")
+def fetch_awesome_readme(full_name: str, *, token: str | None = None) -> tuple[str, dict]:
+    repo_meta = fetch_json(f"https://api.github.com/repos/{full_name}", token=token)
     branch = repo_meta.get("default_branch") or "main"
     last_error = None
     for _filename, url in readme_candidate_urls(full_name, branch):
         try:
-            return fetch_text(url), repo_meta
+            return fetch_text(url, token=token), repo_meta
         except (RuntimeError, URLError, TimeoutError) as exc:
             last_error = exc
     raise RuntimeError(f"Could not fetch README for {full_name}: {last_error}")
@@ -875,6 +932,7 @@ def attach_awesome_list_commit_count(
     meta: dict,
     *,
     existing_first_commit_at=None,
+    token: str | None = None,
 ) -> None:
     default_branch = meta.get("default_branch") or ""
     if not default_branch:
@@ -888,11 +946,12 @@ def attach_awesome_list_commit_count(
     try:
         first_commit_at = None
         if existing_first_commit_at is not None:
-            commit_count = fetch_github_commit_count(full_name, default_branch)
+            commit_count = fetch_github_commit_count(full_name, default_branch, token=token)
         else:
             commit_count, first_commit_at = fetch_github_commit_count_and_first_commit_at(
                 full_name,
                 default_branch,
+                token=token,
             )
         meta["commits_count"] = commit_count
         if first_commit_at is not None:
@@ -1741,6 +1800,8 @@ def awesome_list_repository_history_chart_data(
 
 def sync_awesome_list(awesome_list: AwesomeList, limit: int | None = None) -> dict:
     full_name = awesome_list.repo_full_name or parse_github_repo_url(awesome_list.source_url)
+    sync_token_pool = github_repository_sync_token_pool()
+    list_sync_token = github_repository_sync_token_from_pool(sync_token_pool, 0)
     logger.info(
         "awesome_list_scan_started",
         awesome_list_id=awesome_list.id,
@@ -1749,11 +1810,12 @@ def sync_awesome_list(awesome_list: AwesomeList, limit: int | None = None) -> di
         repo_full_name=full_name,
         limit=limit,
     )
-    markdown, meta = fetch_awesome_readme(full_name)
+    markdown, meta = fetch_awesome_readme(full_name, token=list_sync_token)
     attach_awesome_list_commit_count(
         full_name,
         meta,
         existing_first_commit_at=awesome_list.first_commit_at,
+        token=list_sync_token,
     )
     discovered_repo_names = extract_github_repos(markdown)
     scanned_at = timezone.now()
@@ -1798,11 +1860,20 @@ def sync_awesome_list(awesome_list: AwesomeList, limit: int | None = None) -> di
     synced = 0
     failures = []
     active_source_full_names = active_awesome_list_source_repository_name_set()
-    for repo_name in repo_names:
+    for index, repo_name in enumerate(repo_names, start=1):
         try:
+            sync_kwargs = {
+                "active_source_full_names": active_source_full_names,
+            }
+            repository_sync_token = github_repository_sync_token_from_pool(
+                sync_token_pool,
+                index,
+            )
+            if repository_sync_token:
+                sync_kwargs["github_access_token"] = repository_sync_token
             repo = upsert_repository_from_github(
                 repo_name,
-                active_source_full_names=active_source_full_names,
+                **sync_kwargs,
             )
             _, created = AwesomeListItem.objects.get_or_create(
                 awesome_list=awesome_list,
@@ -1841,6 +1912,7 @@ def discover_missing_awesome_list_repositories(
     awesome_list: AwesomeList, limit: int | None = None
 ) -> dict:
     full_name = awesome_list.repo_full_name or parse_github_repo_url(awesome_list.source_url)
+    list_sync_token = github_repository_sync_token_for_index(0)
     logger.info(
         "awesome_list_missing_repo_discovery_started",
         awesome_list_id=awesome_list.id,
@@ -1849,7 +1921,7 @@ def discover_missing_awesome_list_repositories(
         repo_full_name=full_name,
         limit=limit,
     )
-    markdown, meta = fetch_awesome_readme(full_name)
+    markdown, meta = fetch_awesome_readme(full_name, token=list_sync_token)
     discovered_repo_names = extract_github_repos(markdown)
     scanned_at = timezone.now()
     repo_names = discovered_repo_names
@@ -1930,11 +2002,19 @@ def discover_missing_awesome_list_repositories(
     }
 
 
-def add_repository_to_awesome_list(awesome_list: AwesomeList, repo_full_name: str) -> dict:
+def add_repository_to_awesome_list(
+    awesome_list: AwesomeList,
+    repo_full_name: str,
+    *,
+    github_access_token: str | None = None,
+) -> dict:
     repo = Repository.objects.filter(full_name=repo_full_name).first()
     repository_created = repo is None
     if repo is None:
-        repo = upsert_repository_from_github(repo_full_name)
+        repo = upsert_repository_from_github(
+            repo_full_name,
+            github_access_token=github_access_token,
+        )
 
     _, link_created = AwesomeListItem.objects.get_or_create(
         awesome_list=awesome_list,
@@ -1961,13 +2041,20 @@ def refresh_repositories(
     synced = 0
     failures = []
     active_source_full_names = active_awesome_list_source_repository_name_set()
-    for repo in queryset:
+    sync_token_pool = github_repository_sync_token_pool()
+    for index, repo in enumerate(queryset):
         try:
-            upsert_repository_from_github(
-                repo.full_name,
-                include_readme=include_readme,
-                active_source_full_names=active_source_full_names,
+            kwargs = {
+                "include_readme": include_readme,
+                "active_source_full_names": active_source_full_names,
+            }
+            repository_sync_token = github_repository_sync_token_from_pool(
+                sync_token_pool,
+                index,
             )
+            if repository_sync_token:
+                kwargs["github_access_token"] = repository_sync_token
+            upsert_repository_from_github(repo.full_name, **kwargs)
             synced += 1
         except Exception as exc:  # noqa: BLE001
             failures.append({"repo": repo.full_name, "error": str(exc)})

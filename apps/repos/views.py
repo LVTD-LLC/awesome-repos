@@ -156,18 +156,33 @@ REPOSITORY_FILTER_PARAM_NAMES = (
     "ai_development",
     "sort_direction",
 )
+REPOSITORY_ADVANCED_FILTER_PARAM_NAMES = (
+    "topic",
+    "generated_tag",
+    "framework",
+    "stack",
+    "package_manager",
+    "min_stars",
+    "unmaintained_days",
+    "min_age_years",
+    "min_velocity_percent",
+    "min_star_growth_percent",
+    "min_liability_percent",
+    "archived",
+    "ai_development",
+)
 REPOSITORY_SORT_LABELS = {
-    "stars": "Sort by stars",
-    "forks": "Most forks",
+    "stars": "Stars",
+    "forks": "Forks",
     "recent": "Recently updated",
     "created": "Recently created",
     "oldest": "Oldest first commit",
-    "commits": "Most commits",
+    "commits": "Commits",
     "velocity": "Commit velocity",
     "star_growth": "Star growth",
     "liability": "Star growth",
-    "awesome": "Most awesome-list mentions",
-    "least_awesome": "Fewest awesome-list mentions",
+    "awesome": "Awesome-list mentions",
+    "least_awesome": "Fewest list mentions",
     "name": "Name",
 }
 REPOSITORY_FILTER_LABELS = {
@@ -420,6 +435,26 @@ def repository_filters_applied(params, *, include_sort: bool = False) -> bool:
     return any(params.get(name) for name in names)
 
 
+def repository_advanced_filters_applied(params) -> bool:
+    return any(params.get(name) for name in REPOSITORY_ADVANCED_FILTER_PARAM_NAMES)
+
+
+def repository_filter_remove_querystring(params, name: str) -> str:
+    next_params = params.copy()
+    next_params.pop("page", None)
+    names_to_remove = {name}
+    if name in {"framework", "stack"}:
+        names_to_remove.update({"framework", "stack"})
+    elif name in {"min_star_growth_percent", "min_liability_percent"}:
+        names_to_remove.update({"min_star_growth_percent", "min_liability_percent"})
+    elif name in {"sort", "sort_direction"}:
+        names_to_remove.update({"sort", "sort_direction"})
+
+    for remove_name in names_to_remove:
+        next_params.pop(remove_name, None)
+    return next_params.urlencode()
+
+
 def active_repository_filter_chips(
     params,
     *,
@@ -428,6 +463,10 @@ def active_repository_filter_chips(
     resolved_sort_labels = {**REPOSITORY_SORT_LABELS, **(sort_labels or {})}
     chips = []
     for name in (*REPOSITORY_FILTER_PARAM_NAMES, "sort"):
+        if name == "stack" and params.get("framework"):
+            continue
+        if name == "min_liability_percent" and params.get("min_star_growth_percent"):
+            continue
         value = (params.get(name) or "").strip()
         if not value:
             continue
@@ -449,7 +488,13 @@ def active_repository_filter_chips(
             value = resolved_sort_labels[value]
         else:
             value = REPOSITORY_FILTER_VALUE_LABELS.get(name, {}).get(value, value)
-        chips.append({"label": REPOSITORY_FILTER_LABELS[name], "value": value})
+        chips.append(
+            {
+                "label": REPOSITORY_FILTER_LABELS[name],
+                "value": value,
+                "remove_querystring": repository_filter_remove_querystring(params, name),
+            }
+        )
     return chips
 
 
@@ -517,14 +562,17 @@ def repository_filter_context(
             awesome_list=awesome_list,
             profile=profile,
         )
+    active_filters = active_repository_filter_chips(
+        params,
+        sort_labels=sort_labels,
+    )
     return {
         "params": params,
         "querystring": params.urlencode(),
         "filters_applied": repository_filters_applied(params),
-        "active_repository_filters": active_repository_filter_chips(
-            params,
-            sort_labels=sort_labels,
-        ),
+        "advanced_repository_filters_applied": repository_advanced_filters_applied(params),
+        "active_repository_filters": active_filters,
+        "active_repository_filter_count": len(active_filters),
         "awesome_lists": awesome_lists,
         "languages": languages,
         "topic_options": topic_options,
@@ -581,12 +629,11 @@ class RepositorySearchView(ListView):
         )
         context["total_repositories"] = filter_options["total_repositories"]
         context["total_lists"] = filter_options["total_lists"]
-        context["search_eyebrow"] = "Awesome-list intelligence for GitHub"
-        context["search_title"] = "Search every repository hiding inside awesome lists."
+        context["search_eyebrow"] = "GitHub projects from awesome lists"
+        context["search_title"] = "Search awesome repositories"
         context["search_description"] = (
-            "Discover projects curated by awesome-list maintainers, then narrow them by "
-            "stars, age, freshness, archive status, language, topics, generated tags, "
-            "detected stacks, package managers, and source list."
+            "Search names, descriptions, topics, tags, and stacks, then tune results by "
+            "ecosystem, freshness, health, and cross-list signal."
         )
         context["total_repositories_label"] = "Repos indexed"
         context["total_lists_label"] = "Awesome lists tracked"
@@ -947,7 +994,7 @@ class AwesomeListDetailView(DetailView):
                 reset_url=self.object.get_absolute_url(),
                 awesome_list=self.object,
                 show_list_filter=False,
-                search_field_class="md:col-span-2",
+                search_field_class="md:col-span-2 lg:col-span-1",
                 filter_id_prefix="list-repo",
             )
         )

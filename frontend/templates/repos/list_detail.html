@@ -130,14 +130,24 @@
         <div class="text-sm text-gray-500 dark:text-gray-400">Latest repo push {{ repo_stats.latest_repo_push|date:"Y-m-d"|default:"-" }}</div>
       </div>
 
-      <form method="get" class="mb-6 rounded-2xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-900" x-data="{ searchMode: '{{ request.GET.mode|escapejs }}' }">
-        <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <form method="get" class="mb-6 rounded-2xl border border-gray-200 bg-gray-50 p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900/70" x-data="{ searchMode: '{{ request.GET.mode|escapejs }}' }">
+        <div class="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h3 class="text-lg font-bold text-gray-950 dark:text-white">Filter this list</h3>
+            <p class="text-sm text-gray-600 dark:text-gray-300">Search within {{ awesome_list.name }} or narrow by ecosystem and project health.</p>
+          </div>
+          {% if active_repository_filter_count %}
+            <a href="{{ search_reset_url }}" class="text-sm font-semibold text-green-700 hover:underline dark:text-green-300">Clear {{ active_repository_filter_count }} refinement{{ active_repository_filter_count|pluralize }}</a>
+          {% endif %}
+        </div>
+
+        <div class="mt-4">
           {% include "repos/_repository_filter_fields.html" %}
         </div>
 
         <div class="mt-4 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-          <a href="{{ search_reset_url }}" class="inline-flex min-h-11 items-center justify-center rounded-xl border border-gray-300 bg-white px-5 py-2.5 text-sm font-semibold text-gray-900 shadow-sm transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 dark:hover:bg-gray-800">Reset</a>
-          <button class="inline-flex min-h-11 items-center justify-center rounded-xl bg-green-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-green-700 dark:bg-green-500 dark:text-gray-950 dark:hover:bg-green-400">Apply</button>
+          <a href="{{ search_reset_url }}" class="inline-flex min-h-11 items-center justify-center rounded-xl border border-gray-300 bg-white px-5 py-2.5 text-sm font-semibold text-gray-900 shadow-sm transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 dark:hover:bg-gray-800">Reset filters</a>
+          <button class="inline-flex min-h-11 items-center justify-center rounded-xl bg-green-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-green-700 dark:bg-green-500 dark:text-gray-950 dark:hover:bg-green-400">Search repositories</button>
         </div>
       </form>
 
