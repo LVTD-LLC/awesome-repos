@@ -1049,7 +1049,7 @@ def test_starred_repository_search_uses_shared_repository_filters(auth_client, p
 
 def test_repository_filter_remove_querystring_resets_page_and_coupled_params():
     params = QueryDict(
-        "page=2&q=django&language=Python&framework=django&stack=django&sort=forks"
+        "page=2&q=django&language=Python&framework=django&stack=django&sort=forks&sort_direction=asc"
     )
 
     querystring = repository_filter_remove_querystring(params, "framework")
@@ -1060,6 +1060,13 @@ def test_repository_filter_remove_querystring_resets_page_and_coupled_params():
     assert "q=django" in querystring
     assert "language=Python" in querystring
     assert "sort=forks" in querystring
+    assert "sort_direction=asc" in querystring
+
+    sort_querystring = repository_filter_remove_querystring(params, "sort")
+
+    assert "sort=forks" not in sort_querystring
+    assert "sort_direction=asc" not in sort_querystring
+    assert "q=django" in sort_querystring
 
 
 def stub_repository_readme(monkeypatch, content="# Django\n"):
@@ -5275,7 +5282,7 @@ def test_awesome_list_detail_page_filters_repositories(client):
     assert "web-framework (1)" in content
     assert 'name="mode"' in content
     assert 'name="list"' not in content
-    assert 'class="md:col-span-2"' in content
+    assert 'class="md:col-span-2 lg:col-span-1 min-w-0"' in content
     assert "List: awesome-python" not in content
     assert "Forks" in content
     assert "Fewest list mentions" in content

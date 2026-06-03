@@ -447,6 +447,8 @@ def repository_filter_remove_querystring(params, name: str) -> str:
         names_to_remove.update({"framework", "stack"})
     elif name in {"min_star_growth_percent", "min_liability_percent"}:
         names_to_remove.update({"min_star_growth_percent", "min_liability_percent"})
+    elif name in {"sort", "sort_direction"}:
+        names_to_remove.update({"sort", "sort_direction"})
 
     for remove_name in names_to_remove:
         next_params.pop(remove_name, None)
@@ -988,7 +990,7 @@ class AwesomeListDetailView(DetailView):
                 reset_url=self.object.get_absolute_url(),
                 awesome_list=self.object,
                 show_list_filter=False,
-                search_field_class="md:col-span-2",
+                search_field_class="md:col-span-2 lg:col-span-1",
                 filter_id_prefix="list-repo",
             )
         )
