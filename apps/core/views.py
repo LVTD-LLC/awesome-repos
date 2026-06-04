@@ -674,7 +674,11 @@ class AdminPanelView(UserPassesTestMixin, TemplateView):
         new_users_week = User.objects.filter(date_joined__gte=week_ago).count()
         new_users_month = User.objects.filter(date_joined__gte=month_ago).count()
 
-        recent_users = User.objects.select_related("profile").order_by("-date_joined")[:10]
+        recent_users = (
+            User.objects.select_related("profile")
+            .annotate(starred_repository_count=Count("profile__starred_repository_links"))
+            .order_by("-date_joined")[:10]
+        )
         recent_awesome_lists = AwesomeList.objects.annotate(item_count=Count("items")).order_by(
             "-last_scanned_at",
             "name",
