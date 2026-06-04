@@ -1,5 +1,6 @@
 import re
 from datetime import timedelta
+from html.parser import HTMLParser
 
 import pytest
 from allauth.socialaccount.models import SocialAccount, SocialToken
@@ -10,6 +11,39 @@ from django.utils import timezone
 
 from apps.core.views import build_absolute_public_url
 from apps.repos.models import AwesomeList, Repository, UserStarredRepository
+
+
+class TableRowsParser(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.rows = []
+        self._current_row = None
+        self._current_cell = None
+
+    def handle_starttag(self, tag, attrs):
+        if tag == "tr":
+            self._current_row = []
+        elif tag in {"td", "th"} and self._current_row is not None:
+            self._current_cell = []
+
+    def handle_data(self, data):
+        if self._current_cell is not None:
+            self._current_cell.append(data)
+
+    def handle_endtag(self, tag):
+        if tag in {"td", "th"} and self._current_cell is not None:
+            cell_text = " ".join(" ".join(self._current_cell).split())
+            self._current_row.append(cell_text)
+            self._current_cell = None
+        elif tag == "tr" and self._current_row is not None:
+            self.rows.append(self._current_row)
+            self._current_row = None
+
+
+def table_row_for_text(content, text):
+    parser = TableRowsParser()
+    parser.feed(content)
+    return next(row for row in parser.rows if text in row)
 
 
 @pytest.mark.django_db
@@ -375,10 +409,10 @@ def test_admin_panel_shows_profile_starred_repo_counts_and_import_status(
     assert response.status_code == 200
     assert "Starred repos" in content
     assert "Starred import" in content
-    enabled_row = r"<tr>.*enabled@example\.com.*<td[^>]*>\s*2\s*</td>.*Enabled.*</tr>"
-    disabled_row = r"<tr>.*disabled@example\.com.*<td[^>]*>\s*0\s*</td>.*Disabled.*</tr>"
-    assert re.search(enabled_row, content, re.DOTALL)
-    assert re.search(disabled_row, content, re.DOTALL)
+    enabled_row = table_row_for_text(content, "enabled@example.com")
+    disabled_row = table_row_for_text(content, "disabled@example.com")
+    assert enabled_row[:4] == ["enabled@example.com", "enabled", "2", "Enabled"]
+    assert disabled_row[:4] == ["disabled@example.com", "disabled", "0", "Disabled"]
 
 
 @pytest.mark.django_db

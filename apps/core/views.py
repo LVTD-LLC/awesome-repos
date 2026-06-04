@@ -15,7 +15,7 @@ from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.core.mail import send_mail
 from django.db import transaction
-from django.db.models import BooleanField, Case, Count, Q, Value, When
+from django.db.models import Count, Q
 from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -676,14 +676,7 @@ class AdminPanelView(UserPassesTestMixin, TemplateView):
 
         recent_users = (
             User.objects.select_related("profile")
-            .annotate(
-                starred_repository_count=Count("profile__starred_repository_links"),
-                starred_repository_import_enabled=Case(
-                    When(profile__github_starred_repos_import_enabled=True, then=Value(True)),
-                    default=Value(False),
-                    output_field=BooleanField(),
-                ),
-            )
+            .annotate(starred_repository_count=Count("profile__starred_repository_links"))
             .order_by("-date_joined")[:10]
         )
         recent_awesome_lists = AwesomeList.objects.annotate(item_count=Count("items")).order_by(
