@@ -103,26 +103,23 @@ def _repository_history_badge_svg(
     *,
     colors: dict[str, str],
 ) -> str:
-    history_values = _metric_history_values(repository, metric_config)
+    history_values, snapshot_count = _metric_history_values(repository, metric_config)
     current_value = _current_metric_value(repository, metric_config)
     current_label = _format_compact_number(current_value)
     metric_label = _metric_label(metric_config, current_value)
-    awesome_list_count = _awesome_list_count(repository)
-    secondary_parts = [f"{awesome_list_count} awesome {_pluralize('list', awesome_list_count)}"]
-    if repository.language:
-        secondary_parts.append(repository.language)
-    if repository.is_archived:
-        secondary_parts.append("archived")
 
     minimum = min(history_values)
     maximum = max(history_values)
     range_label = _format_range(minimum, maximum)
     history_label = (
-        f"{len(history_values)} captures" if len(history_values) > 1 else "current catalog snapshot"
+        f"{snapshot_count} {_pluralize('capture', snapshot_count)}"
+        if snapshot_count
+        else "current catalog snapshot"
     )
     full_name = _truncate_text(repository.full_name, 34)
-    title = _escape_text(f"Awesome badge for {repository.full_name}")
-    description = _escape_text(
+    awesome_list_count = _awesome_list_count(repository)
+    title = f"Awesome badge for {repository.full_name}"
+    description = (
         f"{repository.full_name} has {_format_full_number(current_value)} {metric_label} "
         f"and appears in {awesome_list_count} awesome {_pluralize('list', awesome_list_count)}."
     )
@@ -134,7 +131,7 @@ def _repository_history_badge_svg(
         description=description,
         current_label=current_label,
         metric_label=metric_label,
-        secondary_parts=secondary_parts,
+        secondary_parts=_repository_secondary_parts(repository),
         chart_title=metric_config.title,
         footer_left=history_label,
         footer_right=range_label,
@@ -192,8 +189,8 @@ def _repository_growth_badge_svg(
     return _render_badge_svg(
         colors=colors,
         full_name=full_name,
-        title=_escape_text(f"{chart_title} for {repository.full_name}"),
-        description=_escape_text(description_text),
+        title=f"{chart_title} for {repository.full_name}",
+        description=description_text,
         current_label=current_label,
         metric_label=metric_label,
         secondary_parts=_repository_secondary_parts(repository),
@@ -218,10 +215,10 @@ def _render_badge_svg(
     footer_right: str,
     history_values: list[int],
 ) -> str:
-    line_path = _sparkline_path(history_values)
+    points = _sparkline_points(history_values)
+    line_path = _sparkline_path_from_points(points)
     area_path = _sparkline_area_path(line_path)
-    last_x = _sparkline_last_x(history_values)
-    last_y = _sparkline_last_y(history_values)
+    last_x, last_y = points[-1]
     mid_y = CHART_Y + CHART_HEIGHT / 2
     chart_right = CHART_X + CHART_WIDTH
 
@@ -241,8 +238,8 @@ def _render_badge_svg(
             f'height="{BADGE_HEIGHT}" viewBox="0 0 {BADGE_WIDTH} {BADGE_HEIGHT}" '
             'role="img" aria-labelledby="title desc">'
         ),
-        f'  <title id="title">{title}</title>',
-        f'  <desc id="desc">{description}</desc>',
+        f'  <title id="title">{_escape_text(title)}</title>',
+        f'  <desc id="desc">{_escape_text(description)}</desc>',
         f'  <rect width="{BADGE_WIDTH}" height="{BADGE_HEIGHT}" rx="20" fill="{background}" />',
         (
             f'  <rect x="0.5" y="0.5" width="{BADGE_WIDTH - 1}" '
@@ -313,7 +310,7 @@ def _repository_secondary_parts(repository: Repository) -> list[str]:
     return secondary_parts
 
 
-def _metric_history_values(repository: Repository, metric: BadgeMetric) -> list[int]:
+def _metric_history_values(repository: Repository, metric: BadgeMetric) -> tuple[list[int], int]:
     snapshots = list(
         repository.snapshots.order_by("-captured_at", "-id").only(
             "stars",
@@ -321,6 +318,7 @@ def _metric_history_values(repository: Repository, metric: BadgeMetric) -> list[
             "captured_at",
         )[:BADGE_HISTORY_LIMIT]
     )
+    snapshot_count = len(snapshots)
     values = [
         int(value)
         for snapshot in reversed(snapshots)
@@ -328,10 +326,10 @@ def _metric_history_values(repository: Repository, metric: BadgeMetric) -> list[
     ]
     current_value = _current_metric_value(repository, metric)
     if not values:
-        return [current_value]
+        return [current_value], snapshot_count
     if values[-1] != current_value:
         values.append(current_value)
-    return values
+    return values, snapshot_count
 
 
 def _period_baseline_snapshot(repository: Repository, metric: BadgeMetric, days: int):
@@ -422,8 +420,7 @@ def _format_range(minimum: int, maximum: int) -> str:
     return f"{_format_full_number(minimum)} to {_format_full_number(maximum)}"
 
 
-def _sparkline_path(values: list[int]) -> str:
-    points = _sparkline_points(values)
+def _sparkline_path_from_points(points: list[tuple[float, float]]) -> str:
     first_x, first_y = points[0]
     commands = [f"M {first_x:.1f} {first_y:.1f}"]
     commands.extend(f"L {x:.1f} {y:.1f}" for x, y in points[1:])
@@ -435,14 +432,6 @@ def _sparkline_area_path(line_path: str) -> str:
         f"{line_path} L {CHART_X + CHART_WIDTH:.1f} {CHART_Y + CHART_HEIGHT:.1f} "
         f"L {CHART_X:.1f} {CHART_Y + CHART_HEIGHT:.1f} Z"
     )
-
-
-def _sparkline_last_x(values: list[int]) -> float:
-    return _sparkline_points(values)[-1][0]
-
-
-def _sparkline_last_y(values: list[int]) -> float:
-    return _sparkline_points(values)[-1][1]
 
 
 def _sparkline_points(values: list[int]) -> list[tuple[float, float]]:

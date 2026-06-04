@@ -434,10 +434,7 @@ def repository_badge_embed_context(request, repository: Repository) -> dict:
             }
         )
 
-    return {
-        "primary": options[0],
-        "options": options,
-    }
+    return {"options": options}
 
 
 def awesome_list_request_client_ip(request) -> str:

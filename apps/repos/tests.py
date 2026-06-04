@@ -6131,7 +6131,7 @@ def test_repository_badge_svg_renders_shareable_history(client):
         name="django",
         url="https://github.com/django/django",
         language="Python",
-        stars=123456,
+        stars=123457,
         commit_count=90,
     )
     awesome_list = AwesomeList.objects.create(
