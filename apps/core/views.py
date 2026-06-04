@@ -98,7 +98,7 @@ def _profile_for_checkout_session(session, expected_user_id=None) -> Profile | N
 
     try:
         user_id = int(client_reference_id)
-    except TypeError, ValueError:
+    except (TypeError, ValueError) as _:
         return None
 
     if expected_user_id is not None and user_id != expected_user_id:
@@ -834,7 +834,7 @@ class AdminPanelView(UserPassesTestMixin, TemplateView):
     def retry_awesome_list_scan(self, request):
         try:
             awesome_list_id = int(request.POST.get("awesome_list_id", ""))
-        except TypeError, ValueError:
+        except (TypeError, ValueError) as _:
             messages.error(request, "Choose an awesome list to retry.")
             return redirect("admin_panel")
 
