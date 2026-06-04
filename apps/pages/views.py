@@ -5,6 +5,7 @@ from django.shortcuts import redirect
 from django.views.generic import TemplateView
 from django_q.tasks import async_task
 
+from apps.core.analytics import queue_track_event
 from awesome_repos.utils import get_awesome_repos_logger
 
 logger = get_awesome_repos_logger(__name__)
@@ -46,18 +47,13 @@ class SignupTrackingMixin:
             group="Create Posthog Alias",
         )
 
-        async_task(
-            "apps.core.tasks.track_event",
+        queue_track_event(
             profile_id=profile.id,
-            event_name="user_signed_up",
+            event_name="signup_completed",
             properties={
-                "$set": {
-                    "email": profile.user.email,
-                    "username": profile.user.username,
-                },
+                "method": self.tracking_source_name,
             },
             source_function=f"{self.tracking_source_name} - form_valid",
-            group="Track Event",
         )
 
     def form_valid(self, form):

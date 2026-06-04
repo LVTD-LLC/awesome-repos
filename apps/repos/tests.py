@@ -5096,6 +5096,106 @@ def test_authenticated_user_can_toggle_repository_like_with_htmx(auth_client, us
 
 
 @pytest.mark.django_db
+def test_repository_search_tracks_first_page_only(auth_client, user, monkeypatch):
+    for index in range(31):
+        Repository.objects.create(
+            full_name=f"example/repo-{index}",
+            owner="example",
+            name=f"repo-{index}",
+            url=f"https://github.com/example/repo-{index}",
+            description="A framework for testing.",
+        )
+    events = []
+    monkeypatch.setattr(
+        "apps.repos.views.queue_track_event", lambda **kwargs: events.append(kwargs)
+    )
+
+    response = auth_client.get(reverse("repos:search"), {"q": "framework"})
+
+    assert response.status_code == 200
+    assert events == [
+        {
+            "event_name": "search_performed",
+            "profile_id": user.profile.id,
+            "properties": {
+                "query": "framework",
+                "mode": "",
+                "results_count": 31,
+                "sort": "",
+                "sort_direction": "",
+                "search_scope": "public_repositories",
+                "filters_applied": True,
+            },
+            "source_function": "RepositorySearchView",
+        }
+    ]
+
+    events.clear()
+    response = auth_client.get(reverse("repos:search"), {"q": "framework", "page": "2"})
+
+    assert response.status_code == 200
+    assert events == []
+
+
+@pytest.mark.django_db
+def test_repository_like_queues_analytics_event(auth_client, user, monkeypatch):
+    repo = Repository.objects.create(
+        full_name="django/django",
+        owner="django",
+        name="django",
+        url="https://github.com/django/django",
+        language="Python",
+        stars=78000,
+    )
+    events = []
+    monkeypatch.setattr(
+        "apps.repos.views.queue_track_event", lambda **kwargs: events.append(kwargs)
+    )
+
+    response = auth_client.post(
+        reverse("repos:repo_like_toggle", kwargs={"owner": repo.owner, "name": repo.name}),
+        {"next": "/"},
+    )
+
+    assert response.status_code == 302
+    assert events == [
+        {
+            "event_name": "repository_liked",
+            "profile_id": user.profile.id,
+            "properties": {
+                "repository_id": repo.id,
+                "repository_full_name": "django/django",
+                "repository_language": "Python",
+                "repository_stars": 78000,
+            },
+            "source_function": "toggle_repository_like",
+        }
+    ]
+
+    events.clear()
+
+    unlike_response = auth_client.post(
+        reverse("repos:repo_like_toggle", kwargs={"owner": repo.owner, "name": repo.name}),
+        {"next": "/"},
+    )
+
+    assert unlike_response.status_code == 302
+    assert events == [
+        {
+            "event_name": "repository_unliked",
+            "profile_id": user.profile.id,
+            "properties": {
+                "repository_id": repo.id,
+                "repository_full_name": "django/django",
+                "repository_language": "Python",
+                "repository_stars": 78000,
+            },
+            "source_function": "toggle_repository_like",
+        }
+    ]
+
+
+@pytest.mark.django_db
 def test_repository_like_htmx_response_uses_safe_next_url(auth_client):
     repo = Repository.objects.create(
         full_name="django/django",
