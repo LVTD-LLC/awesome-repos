@@ -94,7 +94,7 @@
     {% include 'components/messages.html' with messages=messages %}
   {% endblock default_messages %}
 
-  <div class="min-h-screen bg-white text-gray-900 dark:bg-gray-950 dark:text-gray-100">
+  <div class="min-h-screen bg-white text-gray-900 dark:bg-gray-950 dark:text-gray-100 lg:pb-12">
     {% include "components/site_nav.html" %}
 
     <div class="mx-auto w-full pb-8 pt-6 {% if hide_side_ad_rails or ads_removed %}max-w-7xl px-4 sm:px-6 lg:px-8{% else %}grid max-w-none grid-cols-1 gap-y-6 px-4 sm:px-6 lg:px-8 xl:grid-cols-[11.25rem_minmax(0,1fr)_minmax(0,64rem)_minmax(0,1fr)_11.25rem] xl:gap-x-6 2xl:grid-cols-[14.5rem_minmax(0,1fr)_minmax(0,64rem)_minmax(0,1fr)_14.5rem]{% endif %}" data-page-ad-shell>
@@ -127,6 +127,8 @@
         </div>
       </div>
     </footer>
+
+    {% include "components/shortcut_hints.html" %}
 
   </div>
 

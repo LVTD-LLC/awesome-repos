@@ -1,0 +1,45 @@
+<aside class="shortcut-hints-bar" aria-label="Keyboard shortcut hints">
+  <div class="mx-auto flex h-12 max-w-[104rem] items-center justify-center gap-8 px-2 text-xs font-black uppercase text-gray-500 dark:text-gray-400">
+    <span class="shortcut-hint">
+      Home
+      <kbd class="shortcut-kbd">H</kbd>
+    </span>
+    <span class="shortcut-hint">
+      Search
+      <kbd class="shortcut-kbd">K</kbd>
+      <kbd class="shortcut-kbd">/</kbd>
+    </span>
+    <span class="shortcut-hint">
+      Repos
+      <kbd class="shortcut-kbd">R</kbd>
+    </span>
+    <span class="shortcut-hint">
+      Lists
+      <kbd class="shortcut-kbd">L</kbd>
+    </span>
+    {% if user.is_authenticated %}
+      <span class="shortcut-hint">
+        Starred
+        <kbd class="shortcut-kbd">S</kbd>
+      </span>
+      <span class="shortcut-hint">
+        Liked
+        <kbd class="shortcut-kbd">F</kbd>
+      </span>
+      <span class="shortcut-hint">
+        Settings
+        <kbd class="shortcut-kbd">,</kbd>
+      </span>
+    {% endif %}
+    {% if user.is_superuser %}
+      <span class="shortcut-hint">
+        Admin
+        <kbd class="shortcut-kbd">A</kbd>
+      </span>
+    {% endif %}
+    <span class="shortcut-hint">
+      Theme
+      <kbd class="shortcut-kbd">T</kbd>
+    </span>
+  </div>
+</aside>
