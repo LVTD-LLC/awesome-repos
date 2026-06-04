@@ -16,7 +16,7 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 
 ## [Unreleased]
 ### Added
-- Awesome: added experimental keyboard shortcuts for site navigation, search focus, theme toggling, and an in-app shortcut reference.
+- Awesome: added experimental keyboard shortcuts with inline key hints for site navigation, search focus, and theme toggling.
 - Awesome: added one-time Stripe checkout onboarding for $1,000 sponsor ads, including a TrustMRR-style modal, post-payment notification email, and paid ad-details submission flow.
 - Awesome: added optional Chatwoot live-chat widget support configured with `CHATWOOT_BASE_URL` and `CHATWOOT_WEBSITE_TOKEN`.
 - Awesome: added local logo assets and wired the navbar, favicon, touch icon, README, and base social metadata to the new branding.
