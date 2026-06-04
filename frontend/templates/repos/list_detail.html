@@ -127,7 +127,16 @@
             {% include "repos/_repository_filter_chips.html" %}
           </div>
         </div>
-        <div class="text-sm text-gray-500 dark:text-gray-400">Latest repo push {{ repo_stats.latest_repo_push|date:"Y-m-d"|default:"-" }}</div>
+        <div class="flex flex-col gap-2 sm:items-end">
+          <div class="text-sm text-gray-500 dark:text-gray-400">Latest repo push {{ repo_stats.latest_repo_push|date:"Y-m-d"|default:"-" }}</div>
+          {% if page_obj %}
+            <span class="shortcut-hint hidden text-xs font-black uppercase text-gray-500 dark:text-gray-400 lg:inline-flex" aria-label="List navigation shortcuts">
+              Browse
+              <kbd class="shortcut-kbd" aria-hidden="true">J</kbd>
+              <kbd class="shortcut-kbd" aria-hidden="true">K</kbd>
+            </span>
+          {% endif %}
+        </div>
       </div>
 
       <form method="get" class="mb-6 rounded-2xl border border-gray-200 bg-gray-50 p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900/70" x-data="{ searchMode: '{{ request.GET.mode|escapejs }}' }">
@@ -154,10 +163,10 @@
       <div class="space-y-3">
         {% include "components/highlighted_repo_slot.html" %}
         {% for repo in page_obj %}
-          <article class="rounded-2xl border border-gray-200 p-4 dark:border-gray-800">
+          <article class="rounded-2xl border border-gray-200 p-4 dark:border-gray-800" data-shortcut-list-item>
             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <a href="{{ repo.get_absolute_url }}" class="text-lg font-bold text-gray-950 hover:text-green-700 dark:text-white dark:hover:text-green-300">{{ repo.full_name }}</a>
+                <a href="{{ repo.get_absolute_url }}" class="text-lg font-bold text-gray-950 hover:text-green-700 dark:text-white dark:hover:text-green-300" data-shortcut-list-target>{{ repo.full_name }}</a>
                 <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">{{ repo.description|default:"No description." }}</p>
                 <div class="mt-2 flex flex-wrap gap-2 text-xs text-gray-600 dark:text-gray-400">
                   {% if repo.language %}<span class="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-800">{{ repo.language }}</span>{% endif %}
@@ -195,9 +204,19 @@
       </div>
       {% if page_obj.has_other_pages %}
         <nav class="mt-8 flex items-center justify-center gap-3">
-          {% if page_obj.has_previous %}<a class="rounded-full border px-4 py-2" href="?page={{ page_obj.previous_page_number }}{% if querystring %}&amp;{{ querystring }}{% endif %}">Previous</a>{% endif %}
+          {% if page_obj.has_previous %}
+            <a class="shortcut-hint rounded-full border px-4 py-2" href="?page={{ page_obj.previous_page_number }}{% if querystring %}&amp;{{ querystring }}{% endif %}" data-shortcut-page="previous">
+              Previous
+              <kbd class="shortcut-kbd hidden lg:inline-flex" aria-hidden="true">P</kbd>
+            </a>
+          {% endif %}
           <span class="text-sm text-gray-500">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
-          {% if page_obj.has_next %}<a class="rounded-full border px-4 py-2" href="?page={{ page_obj.next_page_number }}{% if querystring %}&amp;{{ querystring }}{% endif %}">Next</a>{% endif %}
+          {% if page_obj.has_next %}
+            <a class="shortcut-hint rounded-full border px-4 py-2" href="?page={{ page_obj.next_page_number }}{% if querystring %}&amp;{{ querystring }}{% endif %}" data-shortcut-page="next">
+              Next
+              <kbd class="shortcut-kbd hidden lg:inline-flex" aria-hidden="true">N</kbd>
+            </a>
+          {% endif %}
         </nav>
       {% endif %}
     </section>

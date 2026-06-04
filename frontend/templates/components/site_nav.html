@@ -4,13 +4,12 @@
 <header class="sticky top-0 z-40 border-b border-gray-200/80 bg-white/90 backdrop-blur-xl dark:border-gray-800/80 dark:bg-gray-950/90">
   <div class="mx-auto w-full max-w-[104rem] px-4 sm:px-6 lg:px-8">
     <div class="flex min-h-20 items-center gap-3">
-      <a href="{% url 'repos:search' %}" data-shortcut-link data-shortcut-key="h" data-shortcut-label="Home" class="group flex shrink-0 items-center gap-3 rounded-xl pr-2 text-gray-950 transition hover:text-green-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:text-white dark:hover:text-green-300 dark:focus-visible:ring-offset-gray-950" aria-label="Awesome home">
+      <a href="{% url 'repos:search' %}" class="group flex shrink-0 items-center gap-3 rounded-xl pr-2 text-gray-950 transition hover:text-green-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:text-white dark:hover:text-green-300 dark:focus-visible:ring-offset-gray-950" aria-label="Awesome home">
         <span class="flex h-10 w-10 items-center justify-center rounded-2xl border border-gray-200 bg-white shadow-sm transition group-hover:border-green-200 group-hover:bg-green-50 dark:border-gray-800 dark:bg-gray-900 dark:group-hover:border-green-900 dark:group-hover:bg-green-950">
           <img src="{% static 'brand/awesome-repos-mark.svg' %}" alt="" width="28" height="28" class="h-7 w-7" />
         </span>
         <span class="hidden items-center gap-2 sm:flex">
           <span class="text-base font-black">Awesome</span>
-          <kbd class="shortcut-kbd hidden lg:inline-flex" aria-hidden="true">H</kbd>
         </span>
       </a>
 
@@ -26,10 +25,9 @@
             name="q"
             value="{{ request.GET.q }}"
             placeholder="Search repositories"
-            class="h-11 w-full rounded-2xl border border-gray-200 bg-gray-50 pl-11 pr-20 text-sm font-medium text-gray-900 shadow-inner shadow-gray-200/40 transition placeholder:text-gray-400 focus:border-green-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-green-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-100 dark:shadow-black/20 dark:placeholder:text-gray-500 dark:focus:bg-gray-950"
+            class="h-11 w-full rounded-2xl border border-gray-200 bg-gray-50 pl-11 pr-4 text-sm font-medium text-gray-900 shadow-inner shadow-gray-200/40 transition placeholder:text-gray-400 focus:border-green-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-green-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-100 dark:shadow-black/20 dark:placeholder:text-gray-500 dark:focus:bg-gray-950 lg:pr-14"
           />
           <span class="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 items-center gap-1 lg:flex" aria-hidden="true">
-            <kbd class="shortcut-kbd">K</kbd>
             <kbd class="shortcut-kbd">/</kbd>
           </span>
         </div>
