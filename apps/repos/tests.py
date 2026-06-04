@@ -5172,6 +5172,28 @@ def test_repository_like_queues_analytics_event(auth_client, user, monkeypatch):
         }
     ]
 
+    events.clear()
+
+    unlike_response = auth_client.post(
+        reverse("repos:repo_like_toggle", kwargs={"owner": repo.owner, "name": repo.name}),
+        {"next": "/"},
+    )
+
+    assert unlike_response.status_code == 302
+    assert events == [
+        {
+            "event_name": "repository_unliked",
+            "profile_id": user.profile.id,
+            "properties": {
+                "repository_id": repo.id,
+                "repository_full_name": "django/django",
+                "repository_language": "Python",
+                "repository_stars": 78000,
+            },
+            "source_function": "toggle_repository_like",
+        }
+    ]
+
 
 @pytest.mark.django_db
 def test_repository_like_htmx_response_uses_safe_next_url(auth_client):

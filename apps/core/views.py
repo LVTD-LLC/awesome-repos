@@ -59,14 +59,13 @@ def _profile_id_for_request(request) -> int | None:
     return None
 
 
-def _track_checkout_started(request, *, session_id: str, product: str, value: float) -> None:
+def _track_checkout_started(request, *, session_id: str, product: str) -> None:
     queue_track_event(
         event_name="checkout_started",
         profile_id=_profile_id_for_request(request),
         distinct_id=f"stripe_checkout:{session_id}",
         properties={
             "product": product,
-            "value": value,
             "currency": "usd",
             "transaction_id": session_id,
         },
@@ -300,7 +299,6 @@ def sponsor_checkout(request):
         request,
         session_id=session["id"],
         product="sponsor_ads",
-        value=1000,
     )
     return redirect(session["url"])
 
@@ -394,7 +392,6 @@ def highlighted_repo_checkout(request):
         request,
         session_id=session["id"],
         product="highlighted_repo",
-        value=20,
     )
     return redirect(session["url"])
 
@@ -431,7 +428,6 @@ def remove_ads_checkout(request):
         request,
         session_id=session["id"],
         product="remove_ads",
-        value=4,
     )
     return redirect(session["url"])
 

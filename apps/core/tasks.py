@@ -12,15 +12,21 @@ logger = get_awesome_repos_logger(__name__)
 SENSITIVE_ANALYTICS_PROPERTY_KEYS = {"cookies", "email", "posthog_cookie"}
 
 
+def _scrub_analytics_value(value):
+    if isinstance(value, dict):
+        return _scrub_analytics_properties(value)
+    if isinstance(value, list):
+        return [_scrub_analytics_value(item) for item in value]
+    return value
+
+
 def _scrub_analytics_properties(properties: dict) -> dict:
     scrubbed = {}
     for key, value in properties.items():
         normalized_key = str(key).lower()
         if normalized_key in SENSITIVE_ANALYTICS_PROPERTY_KEYS or normalized_key.endswith("_email"):
             continue
-        if isinstance(value, dict):
-            value = _scrub_analytics_properties(value)
-        scrubbed[key] = value
+        scrubbed[key] = _scrub_analytics_value(value)
     return scrubbed
 
 
@@ -98,8 +104,8 @@ def track_event(
             "is_authenticated": True,
             **event_properties,
         }
-        set_properties = event_properties.get("$set", {})
-        if isinstance(set_properties, dict):
+        set_properties = event_properties.get("$set")
+        if set_properties is not None and isinstance(set_properties, dict):
             event_properties["$set"] = {
                 "profile_id": profile.id,
                 "current_state": profile.state,

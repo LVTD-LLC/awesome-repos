@@ -72,6 +72,12 @@ def test_track_event_identifies_profile_without_email(profile, monkeypatch):
                 "email": profile.user.email,
                 "company_email": "team@example.com",
             },
+            "items": [
+                {
+                    "name": "seat",
+                    "email": profile.user.email,
+                }
+            ],
         },
     )
 
@@ -81,11 +87,38 @@ def test_track_event_identifies_profile_without_email(profile, monkeypatch):
     assert captured["properties"]["profile_id"] == profile.id
     assert captured["properties"]["method"] == "github"
     assert "email" not in captured["properties"]
+    assert captured["properties"]["items"] == [{"name": "seat"}]
     assert captured["properties"]["$set"] == {
         "profile_id": profile.id,
         "current_state": profile.state,
     }
     assert profile.user.email not in str(captured)
+
+
+@pytest.mark.django_db
+@override_settings(POSTHOG_API_KEY="phc_test")
+def test_track_event_does_not_set_person_properties_by_default(profile, monkeypatch):
+    captured = {}
+
+    def fake_capture(distinct_id, *, event, properties):
+        captured["distinct_id"] = distinct_id
+        captured["event"] = event
+        captured["properties"] = properties
+
+    monkeypatch.setattr("apps.core.tasks.posthog.capture", fake_capture)
+
+    result = track_event(
+        profile_id=profile.id,
+        event_name="repository_liked",
+        properties={"repository_full_name": "django/django"},
+    )
+
+    assert result == "Tracked event repository_liked"
+    assert captured["distinct_id"] == str(profile.id)
+    assert captured["event"] == "repository_liked"
+    assert captured["properties"]["profile_id"] == profile.id
+    assert captured["properties"]["repository_full_name"] == "django/django"
+    assert "$set" not in captured["properties"]
 
 
 @pytest.mark.django_db
