@@ -9,7 +9,9 @@ def test_side_ad_sponsor_checkout_form_includes_csrf_token(template_name):
     content = render_to_string(template_name, {"csrf_token": "csrf-test-token"})
 
     assert re.search(
-        r'<form method="post" action="/sponsor/checkout/"[^>]*>\s*'
-        r'<input type="hidden" name="csrfmiddlewaretoken" value="csrf-test-token">',
+        r'<form\b(?=[^>]*\bmethod="post")(?=[^>]*\baction="/sponsor/checkout/")[^>]*>'
+        r"[\s\S]*?"
+        r'<input\b(?=[^>]*\btype="hidden")'
+        r'(?=[^>]*\bname="csrfmiddlewaretoken")(?=[^>]*\bvalue="csrf-test-token")[^>]*>',
         content,
     ), "Sponsor checkout form should render the forwarded CSRF token."

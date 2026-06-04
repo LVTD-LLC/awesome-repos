@@ -15,6 +15,16 @@ from django.urls import reverse
 pytestmark = pytest.mark.django_db
 
 
+def assert_sponsor_checkout_form_has_csrf(content: str, csrf_value_pattern: str = r'[^"]+'):
+    assert re.search(
+        r'<form\b(?=[^>]*\bmethod="post")(?=[^>]*\baction="/sponsor/checkout/")[^>]*>'
+        r"[\s\S]*?"
+        rf'<input\b(?=[^>]*\btype="hidden")'
+        rf'(?=[^>]*\bname="csrfmiddlewaretoken")(?=[^>]*\bvalue="{csrf_value_pattern}")[^>]*>',
+        content,
+    ), "Sponsor checkout form should render a hidden CSRF input."
+
+
 def assert_standard_ad_layout(content):
     assert "data-page-ad-shell" in content
     assert "data-page-content" in content
@@ -34,11 +44,7 @@ def assert_standard_ad_layout(content):
     assert content.count("utm_medium=side_ad") == 9
     assert "data-sponsor-modal-open" in content
     assert 'action="/sponsor/checkout/"' in content
-    assert re.search(
-        r'<form method="post" action="/sponsor/checkout/"[^>]*>\s*'
-        r'<input type="hidden" name="csrfmiddlewaretoken" value="[^"]+">',
-        content,
-    ), "Sponsor checkout form should render a hidden CSRF input."
+    assert_sponsor_checkout_form_has_csrf(content)
 
 
 def test_side_ad_slot_default_sponsor_email():
