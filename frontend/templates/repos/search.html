@@ -2,8 +2,11 @@
 {% load static humanize socialaccount repo_stack_tags %}
 
 {% block meta %}
-<title>{{ search_title|default:"Search awesome repositories" }} · Awesome</title>
-<meta name="description" content="{{ search_description|default:'Search GitHub repositories discovered across curated awesome lists.' }}" />
+  {% if is_personal_starred_search %}
+    {% include "components/seo_meta.html" with title="Search your starred repositories · Awesome" description=search_description robots="noindex, nofollow" canonical_path=request.path %}
+  {% else %}
+    {% include "components/seo_meta.html" with title="Search Awesome Repositories · Awesome" description=search_description canonical_path=request.path %}
+  {% endif %}
 {% endblock meta %}
 
 {% block content %}

@@ -1,5 +1,7 @@
 {% extends "base_landing.html" %}
-{% block meta %}<title>Unsubscribe · Awesome</title>{% endblock meta %}
+{% block meta %}
+{% include "components/seo_meta.html" with title="Unsubscribe · Awesome" description="Manage an Awesome repository newsletter subscription." robots="noindex, nofollow" canonical_path=request.path twitter_card="summary" %}
+{% endblock meta %}
 {% block content %}
 <section class="mx-auto max-w-xl px-4 py-16 sm:px-6 lg:px-8">
   <div class="rounded-2xl border border-gray-200 p-6 dark:border-gray-800">

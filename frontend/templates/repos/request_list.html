@@ -1,8 +1,7 @@
 {% extends "base_landing.html" %}
 
 {% block meta %}
-<title>Request an awesome list · Awesome</title>
-<meta name="description" content="Request a GitHub awesome list to be reviewed for Awesome indexing." />
+{% include "components/seo_meta.html" with title="Request an Awesome List · Awesome" description="Request a GitHub awesome list to be reviewed for indexing in the Awesome repository discovery catalog." canonical_path=request.path twitter_card="summary" %}
 {% endblock meta %}
 
 {% block content %}

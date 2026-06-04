@@ -2,8 +2,7 @@
 {% load humanize socialaccount %}
 
 {% block meta %}
-  <title>Settings · Awesome</title>
-  <meta name="description" content="Manage your Awesome account, GitHub imports, and repository update preferences." />
+  {% include "components/seo_meta.html" with title="Settings · Awesome" description="Manage your Awesome account, GitHub imports, and repository update preferences." robots="noindex, nofollow" canonical_path=request.path twitter_card="summary" %}
 {% endblock meta %}
 
 {% block content %}

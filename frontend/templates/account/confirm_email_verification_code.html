@@ -3,7 +3,7 @@
 {% load widget_tweaks %}
 
 {% block meta %}
-<title>Email verification · the app</title>
+{% include "components/seo_meta.html" with title="Email verification · Awesome" description="Confirm the email address for your Awesome account." robots="noindex, nofollow" canonical_path=request.path twitter_card="summary" %}
 {% endblock meta %}
 
 {% block content %}
@@ -65,5 +65,4 @@
   </div>
 </div>
 {% endblock content %}
-
 

@@ -2,8 +2,7 @@
 {% load humanize %}
 
 {% block meta %}
-<title>Liked repositories · Awesome</title>
-<meta name="description" content="Review repositories you liked on Awesome." />
+{% include "components/seo_meta.html" with title="Liked repositories · Awesome" description="Review repositories you liked on Awesome." robots="noindex, nofollow" canonical_path=request.path twitter_card="summary" %}
 {% endblock meta %}
 
 {% block content %}

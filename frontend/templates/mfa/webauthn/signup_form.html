@@ -3,7 +3,7 @@
 {% load widget_tweaks %}
 
 {% block meta %}
-<title>Create passkey · the app</title>
+{% include "components/seo_meta.html" with title="Create passkey · Awesome" description="Create a passkey for your Awesome account." robots="noindex, nofollow" canonical_path=request.path twitter_card="summary" %}
 {% endblock meta %}
 
 {% block content %}
@@ -51,5 +51,4 @@
   }
 }</script>
 {% endblock content %}
-
 

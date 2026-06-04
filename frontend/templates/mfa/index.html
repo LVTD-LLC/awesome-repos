@@ -3,7 +3,7 @@
 {% load i18n %}
 
 {% block meta %}
-<title>Passkeys · the app</title>
+{% include "components/seo_meta.html" with title="Passkeys · Awesome" description="Manage passkeys for your Awesome account." robots="noindex, nofollow" canonical_path=request.path twitter_card="summary" %}
 {% endblock meta %}
 
 {% block mfa_content %}
@@ -70,5 +70,4 @@
     Note: the app requires a confirmed email address before adding passkeys, and recovery codes provide a fallback if a passkey is lost.
   </p>
 {% endblock mfa_content %}
-
 

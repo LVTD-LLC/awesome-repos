@@ -2,7 +2,7 @@
 {% load humanize static %}
 
 {% block meta %}
-  <title>Admin Panel - Awesome</title>
+  {% include "components/seo_meta.html" with title="Admin Panel · Awesome" description="Admin tools for managing Awesome repository and awesome-list indexing." robots="noindex, nofollow" canonical_path=request.path twitter_card="summary" %}
 {% endblock meta %}
 
 {% block content %}

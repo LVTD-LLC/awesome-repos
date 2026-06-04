@@ -2,22 +2,7 @@
 {% load static %}
 
 {% block meta %}
-    <title>Technologies We Use | Awesome</title>
-    <meta name="description" content="Technologies and Tools Used by Awesome" />
-    <meta name="keywords" content="Awesome, Technology Stack, Web Development" />
-    <meta name="robots" content="index, follow" />
-    <link rel="canonical" href="https://{{ request.get_host }}/uses" />
-    <meta property="og:type" content="article" />
-    <meta property="og:title" content="Technologies We Use | Awesome" />
-    <meta property="og:url" content="https://{{ request.get_host }}/uses" />
-    <meta property="og:description" content="Technologies and Tools Used by Awesome" />
-    <meta property="og:locale" content="en_US" />
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:creator" content="@rasulkireev" />
-    <meta name="twitter:site" content="@rasulkireev" />
-    <meta name="twitter:title" content="Technologies We Use | Awesome" />
-    <meta name="twitter:description" content="Technologies and Tools Used by Awesome" />
-    <meta name="twitter:image" content="https://osig.app/g?site=x&style=logo&font=markerfelt&title=Awesome&subtitle=Tech we use&" />
+    {% include "components/seo_meta.html" with title="Technologies We Use · Awesome" description="See the technologies and tools used to build Awesome, the GitHub repository discovery app for curated awesome lists." canonical_path=request.path og_type="article" %}
 {% endblock meta %}
 
 {% block content %}

@@ -1,9 +1,7 @@
 {% extends 'base_landing.html' %}
 
 {% block meta %}
-<title>404 - Page not found | Awesome</title>
-<meta name="description" content="The page you are looking for could not be found." />
-<meta name="robots" content="noindex, follow" />
+{% include "components/seo_meta.html" with title="Page Not Found · Awesome" description="The page you are looking for could not be found." robots="noindex, follow" canonical_path=request.path twitter_card="summary" %}
 {% endblock meta %}
 
 {% block content %}
