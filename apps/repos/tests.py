@@ -5034,6 +5034,10 @@ def test_search_page_renders(client):
     assert b"Any GitHub topic" in content
     assert b"Any detected framework" in content
     assert b"Commit velocity" in content
+    assert b"What does Commit velocity mean?" in content
+    assert b"commit-count growth since Awesome first tracked the repository" in content
+    assert b"What does Star growth mean?" in content
+    assert b"GitHub star growth since Awesome first tracked the repository" in content
     assert b"Direction" in content
     assert b"django (1)" in content
     assert b'href="/?topic=django"' in content

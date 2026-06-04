@@ -212,7 +212,29 @@
             </div>
 
             <div>
-              <label for="{{ filter_id_prefix }}-min-velocity-percent" class="{{ label_class }}">Commit velocity</label>
+              <div class="flex items-center gap-1.5">
+                <label for="{{ filter_id_prefix }}-min-velocity-percent" class="{{ label_class }}">Commit velocity</label>
+                <span class="group/help relative inline-flex">
+                  <button
+                    type="button"
+                    class="inline-flex h-5 w-5 items-center justify-center rounded-full border border-gray-300 text-gray-500 transition hover:border-gray-400 hover:text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500 dark:border-gray-700 dark:text-gray-400 dark:hover:border-gray-500 dark:hover:text-gray-100"
+                    aria-label="What does Commit velocity mean?"
+                    aria-describedby="{{ filter_id_prefix }}-commit-velocity-help"
+                  >
+                    <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                      <path d="M7.75 7.25a2.25 2.25 0 1 1 3.54 1.84c-.78.55-1.29 1.05-1.29 1.91" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                      <path d="M10 14.25h.01" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" />
+                    </svg>
+                  </button>
+                  <span
+                    id="{{ filter_id_prefix }}-commit-velocity-help"
+                    role="tooltip"
+                    class="pointer-events-none absolute left-0 top-full z-30 mt-2 w-72 max-w-[calc(100vw-2rem)] rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium leading-5 text-gray-600 opacity-0 shadow-lg transition group-hover/help:opacity-100 group-focus-within/help:opacity-100 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300"
+                  >
+                    Filters by commit-count growth since Awesome first tracked the repository. Enter the minimum percentage increase.
+                  </span>
+                </span>
+              </div>
               <input
                 id="{{ filter_id_prefix }}-min-velocity-percent"
                 type="number"
@@ -225,7 +247,29 @@
             </div>
 
             <div>
-              <label for="{{ filter_id_prefix }}-min-star-growth-percent" class="{{ label_class }}">Star growth</label>
+              <div class="flex items-center gap-1.5">
+                <label for="{{ filter_id_prefix }}-min-star-growth-percent" class="{{ label_class }}">Star growth</label>
+                <span class="group/help relative inline-flex">
+                  <button
+                    type="button"
+                    class="inline-flex h-5 w-5 items-center justify-center rounded-full border border-gray-300 text-gray-500 transition hover:border-gray-400 hover:text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500 dark:border-gray-700 dark:text-gray-400 dark:hover:border-gray-500 dark:hover:text-gray-100"
+                    aria-label="What does Star growth mean?"
+                    aria-describedby="{{ filter_id_prefix }}-star-growth-help"
+                  >
+                    <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                      <path d="M7.75 7.25a2.25 2.25 0 1 1 3.54 1.84c-.78.55-1.29 1.05-1.29 1.91" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                      <path d="M10 14.25h.01" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" />
+                    </svg>
+                  </button>
+                  <span
+                    id="{{ filter_id_prefix }}-star-growth-help"
+                    role="tooltip"
+                    class="pointer-events-none absolute left-0 top-full z-30 mt-2 w-72 max-w-[calc(100vw-2rem)] rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium leading-5 text-gray-600 opacity-0 shadow-lg transition group-hover/help:opacity-100 group-focus-within/help:opacity-100 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300"
+                  >
+                    Filters by GitHub star growth since Awesome first tracked the repository. Enter the minimum percentage increase.
+                  </span>
+                </span>
+              </div>
               <input
                 id="{{ filter_id_prefix }}-min-star-growth-percent"
                 type="number"
