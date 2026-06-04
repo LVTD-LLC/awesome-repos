@@ -1,7 +1,7 @@
 {% extends "base_landing.html" %}
 {% block meta %}
-  {% with meta_title=repository.full_name|add:" newsletters · Awesome" meta_description="Generated repository change updates and RSS feeds from tracked commits." %}
-    {% include "components/seo_meta.html" with title=meta_title description=meta_description canonical_path=request.path og_type="article" %}
+  {% with meta_title=repository.full_name|add:" newsletters · Awesome" %}
+    {% include "components/seo_meta.html" with title=meta_title description=newsletter_list_meta_description canonical_path=request.path og_type="article" %}
   {% endwith %}
 {% endblock meta %}
 {% block content %}

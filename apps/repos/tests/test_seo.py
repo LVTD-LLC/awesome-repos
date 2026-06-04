@@ -91,6 +91,37 @@ def test_awesome_list_detail_has_page_specific_metadata_and_schema(client):
 
 
 @override_settings(SITE_URL="https://testserver")
+def test_newsletter_issue_list_has_repository_specific_seo_description(client):
+    repository = Repository.objects.create(
+        full_name="django/django",
+        owner="django",
+        name="django",
+        url="https://github.com/django/django",
+        description="The Web framework for perfectionists with deadlines.",
+    )
+
+    response = client.get(
+        reverse(
+            "repos:newsletter_issue_list",
+            kwargs={"owner": repository.owner, "name": repository.name},
+        )
+    )
+
+    assert response.status_code == 200
+    content = response_text(response)
+    assert "<title>django/django newsletters · Awesome</title>" in content
+    assert (
+        '<meta name="description" content="django/django repository newsletter archive '
+        'with generated weekly and monthly change updates plus RSS feeds from tracked commits." />'
+        in content
+    )
+    assert (
+        '<link rel="canonical" href="https://testserver/repos/django/django/newsletters/" />'
+        in content
+    )
+
+
+@override_settings(SITE_URL="https://testserver")
 def test_newsletter_issue_detail_has_unique_seo_description(client):
     repository = Repository.objects.create(
         full_name="django/django",
