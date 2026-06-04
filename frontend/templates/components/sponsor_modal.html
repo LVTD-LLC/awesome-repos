@@ -1,63 +1,109 @@
-<div
-  class="fixed inset-0 z-50 hidden items-center justify-center bg-black/70 px-4 py-8 backdrop-blur-sm"
-  data-sponsor-modal
-  aria-hidden="true"
->
-  <div class="relative max-h-[calc(100vh-2rem)] w-full max-w-3xl overflow-y-auto rounded-2xl border border-gray-700 bg-[#242424] p-6 text-gray-100 shadow-2xl sm:p-8" role="dialog" aria-modal="true" aria-labelledby="sponsor-modal-heading">
-    <button type="button" class="absolute right-5 top-5 rounded-full p-2 text-gray-300 transition hover:bg-white/10 hover:text-white" data-sponsor-modal-close aria-label="Close sponsor modal">
-      <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18 18 6M6 6l12 12" />
-      </svg>
-    </button>
-
-    <p class="app-label-caps text-green-300">Sponsor Awesome</p>
-    <h2 id="sponsor-modal-heading" class="mt-2 pr-10 text-3xl font-black tracking-tight text-white">Advertise on Awesome</h2>
-    <p class="mt-3 max-w-2xl text-sm leading-6 text-gray-300 sm:text-base">Reach developers, founders, and operators browsing curated open-source repositories and awesome lists.</p>
-
-    <div class="mt-8 grid gap-4 sm:grid-cols-3">
-      <div class="rounded-xl border border-white/10 bg-white/5 p-5 text-center">
-        <div class="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-green-300">
-          <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 0 0-4-4h-1M9 20H4v-2a4 4 0 0 1 4-4h1m4-4a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z" /></svg>
+<div class="fixed inset-0 z-50 hidden items-center justify-center bg-black/70 px-4 py-8 backdrop-blur-sm"
+     data-sponsor-modal
+     aria-hidden="true">
+    <div class="relative max-h-[calc(100vh-2rem)] w-full max-w-3xl overflow-y-auto rounded-2xl border border-gray-700 bg-[#242424] p-6 text-gray-100 shadow-2xl sm:p-8"
+         role="dialog"
+         aria-modal="true"
+         aria-labelledby="sponsor-modal-heading">
+        <button type="button"
+                class="absolute right-5 top-5 rounded-full p-2 text-gray-300 transition hover:bg-white/10 hover:text-white"
+                data-sponsor-modal-close
+                aria-label="Close sponsor modal">
+            <svg class="h-5 w-5"
+                 xmlns="http://www.w3.org/2000/svg"
+                 fill="none"
+                 viewBox="0 0 24 24"
+                 stroke="currentColor"
+                 aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18 18 6M6 6l12 12" />
+            </svg>
+        </button>
+        <p class="app-label-caps text-green-300">Sponsor Awesome</p>
+        <h2 id="sponsor-modal-heading"
+            class="mt-2 pr-10 text-3xl font-black tracking-tight text-white">Advertise on Awesome</h2>
+        <p class="mt-3 max-w-2xl text-sm leading-6 text-gray-300 sm:text-base">
+            Reach developers, founders, and operators browsing curated open-source repositories and awesome lists.
+        </p>
+        <div class="mt-8 grid gap-4 sm:grid-cols-3">
+            <div class="rounded-xl border border-white/10 bg-white/5 p-5 text-center">
+                <div class="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-green-300">
+                    <svg class="h-5 w-5"
+                         xmlns="http://www.w3.org/2000/svg"
+                         fill="none"
+                         viewBox="0 0 24 24"
+                         stroke="currentColor"
+                         aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 0 0-4-4h-1M9 20H4v-2a4 4 0 0 1 4-4h1m4-4a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z" />
+                    </svg>
+                </div>
+                <div class="mt-3 text-2xl font-black">Developers</div>
+                <p class="mt-1 text-sm text-gray-400">Open-source audience</p>
+            </div>
+            <div class="rounded-xl border border-white/10 bg-white/5 p-5 text-center">
+                <div class="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-green-300">
+                    <svg class="h-5 w-5"
+                         xmlns="http://www.w3.org/2000/svg"
+                         fill="none"
+                         viewBox="0 0 24 24"
+                         stroke="currentColor"
+                         aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
+                    </svg>
+                </div>
+                <div class="mt-3 text-2xl font-black">High intent</div>
+                <p class="mt-1 text-sm text-gray-400">Builders, not browsers</p>
+            </div>
+            <div class="rounded-xl border border-amber-500/40 bg-amber-500/10 p-5 text-center">
+                <div class="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-amber-500/20 text-amber-300">
+                    <svg class="h-5 w-5"
+                         xmlns="http://www.w3.org/2000/svg"
+                         fill="none"
+                         viewBox="0 0 24 24"
+                         stroke="currentColor"
+                         aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m13 2-9 13h7l-1 7 10-14h-7l0-6Z" />
+                    </svg>
+                </div>
+                <div class="mt-3 text-2xl font-black">1 month</div>
+                <p class="mt-1 text-sm text-gray-400">One-time placement</p>
+            </div>
         </div>
-        <div class="mt-3 text-2xl font-black">Developers</div>
-        <p class="mt-1 text-sm text-gray-400">Open-source audience</p>
-      </div>
-      <div class="rounded-xl border border-white/10 bg-white/5 p-5 text-center">
-        <div class="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-green-300">
-          <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" /></svg>
+        <div class="mt-8">
+            <h3 class="text-lg font-black text-white">How it works</h3>
+            <p class="mt-3 text-sm leading-7 text-gray-300">
+                Your startup appears in rotating sponsor slots on Awesome pages. After checkout, you’ll submit your logo, startup name, and short description so we can place the ad on the home page.
+            </p>
         </div>
-        <div class="mt-3 text-2xl font-black">High intent</div>
-        <p class="mt-1 text-sm text-gray-400">Builders, not browsers</p>
-      </div>
-      <div class="rounded-xl border border-amber-500/40 bg-amber-500/10 p-5 text-center">
-        <div class="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-amber-500/20 text-amber-300">
-          <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m13 2-9 13h7l-1 7 10-14h-7l0-6Z" /></svg>
+        <div class="mt-6 rounded-xl border border-white/10 bg-black/35 p-5">
+            <h3 class="text-lg font-black text-white">Pricing</h3>
+            <p class="mt-3 text-sm leading-6 text-gray-300">
+                <strong class="text-white">Monthly placement:</strong> $1,000 for one month.
+            </p>
+            <p class="mt-1 text-sm leading-6 text-gray-300">
+                <strong class="text-white">Simple purchase.</strong> No subscription and no recurring billing.
+            </p>
         </div>
-        <div class="mt-3 text-2xl font-black">1 month</div>
-        <p class="mt-1 text-sm text-gray-400">One-time placement</p>
-      </div>
+        {% url 'sponsor_checkout' as sponsor_checkout_url %}
+        <form method="post"
+              action="{{ sponsor_checkout_url|default:'#' }}"
+              class="mt-6">
+            {% csrf_token %}
+            <button type="submit"
+                    class="inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-xl bg-white px-6 text-sm font-black text-gray-950 shadow-sm transition hover:bg-gray-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-400 focus-visible:ring-offset-2 focus-visible:ring-offset-[#242424]"
+                    {% if not sponsor_checkout_url %}disabled{% endif %}>
+                Get started ($1,000)
+                <svg class="h-4 w-4"
+                     xmlns="http://www.w3.org/2000/svg"
+                     fill="none"
+                     viewBox="0 0 24 24"
+                     stroke="currentColor"
+                     aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 17 17 7M9 7h8v8" />
+                </svg>
+            </button>
+        </form>
     </div>
-
-    <div class="mt-8">
-      <h3 class="text-lg font-black text-white">How it works</h3>
-      <p class="mt-3 text-sm leading-7 text-gray-300">Your startup appears in rotating sponsor slots on Awesome pages. After checkout, you’ll submit your logo, startup name, and short description so we can place the ad on the home page.</p>
-    </div>
-
-    <div class="mt-6 rounded-xl border border-white/10 bg-black/35 p-5">
-      <h3 class="text-lg font-black text-white">Pricing</h3>
-      <p class="mt-3 text-sm leading-6 text-gray-300"><strong class="text-white">Monthly placement:</strong> $1,000 for one month.</p>
-      <p class="mt-1 text-sm leading-6 text-gray-300"><strong class="text-white">Simple purchase.</strong> No subscription and no recurring billing.</p>
-    </div>
-
-    {% url 'sponsor_checkout' as sponsor_checkout_url %}
-    <form method="post" action="{{ sponsor_checkout_url|default:'#' }}" class="mt-6">
-      {% csrf_token %}
-      <button type="submit" class="inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-xl bg-white px-6 text-sm font-black text-gray-950 shadow-sm transition hover:bg-gray-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-400 focus-visible:ring-offset-2 focus-visible:ring-offset-[#242424]" {% if not sponsor_checkout_url %}disabled{% endif %}>
-        Get started ($1,000)
-        <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 17 17 7M9 7h8v8" /></svg>
-      </button>
-    </form>
-  </div>
 </div>
 <script>
   document.addEventListener("DOMContentLoaded", function () {

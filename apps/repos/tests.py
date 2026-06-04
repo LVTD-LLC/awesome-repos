@@ -4224,9 +4224,10 @@ def test_repository_search_filters_growth_unmaintained_and_sort_direction():
         unknown_baseline,
         fast,
     ]
-    assert list(
-        repository_search_queryset({"updated_days": "30", "unmaintained_days": "365"})
-    ) == [unknown_baseline, fast]
+    assert list(repository_search_queryset({"updated_days": "30", "unmaintained_days": "365"})) == [
+        unknown_baseline,
+        fast,
+    ]
 
     repos = list(repository_search_queryset({"sort": "velocity"}))
     assert repos == [fast, slow, unknown_baseline]
@@ -4245,9 +4246,11 @@ def test_repository_search_filters_growth_unmaintained_and_sort_direction():
         unknown_baseline,
     ]
 
-    assert list(
-        repository_search_queryset({"sort": "stars", "sort_direction": "asc"})
-    ) == [slow, fast, unknown_baseline]
+    assert list(repository_search_queryset({"sort": "stars", "sort_direction": "asc"})) == [
+        slow,
+        fast,
+        unknown_baseline,
+    ]
     assert list(repository_search_queryset({"sort": "stars", "direction": "asc"})) == [
         unknown_baseline,
         fast,

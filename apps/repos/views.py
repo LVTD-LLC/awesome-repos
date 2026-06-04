@@ -214,6 +214,11 @@ REPOSITORY_FILTER_VALUE_LABELS = {
     "ai_development": {"yes": "Has signals", "no": "No signals"},
     "sort_direction": {"asc": "Ascending", "desc": "Descending"},
 }
+REPOSITORY_PERCENT_FILTER_PARAM_NAMES = (
+    "min_velocity_percent",
+    "min_star_growth_percent",
+    "min_liability_percent",
+)
 
 
 def _require_superuser(request):
@@ -468,6 +473,24 @@ def repository_filter_remove_querystring(params, name: str) -> str:
     return next_params.urlencode()
 
 
+def _repository_filter_chip_value(
+    name: str,
+    value: str,
+    sort_labels: dict[str, str],
+) -> str | None:
+    if name == "updated_days":
+        return f"{value} days"
+    if name == "unmaintained_days":
+        return f"{value}+ days"
+    if name == "min_age_years":
+        return f"{value}+ years"
+    if name in REPOSITORY_PERCENT_FILTER_PARAM_NAMES:
+        return f"{value}%+"
+    if name == "sort":
+        return sort_labels.get(value)
+    return REPOSITORY_FILTER_VALUE_LABELS.get(name, {}).get(value, value)
+
+
 def active_repository_filter_chips(
     params,
     *,
@@ -483,24 +506,9 @@ def active_repository_filter_chips(
         value = (params.get(name) or "").strip()
         if not value:
             continue
-        if name == "updated_days":
-            value = f"{value} days"
-        elif name == "unmaintained_days":
-            value = f"{value}+ days"
-        elif name == "min_age_years":
-            value = f"{value}+ years"
-        elif name in {
-            "min_velocity_percent",
-            "min_star_growth_percent",
-            "min_liability_percent",
-        }:
-            value = f"{value}%+"
-        elif name == "sort":
-            if value not in resolved_sort_labels:
-                continue
-            value = resolved_sort_labels[value]
-        else:
-            value = REPOSITORY_FILTER_VALUE_LABELS.get(name, {}).get(value, value)
+        value = _repository_filter_chip_value(name, value, resolved_sort_labels)
+        if value is None:
+            continue
         chips.append(
             {
                 "label": REPOSITORY_FILTER_LABELS[name],
@@ -623,10 +631,14 @@ class RepositorySearchView(ListView):
         context["object_list"] = context["repositories"]
         context["page_obj"].object_list = context["repositories"]
         search_page = self.request.GET.get("page") or "1"
-        if self.request.user.is_authenticated and repository_filters_applied(
-            self.request.GET,
-            include_sort=True,
-        ) and search_page == "1":
+        if (
+            self.request.user.is_authenticated
+            and repository_filters_applied(
+                self.request.GET,
+                include_sort=True,
+            )
+            and search_page == "1"
+        ):
             params = repository_search_params(self.request)
             queue_track_event(
                 event_name="search_performed",
@@ -692,12 +704,10 @@ class UserStarredRepositorySearchView(LoginRequiredMixin, ListView):
 
     def starred_repository_queryset(self):
         profile = self.get_profile()
-        return (
-            self.base_starred_repository_queryset().annotate(
-                user_starred_at=Max(
-                    "starred_by_profiles__starred_at",
-                    filter=Q(starred_by_profiles__profile=profile),
-                )
+        return self.base_starred_repository_queryset().annotate(
+            user_starred_at=Max(
+                "starred_by_profiles__starred_at",
+                filter=Q(starred_by_profiles__profile=profile),
             )
         )
 

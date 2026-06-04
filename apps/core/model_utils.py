@@ -2,7 +2,6 @@ import hashlib
 import hmac
 import secrets
 
-
 API_KEY_PREFIX = "ak"
 API_KEY_ID_BYTES = 12
 API_KEY_SECRET_BYTES = 32
@@ -51,4 +50,4 @@ def verify_api_key(api_key: str, api_key_hash: str) -> bool:
 
 
 def _hash_api_key_with_salt(api_key: str, salt: str) -> str:
-    return hashlib.sha256(f"{API_KEY_HASH_CONTEXT}:{salt}:{api_key}".encode("utf-8")).hexdigest()
+    return hashlib.sha256(f"{API_KEY_HASH_CONTEXT}:{salt}:{api_key}".encode()).hexdigest()

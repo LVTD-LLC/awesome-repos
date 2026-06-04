@@ -1,141 +1,179 @@
 {% extends "base_landing.html" %}
 {% load humanize %}
-
 {% block meta %}
-{% include "components/seo_meta.html" with title="Liked repositories · Awesome" description="Review repositories you liked on Awesome." robots="noindex, nofollow" canonical_path=request.path twitter_card="summary" %}
+    {% include "components/seo_meta.html" with title="Liked repositories · Awesome" description="Review repositories you liked on Awesome." robots="noindex, nofollow" canonical_path=request.path twitter_card="summary" %}
 {% endblock meta %}
-
 {% block content %}
-<section class="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-  <div class="grid gap-6 border-b border-gray-200 pb-8 dark:border-gray-800 lg:grid-cols-[minmax(0,1fr)_21rem] lg:items-end">
-    <div>
-      <p class="text-sm font-semibold uppercase tracking-wide text-green-600 dark:text-green-400">Your library</p>
-      <h1 class="mt-2 text-4xl font-black tracking-tight text-gray-950 dark:text-white sm:text-5xl">Liked repositories</h1>
-      <p class="mt-4 max-w-2xl text-lg leading-8 text-gray-600 dark:text-gray-300">
-        Revisit the repos you saved while searching awesome lists.
-      </p>
-      <form method="get" class="mt-7 grid gap-3 rounded-2xl border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-900 sm:grid-cols-[minmax(0,1fr)_13rem_auto]">
-        <label for="liked-query" class="sr-only">Search liked repositories</label>
-        <input
-          id="liked-query"
-          name="q"
-          value="{{ request.GET.q }}"
-          placeholder="Search your liked repos"
-          class="min-h-12 rounded-xl border border-gray-300 bg-white px-4 text-gray-900 placeholder:text-gray-400 focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 dark:placeholder:text-gray-500"
-        />
-        <label for="liked-sort" class="sr-only">Sort liked repositories</label>
-        <select id="liked-sort" name="sort" class="min-h-12 rounded-xl border border-gray-300 bg-white px-4 text-gray-900 focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100">
-          <option value="liked" {% if request.GET.sort == "liked" or not request.GET.sort %}selected{% endif %}>Recently liked</option>
-          <option value="stars" {% if request.GET.sort == "stars" %}selected{% endif %}>Most stars</option>
-          <option value="recent" {% if request.GET.sort == "recent" %}selected{% endif %}>Recently updated</option>
-          <option value="created" {% if request.GET.sort == "created" %}selected{% endif %}>Recently created</option>
-          <option value="oldest" {% if request.GET.sort == "oldest" %}selected{% endif %}>Oldest first commit</option>
-          <option value="commits" {% if request.GET.sort == "commits" %}selected{% endif %}>Most commits</option>
-          <option value="awesome" {% if request.GET.sort == "awesome" %}selected{% endif %}>Most list mentions</option>
-          <option value="name" {% if request.GET.sort == "name" %}selected{% endif %}>Name</option>
-        </select>
-        <button class="inline-flex min-h-12 items-center justify-center rounded-xl bg-green-600 px-5 text-sm font-bold text-white transition hover:bg-green-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-50 dark:bg-green-500 dark:text-gray-950 dark:hover:bg-green-400 dark:focus-visible:ring-offset-gray-900">
-          Search
-        </button>
-      </form>
-    </div>
-
-    <aside class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-      <div class="flex items-start justify-between gap-4">
-        <div>
-          <div class="text-sm font-semibold text-gray-500 dark:text-gray-400">Saved here</div>
-          <div class="mt-1 text-3xl font-black text-gray-950 dark:text-white">{{ liked_repository_count|intcomma }}</div>
-        </div>
-        <span class="rounded-lg bg-green-50 px-2 py-1 text-xs font-black uppercase tracking-[0.16em] text-green-700 dark:bg-green-950 dark:text-green-300">Live</span>
-      </div>
-      <div class="mt-5 rounded-xl border border-dashed border-gray-300 p-4 dark:border-gray-700">
-        <div class="text-sm font-semibold text-gray-950 dark:text-white">GitHub starred imports</div>
-        <p class="mt-1 text-sm leading-6 text-gray-600 dark:text-gray-300">Search imported public repositories you starred on GitHub.</p>
-        <a href="{% url 'repos:starred' %}" class="mt-3 inline-flex text-sm font-semibold text-green-700 hover:underline dark:text-green-300">
-          Search starred repos
-        </a>
-      </div>
-    </aside>
-  </div>
-
-  <div class="mb-6 mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-    <div>
-      <div class="text-sm font-semibold text-gray-950 dark:text-white">{{ page_obj.paginator.count|intcomma }} repo{{ page_obj.paginator.count|pluralize }} shown</div>
-      {% if request.GET.q %}
-        <div class="mt-2 text-sm text-gray-600 dark:text-gray-300">Search: {{ request.GET.q }}</div>
-      {% endif %}
-    </div>
-    <div class="flex flex-wrap items-center gap-3">
-      {% if repositories %}
-        <span class="shortcut-hint hidden text-xs font-black uppercase text-gray-500 dark:text-gray-400 lg:inline-flex" aria-label="List navigation shortcuts">
-          Browse
-          <kbd class="shortcut-kbd" aria-hidden="true">J</kbd>
-          <kbd class="shortcut-kbd" aria-hidden="true">K</kbd>
-        </span>
-      {% endif %}
-      {% if request.GET.q or request.GET.sort %}
-        <a href="{% url 'repos:liked' %}" class="inline-flex min-h-11 items-center justify-center rounded-xl border border-gray-300 px-5 text-sm font-semibold text-gray-900 transition hover:bg-gray-100 dark:border-gray-700 dark:text-gray-100 dark:hover:bg-gray-900">Reset</a>
-      {% endif %}
-    </div>
-  </div>
-
-  <div class="space-y-3">
-    {% include "components/highlighted_repo_slot.html" %}
-    {% for repo in repositories %}
-      <article class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition hover:border-green-300 dark:border-gray-800 dark:bg-gray-950 dark:hover:border-green-800" data-shortcut-list-item>
-        <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div class="min-w-0">
-            <a href="{{ repo.get_absolute_url }}" class="text-xl font-bold text-gray-950 hover:text-green-700 dark:text-white dark:hover:text-green-300" data-shortcut-list-target>{{ repo.full_name }}</a>
-            <p class="mt-2 max-w-3xl text-sm leading-6 text-gray-600 dark:text-gray-300">{{ repo.description|default:"No description." }}</p>
-            <div class="mt-3 flex flex-wrap gap-2 text-xs text-gray-600 dark:text-gray-400">
-              {% if repo.language %}<span class="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-900">{{ repo.language }}</span>{% endif %}
-              {% for topic in repo.topics|slice:":4" %}<a href="{% url 'repos:search' %}?topic={{ topic|urlencode }}" class="rounded-full bg-blue-50 px-3 py-1 text-blue-700 transition hover:bg-blue-100 dark:bg-blue-950 dark:text-blue-200 dark:hover:bg-blue-900">#{{ topic }}</a>{% endfor %}
-              {% for tag in repo.generated_tags|slice:":4" %}<span class="rounded-full bg-green-50 px-3 py-1 text-green-700 dark:bg-green-950 dark:text-green-200">{{ tag }}</span>{% endfor %}
-              {% if repo.github_pushed_at %}<span class="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-900">pushed {{ repo.github_pushed_at|date:"Y-m-d" }}</span>{% endif %}
-              <span class="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-900">{{ repo.awesome_count }} list mention{{ repo.awesome_count|pluralize }}</span>
-              {% if repo.is_archived %}<span class="rounded-full bg-yellow-100 px-3 py-1 text-yellow-800">archived</span>{% endif %}
+    <section class="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
+        <div class="grid gap-6 border-b border-gray-200 pb-8 dark:border-gray-800 lg:grid-cols-[minmax(0,1fr)_21rem] lg:items-end">
+            <div>
+                <p class="text-sm font-semibold uppercase tracking-wide text-green-600 dark:text-green-400">Your library</p>
+                <h1 class="mt-2 text-4xl font-black tracking-tight text-gray-950 dark:text-white sm:text-5xl">Liked repositories</h1>
+                <p class="mt-4 max-w-2xl text-lg leading-8 text-gray-600 dark:text-gray-300">
+                    Revisit the repos you saved while searching awesome lists.
+                </p>
+                <form method="get"
+                      class="mt-7 grid gap-3 rounded-2xl border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-900 sm:grid-cols-[minmax(0,1fr)_13rem_auto]">
+                    <label for="liked-query" class="sr-only">Search liked repositories</label>
+                    <input id="liked-query"
+                           name="q"
+                           value="{{ request.GET.q }}"
+                           placeholder="Search your liked repos"
+                           class="min-h-12 rounded-xl border border-gray-300 bg-white px-4 text-gray-900 placeholder:text-gray-400 focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 dark:placeholder:text-gray-500" />
+                    <label for="liked-sort" class="sr-only">Sort liked repositories</label>
+                    <select id="liked-sort"
+                            name="sort"
+                            class="min-h-12 rounded-xl border border-gray-300 bg-white px-4 text-gray-900 focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100">
+                        <option value="liked"
+                                {% if request.GET.sort == "liked" or not request.GET.sort %}selected{% endif %}>
+                            Recently liked
+                        </option>
+                        <option value="stars" {% if request.GET.sort == "stars" %}selected{% endif %}>Most stars</option>
+                        <option value="recent"
+                                {% if request.GET.sort == "recent" %}selected{% endif %}>Recently updated</option>
+                        <option value="created"
+                                {% if request.GET.sort == "created" %}selected{% endif %}>Recently created</option>
+                        <option value="oldest"
+                                {% if request.GET.sort == "oldest" %}selected{% endif %}>Oldest first commit</option>
+                        <option value="commits"
+                                {% if request.GET.sort == "commits" %}selected{% endif %}>Most commits</option>
+                        <option value="awesome"
+                                {% if request.GET.sort == "awesome" %}selected{% endif %}>Most list mentions</option>
+                        <option value="name" {% if request.GET.sort == "name" %}selected{% endif %}>Name</option>
+                    </select>
+                    <button class="inline-flex min-h-12 items-center justify-center rounded-xl bg-green-600 px-5 text-sm font-bold text-white transition hover:bg-green-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-50 dark:bg-green-500 dark:text-gray-950 dark:hover:bg-green-400 dark:focus-visible:ring-offset-gray-900">
+                        Search
+                    </button>
+                </form>
             </div>
-          </div>
-          <div class="flex shrink-0 items-center justify-between gap-4 sm:flex-col sm:items-end">
-            {% include "repos/_repository_like_button.html" with repository=repo disable_hx=True %}
-            <div class="text-right">
-              <div class="font-semibold text-gray-950 dark:text-white">★ {{ repo.stars|intcomma }}</div>
-              <div class="mt-1 flex flex-wrap justify-end gap-x-3 gap-y-1">
-                {% if repo.homepage_url and repo.homepage_url != repo.url %}
-                  <a href="{{ repo.homepage_url }}" target="_blank" rel="noopener" class="text-sm font-semibold text-blue-700 hover:underline dark:text-blue-300">Website ↗</a>
+            <aside class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+                <div class="flex items-start justify-between gap-4">
+                    <div>
+                        <div class="text-sm font-semibold text-gray-500 dark:text-gray-400">Saved here</div>
+                        <div class="mt-1 text-3xl font-black text-gray-950 dark:text-white">{{ liked_repository_count|intcomma }}</div>
+                    </div>
+                    <span class="rounded-lg bg-green-50 px-2 py-1 text-xs font-black uppercase tracking-[0.16em] text-green-700 dark:bg-green-950 dark:text-green-300">Live</span>
+                </div>
+                <div class="mt-5 rounded-xl border border-dashed border-gray-300 p-4 dark:border-gray-700">
+                    <div class="text-sm font-semibold text-gray-950 dark:text-white">GitHub starred imports</div>
+                    <p class="mt-1 text-sm leading-6 text-gray-600 dark:text-gray-300">
+                        Search imported public repositories you starred on GitHub.
+                    </p>
+                    <a href="{% url 'repos:starred' %}"
+                       class="mt-3 inline-flex text-sm font-semibold text-green-700 hover:underline dark:text-green-300">
+                        Search starred repos
+                    </a>
+                </div>
+            </aside>
+        </div>
+        <div class="mb-6 mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+                <div class="text-sm font-semibold text-gray-950 dark:text-white">
+                    {{ page_obj.paginator.count|intcomma }} repo{{ page_obj.paginator.count|pluralize }} shown
+                </div>
+                {% if request.GET.q %}
+                    <div class="mt-2 text-sm text-gray-600 dark:text-gray-300">Search: {{ request.GET.q }}</div>
                 {% endif %}
-                <a href="{{ repo.url }}" target="_blank" rel="noopener" class="text-sm font-semibold text-green-700 hover:underline dark:text-green-300">GitHub ↗</a>
-              </div>
             </div>
-          </div>
+            <div class="flex flex-wrap items-center gap-3">
+                {% if repositories %}
+                    <span class="shortcut-hint hidden text-xs font-black uppercase text-gray-500 dark:text-gray-400 lg:inline-flex"
+                          aria-label="List navigation shortcuts">
+                        Browse
+                        <kbd class="shortcut-kbd" aria-hidden="true">J</kbd>
+                        <kbd class="shortcut-kbd" aria-hidden="true">K</kbd>
+                    </span>
+                {% endif %}
+                {% if request.GET.q or request.GET.sort %}
+                    <a href="{% url 'repos:liked' %}"
+                       class="inline-flex min-h-11 items-center justify-center rounded-xl border border-gray-300 px-5 text-sm font-semibold text-gray-900 transition hover:bg-gray-100 dark:border-gray-700 dark:text-gray-100 dark:hover:bg-gray-900">Reset</a>
+                {% endif %}
+            </div>
         </div>
-      </article>
-    {% empty %}
-      <div class="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-10 text-center dark:border-gray-700 dark:bg-gray-900">
-        <h2 class="text-xl font-bold text-gray-950 dark:text-white">No liked repositories yet</h2>
-        <p class="mx-auto mt-2 max-w-md text-sm leading-6 text-gray-600 dark:text-gray-300">Like repositories from search results or list pages, then come back here to compare them.</p>
-        <a href="{% url 'repos:search' %}" class="mt-6 inline-flex min-h-11 items-center justify-center rounded-xl bg-green-600 px-5 text-sm font-bold text-white transition hover:bg-green-700 dark:bg-green-500 dark:text-gray-950 dark:hover:bg-green-400">Search repos</a>
-      </div>
-    {% endfor %}
-  </div>
-
-  {% if is_paginated %}
-    <nav class="mt-8 flex items-center justify-center gap-3" aria-label="Liked repositories pagination">
-      {% if page_obj.has_previous %}
-        <a class="shortcut-hint rounded-full border px-4 py-2" href="?page={{ page_obj.previous_page_number }}{% if querystring %}&amp;{{ querystring }}{% endif %}" data-shortcut-page="previous">
-          Previous
-          <kbd class="shortcut-kbd hidden lg:inline-flex" aria-hidden="true">P</kbd>
-        </a>
-      {% endif %}
-      <span class="text-sm text-gray-500">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
-      {% if page_obj.has_next %}
-        <a class="shortcut-hint rounded-full border px-4 py-2" href="?page={{ page_obj.next_page_number }}{% if querystring %}&amp;{{ querystring }}{% endif %}" data-shortcut-page="next">
-          Next
-          <kbd class="shortcut-kbd hidden lg:inline-flex" aria-hidden="true">N</kbd>
-        </a>
-      {% endif %}
-    </nav>
-  {% endif %}
-</section>
-{% include "components/highlighted_repo_modal.html" %}
+        <div class="space-y-3">
+            {% include "components/highlighted_repo_slot.html" %}
+            {% for repo in repositories %}
+                <article class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition hover:border-green-300 dark:border-gray-800 dark:bg-gray-950 dark:hover:border-green-800"
+                         data-shortcut-list-item>
+                    <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                        <div class="min-w-0">
+                            <a href="{{ repo.get_absolute_url }}"
+                               class="text-xl font-bold text-gray-950 hover:text-green-700 dark:text-white dark:hover:text-green-300"
+                               data-shortcut-list-target>{{ repo.full_name }}</a>
+                            <p class="mt-2 max-w-3xl text-sm leading-6 text-gray-600 dark:text-gray-300">
+                                {{ repo.description|default:"No description." }}
+                            </p>
+                            <div class="mt-3 flex flex-wrap gap-2 text-xs text-gray-600 dark:text-gray-400">
+                                {% if repo.language %}
+                                    <span class="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-900">{{ repo.language }}</span>
+                                {% endif %}
+                                {% for topic in repo.topics|slice:":4" %}
+                                    <a href="{% url 'repos:search' %}?topic={{ topic|urlencode }}"
+                                       class="rounded-full bg-blue-50 px-3 py-1 text-blue-700 transition hover:bg-blue-100 dark:bg-blue-950 dark:text-blue-200 dark:hover:bg-blue-900">#{{ topic }}</a>
+                                {% endfor %}
+                                {% for tag in repo.generated_tags|slice:":4" %}
+                                    <span class="rounded-full bg-green-50 px-3 py-1 text-green-700 dark:bg-green-950 dark:text-green-200">{{ tag }}</span>
+                                {% endfor %}
+                                {% if repo.github_pushed_at %}
+                                    <span class="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-900">pushed {{ repo.github_pushed_at|date:"Y-m-d" }}</span>
+                                {% endif %}
+                                <span class="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-900">{{ repo.awesome_count }} list mention{{ repo.awesome_count|pluralize }}</span>
+                                {% if repo.is_archived %}<span class="rounded-full bg-yellow-100 px-3 py-1 text-yellow-800">archived</span>{% endif %}
+                            </div>
+                        </div>
+                        <div class="flex shrink-0 items-center justify-between gap-4 sm:flex-col sm:items-end">
+                            {% include "repos/_repository_like_button.html" with repository=repo disable_hx=True %}
+                            <div class="text-right">
+                                <div class="font-semibold text-gray-950 dark:text-white">★ {{ repo.stars|intcomma }}</div>
+                                <div class="mt-1 flex flex-wrap justify-end gap-x-3 gap-y-1">
+                                    {% if repo.homepage_url and repo.homepage_url != repo.url %}
+                                        <a href="{{ repo.homepage_url }}"
+                                           target="_blank"
+                                           rel="noopener"
+                                           class="text-sm font-semibold text-blue-700 hover:underline dark:text-blue-300">Website ↗</a>
+                                    {% endif %}
+                                    <a href="{{ repo.url }}"
+                                       target="_blank"
+                                       rel="noopener"
+                                       class="text-sm font-semibold text-green-700 hover:underline dark:text-green-300">GitHub ↗</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </article>
+            {% empty %}
+                <div class="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-10 text-center dark:border-gray-700 dark:bg-gray-900">
+                    <h2 class="text-xl font-bold text-gray-950 dark:text-white">No liked repositories yet</h2>
+                    <p class="mx-auto mt-2 max-w-md text-sm leading-6 text-gray-600 dark:text-gray-300">
+                        Like repositories from search results or list pages, then come back here to compare them.
+                    </p>
+                    <a href="{% url 'repos:search' %}"
+                       class="mt-6 inline-flex min-h-11 items-center justify-center rounded-xl bg-green-600 px-5 text-sm font-bold text-white transition hover:bg-green-700 dark:bg-green-500 dark:text-gray-950 dark:hover:bg-green-400">Search repos</a>
+                </div>
+            {% endfor %}
+        </div>
+        {% if is_paginated %}
+            <nav class="mt-8 flex items-center justify-center gap-3"
+                 aria-label="Liked repositories pagination">
+                {% if page_obj.has_previous %}
+                    <a class="shortcut-hint rounded-full border px-4 py-2"
+                       href="?page={{ page_obj.previous_page_number }}{% if querystring %}&amp;{{ querystring }}{% endif %}"
+                       data-shortcut-page="previous">
+                        Previous
+                        <kbd class="shortcut-kbd hidden lg:inline-flex" aria-hidden="true">P</kbd>
+                    </a>
+                {% endif %}
+                <span class="text-sm text-gray-500">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+                {% if page_obj.has_next %}
+                    <a class="shortcut-hint rounded-full border px-4 py-2"
+                       href="?page={{ page_obj.next_page_number }}{% if querystring %}&amp;{{ querystring }}{% endif %}"
+                       data-shortcut-page="next">
+                        Next
+                        <kbd class="shortcut-kbd hidden lg:inline-flex" aria-hidden="true">N</kbd>
+                    </a>
+                {% endif %}
+            </nav>
+        {% endif %}
+    </section>
+    {% include "components/highlighted_repo_modal.html" %}
 {% endblock content %}

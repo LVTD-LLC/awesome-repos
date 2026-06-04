@@ -83,9 +83,9 @@ services:
       - "1025:1025"
       - "8025:8025"
 
-  
 
-  
+
+
 
   minio:
     image: minio/minio
@@ -117,10 +117,9 @@ services:
       /usr/bin/mc anonymous set download myminio/awesome_repos-dev &&
       exit 0;
       "
-  
+
 
 volumes:
   postgres_data:
   redis_data:
   minio_data:
-  

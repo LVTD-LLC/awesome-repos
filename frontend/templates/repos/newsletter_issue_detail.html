@@ -1,19 +1,22 @@
 {% extends "base_landing.html" %}
 {% block meta %}
-  {% with meta_title=issue.title|add:" · Awesome" %}
-    {% include "components/seo_meta.html" with title=meta_title description=newsletter_issue_meta_description canonical_path=request.path og_type="article" %}
-  {% endwith %}
+    {% with meta_title=issue.title|add:" · Awesome" %}
+        {% include "components/seo_meta.html" with title=meta_title description=newsletter_issue_meta_description canonical_path=request.path og_type="article" %}
+    {% endwith %}
 {% endblock meta %}
 {% block content %}
-<article class="mx-auto max-w-3xl px-4 py-12 sm:px-6 lg:px-8">
-  <a href="{% url 'repos:newsletter_issue_list' owner=issue.repository.owner name=issue.repository.name %}" class="text-sm font-semibold text-green-700 hover:underline">← All newsletters</a>
-  <header class="mt-6 border-b border-gray-200 pb-8 dark:border-gray-800">
-    <div class="text-xs font-semibold uppercase tracking-wide text-green-700 dark:text-green-300">{{ issue.repository.full_name }} · {{ issue.get_cadence_display }} · {{ issue.period_start|date:"M d, Y" }} – {{ issue.period_end|date:"M d, Y" }}</div>
-    <h1 class="mt-3 text-4xl font-bold">{{ issue.title }}</h1>
-    <p class="mt-3 text-gray-600 dark:text-gray-300">{{ issue.commit_count }} commit{{ issue.commit_count|pluralize }} · Published {{ issue.published_at|date:"M d, Y" }}</p>
-  </header>
-  <div class="prose prose-gray mt-8 max-w-none dark:prose-invert">
-    {{ issue.content_html|safe }}
-  </div>
-</article>
+    <article class="mx-auto max-w-3xl px-4 py-12 sm:px-6 lg:px-8">
+        <a href="{% url 'repos:newsletter_issue_list' owner=issue.repository.owner name=issue.repository.name %}"
+           class="text-sm font-semibold text-green-700 hover:underline">← All newsletters</a>
+        <header class="mt-6 border-b border-gray-200 pb-8 dark:border-gray-800">
+            <div class="text-xs font-semibold uppercase tracking-wide text-green-700 dark:text-green-300">
+                {{ issue.repository.full_name }} · {{ issue.get_cadence_display }} · {{ issue.period_start|date:"M d, Y" }} – {{ issue.period_end|date:"M d, Y" }}
+            </div>
+            <h1 class="mt-3 text-4xl font-bold">{{ issue.title }}</h1>
+            <p class="mt-3 text-gray-600 dark:text-gray-300">
+                {{ issue.commit_count }} commit{{ issue.commit_count|pluralize }} · Published {{ issue.published_at|date:"M d, Y" }}
+            </p>
+        </header>
+        <div class="prose prose-gray mt-8 max-w-none dark:prose-invert">{{ issue.content_html|safe }}</div>
+    </article>
 {% endblock content %}
