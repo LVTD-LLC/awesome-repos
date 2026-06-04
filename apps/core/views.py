@@ -25,6 +25,7 @@ from django.views.decorators.http import require_POST
 from django.views.generic import TemplateView
 from django_q.tasks import async_task
 
+from apps.core.analytics import queue_track_event
 from apps.core.forms import HighlightedRepoDetailsForm, SponsorAdDetailsForm
 from apps.core.models import HighlightedRepoPurchase, Profile, SponsorAdPurchase
 from apps.core.payments import (
@@ -50,6 +51,66 @@ from apps.repos.services import (
 from awesome_repos.utils import get_awesome_repos_logger
 
 logger = get_awesome_repos_logger(__name__)
+
+
+def _profile_id_for_request(request) -> int | None:
+    if request.user.is_authenticated:
+        return request.user.profile.id
+    return None
+
+
+def _track_checkout_started(request, *, session_id: str, product: str, value: float) -> None:
+    queue_track_event(
+        event_name="checkout_started",
+        profile_id=_profile_id_for_request(request),
+        distinct_id=f"stripe_checkout:{session_id}",
+        properties={
+            "product": product,
+            "value": value,
+            "currency": "usd",
+            "transaction_id": session_id,
+        },
+        source_function=f"{product} checkout",
+    )
+
+
+def _track_purchase_completed(*, session, product: str, profile: Profile | None = None) -> None:
+    amount_total = session.get("amount_total") or 0
+    currency = (session.get("currency") or "usd").lower()
+    session_id = session.get("id", "")
+    queue_track_event(
+        event_name="purchase_completed",
+        profile_id=profile.id if profile else None,
+        distinct_id=f"stripe_checkout:{session_id}" if session_id else None,
+        properties={
+            "product": product,
+            "value": amount_total / 100,
+            "currency": currency,
+            "transaction_id": session_id,
+        },
+        source_function=f"{product} checkout completion",
+    )
+
+
+def _handle_completed_checkout_session(session) -> None:
+    metadata = session.get("metadata", {})
+    if metadata.get("app") == "awesome" and metadata.get("kind", "sponsor_ads") == "sponsor_ads":
+        purchase = upsert_purchase_from_checkout_session(session)
+        if purchase.status in {SponsorAdPurchase.Status.PAID, SponsorAdPurchase.Status.ACTIVE}:
+            notify_sponsor_payment(purchase)
+            _track_purchase_completed(session=session, product="sponsor_ads")
+    elif metadata.get("app") == "awesome" and metadata.get("kind") == "highlighted_repo":
+        purchase = upsert_highlighted_repo_from_checkout_session(session)
+        if purchase.status in {
+            HighlightedRepoPurchase.Status.PAID,
+            HighlightedRepoPurchase.Status.ACTIVE,
+        }:
+            notify_highlighted_repo_payment(purchase)
+            _track_purchase_completed(session=session, product="highlighted_repo")
+    elif metadata.get("app") == "awesome" and metadata.get("kind") == "remove_ads":
+        profile = enable_remove_ads_for_checkout_session(session)
+        if profile is not None:
+            _track_purchase_completed(session=session, product="remove_ads", profile=profile)
 
 
 def build_absolute_public_url(path: str) -> str:
@@ -223,6 +284,12 @@ def sponsor_checkout(request):
         return redirect("repos:search")
 
     SponsorAdPurchase.objects.get_or_create(stripe_checkout_session_id=session["id"])
+    _track_checkout_started(
+        request,
+        session_id=session["id"],
+        product="sponsor_ads",
+        value=1000,
+    )
     return redirect(session["url"])
 
 
@@ -262,6 +329,15 @@ def sponsor_success(request):
             purchase.mark_details_submitted()
             purchase.save()
             cache.delete("awesome:active_sponsor_ad")
+            queue_track_event(
+                event_name="sponsor_ad_details_submitted",
+                distinct_id=f"stripe_checkout:{session_id}",
+                properties={
+                    "product": "sponsor_ads",
+                    "transaction_id": session_id,
+                },
+                source_function="sponsor_success",
+            )
             messages.success(request, "Thanks — your ad details are saved.")
             return redirect("repos:search")
     else:
@@ -302,6 +378,12 @@ def highlighted_repo_checkout(request):
         return redirect("repos:search")
 
     HighlightedRepoPurchase.objects.get_or_create(stripe_checkout_session_id=session["id"])
+    _track_checkout_started(
+        request,
+        session_id=session["id"],
+        product="highlighted_repo",
+        value=20,
+    )
     return redirect(session["url"])
 
 
@@ -333,6 +415,12 @@ def remove_ads_checkout(request):
         messages.error(request, "Could not start checkout. Please try again shortly.")
         return redirect("settings")
 
+    _track_checkout_started(
+        request,
+        session_id=session["id"],
+        product="remove_ads",
+        value=4,
+    )
     return redirect(session["url"])
 
 
@@ -377,6 +465,15 @@ def highlighted_repo_success(request):
             purchase.mark_details_submitted()
             purchase.save()
             cache.delete("awesome:active_highlighted_repo")
+            queue_track_event(
+                event_name="highlighted_repo_details_submitted",
+                distinct_id=f"stripe_checkout:{session_id}",
+                properties={
+                    "product": "highlighted_repo",
+                    "transaction_id": session_id,
+                },
+                source_function="highlighted_repo_success",
+            )
             messages.success(request, "Thanks — your highlighted repository details are saved.")
             return redirect("repos:search")
     else:
@@ -417,23 +514,7 @@ def stripe_webhook(request):
 
     if event.get("type") == "checkout.session.completed":
         session = event.get("data", {}).get("object", {})
-        metadata = session.get("metadata", {})
-        if (
-            metadata.get("app") == "awesome"
-            and metadata.get("kind", "sponsor_ads") == "sponsor_ads"
-        ):
-            purchase = upsert_purchase_from_checkout_session(session)
-            if purchase.status in {SponsorAdPurchase.Status.PAID, SponsorAdPurchase.Status.ACTIVE}:
-                notify_sponsor_payment(purchase)
-        elif metadata.get("app") == "awesome" and metadata.get("kind") == "highlighted_repo":
-            purchase = upsert_highlighted_repo_from_checkout_session(session)
-            if purchase.status in {
-                HighlightedRepoPurchase.Status.PAID,
-                HighlightedRepoPurchase.Status.ACTIVE,
-            }:
-                notify_highlighted_repo_payment(purchase)
-        elif metadata.get("app") == "awesome" and metadata.get("kind") == "remove_ads":
-            enable_remove_ads_for_checkout_session(session)
+        _handle_completed_checkout_session(session)
 
     return HttpResponse("ok")
 
@@ -542,6 +623,15 @@ def import_starred_repositories(request):
             group="Import GitHub starred repositories",
         )
     )
+    queue_track_event(
+        event_name="starred_import_requested",
+        profile_id=profile.id,
+        properties={
+            "was_import_enabled": was_import_enabled,
+            "refresh_existing": True,
+        },
+        source_function="import_starred_repositories",
+    )
     success_message = (
         "Queued your GitHub starred repository refresh."
         if was_import_enabled
@@ -566,6 +656,12 @@ def disable_starred_repository_import(request):
             "github_starred_repos_last_error",
             "updated_at",
         ]
+    )
+    queue_track_event(
+        event_name="starred_import_disabled",
+        profile_id=profile.id,
+        properties={},
+        source_function="disable_starred_repository_import",
     )
     messages.success(request, "Disabled daily GitHub starred repository refresh.")
     return redirect("settings")

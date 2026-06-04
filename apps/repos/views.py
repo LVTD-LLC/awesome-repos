@@ -15,6 +15,7 @@ from django.views.decorators.http import require_POST
 from django.views.generic import DetailView, FormView, ListView
 from django_q.tasks import async_task
 
+from apps.core.analytics import queue_track_event
 from apps.core.models import Profile
 from apps.repos.cache import (
     PUBLIC_REPOSITORY_FILTER_OPTIONS_CACHE_KEY,
@@ -330,6 +331,18 @@ def toggle_repository_like(request, owner: str, name: str):
         like.delete()
         repository.is_liked = False
 
+    queue_track_event(
+        event_name="repository_liked" if created else "repository_unliked",
+        profile_id=request.user.profile.id,
+        properties={
+            "repository_id": repository.id,
+            "repository_full_name": repository.full_name,
+            "repository_language": repository.language,
+            "repository_stars": repository.stars,
+        },
+        source_function="toggle_repository_like",
+    )
+
     next_url = request.POST.get("next") or repository.get_absolute_url()
     if not url_has_allowed_host_and_scheme(
         next_url,
@@ -609,6 +622,25 @@ class RepositorySearchView(ListView):
         context["repositories"] = attach_repository_snapshot_counts(context["repositories"])
         context["object_list"] = context["repositories"]
         context["page_obj"].object_list = context["repositories"]
+        if self.request.user.is_authenticated and repository_filters_applied(
+            self.request.GET,
+            include_sort=True,
+        ):
+            params = repository_search_params(self.request)
+            queue_track_event(
+                event_name="search_performed",
+                profile_id=self.request.user.profile.id,
+                properties={
+                    "query": params.get("q", ""),
+                    "mode": params.get("mode", ""),
+                    "results_count": context["page_obj"].paginator.count,
+                    "sort": params.get("sort", ""),
+                    "sort_direction": params.get("sort_direction", ""),
+                    "search_scope": "public_repositories",
+                    "filters_applied": repository_filters_applied(params, include_sort=False),
+                },
+                source_function="RepositorySearchView",
+            )
         visible_repositories = visible_repository_queryset()
         filter_options = public_repository_filter_options()
         search_url = reverse("repos:search")

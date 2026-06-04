@@ -477,11 +477,14 @@ class TestRemoveAdsCheckout:
     def test_webhook_enables_remove_ads_on_profile(self, client, django_user_model, monkeypatch):
         user = django_user_model.objects.create_user(username="buyer", password="pw")
         profile = user.profile
+        events = []
         event = {
             "type": "checkout.session.completed",
             "data": {
                 "object": {
                     "id": "cs_test_remove_ads_paid",
+                    "amount_total": 400,
+                    "currency": "usd",
                     "payment_status": "paid",
                     "client_reference_id": str(user.id),
                     "metadata": {"app": "awesome", "kind": "remove_ads"},
@@ -491,6 +494,10 @@ class TestRemoveAdsCheckout:
         monkeypatch.setattr(
             "apps.core.views.verify_webhook_signature",
             lambda *args, **kwargs: True,
+        )
+        monkeypatch.setattr(
+            "apps.core.views.queue_track_event",
+            lambda **kwargs: events.append(kwargs),
         )
 
         response = client.post(
@@ -503,6 +510,20 @@ class TestRemoveAdsCheckout:
         assert response.status_code == 200
         profile.refresh_from_db()
         assert profile.remove_ads is True
+        assert events == [
+            {
+                "event_name": "purchase_completed",
+                "profile_id": profile.id,
+                "distinct_id": "stripe_checkout:cs_test_remove_ads_paid",
+                "properties": {
+                    "product": "remove_ads",
+                    "value": 4,
+                    "currency": "usd",
+                    "transaction_id": "cs_test_remove_ads_paid",
+                },
+                "source_function": "remove_ads checkout completion",
+            }
+        ]
 
     @override_settings(
         STRIPE_SECRET_KEY="sk_test",

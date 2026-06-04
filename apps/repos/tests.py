@@ -5096,6 +5096,42 @@ def test_authenticated_user_can_toggle_repository_like_with_htmx(auth_client, us
 
 
 @pytest.mark.django_db
+def test_repository_like_queues_analytics_event(auth_client, user, monkeypatch):
+    repo = Repository.objects.create(
+        full_name="django/django",
+        owner="django",
+        name="django",
+        url="https://github.com/django/django",
+        language="Python",
+        stars=78000,
+    )
+    events = []
+    monkeypatch.setattr(
+        "apps.repos.views.queue_track_event", lambda **kwargs: events.append(kwargs)
+    )
+
+    response = auth_client.post(
+        reverse("repos:repo_like_toggle", kwargs={"owner": repo.owner, "name": repo.name}),
+        {"next": "/"},
+    )
+
+    assert response.status_code == 302
+    assert events == [
+        {
+            "event_name": "repository_liked",
+            "profile_id": user.profile.id,
+            "properties": {
+                "repository_id": repo.id,
+                "repository_full_name": "django/django",
+                "repository_language": "Python",
+                "repository_stars": 78000,
+            },
+            "source_function": "toggle_repository_like",
+        }
+    ]
+
+
+@pytest.mark.django_db
 def test_repository_like_htmx_response_uses_safe_next_url(auth_client):
     repo = Repository.objects.create(
         full_name="django/django",
