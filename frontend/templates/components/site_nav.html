@@ -4,11 +4,14 @@
 <header class="sticky top-0 z-40 border-b border-gray-200/80 bg-white/90 backdrop-blur-xl dark:border-gray-800/80 dark:bg-gray-950/90">
   <div class="mx-auto w-full max-w-[104rem] px-4 sm:px-6 lg:px-8">
     <div class="flex min-h-20 items-center gap-3">
-      <a href="{% url 'repos:search' %}" data-shortcut-link data-shortcut-key="g h" data-shortcut-label="Home" class="group flex shrink-0 items-center gap-3 rounded-xl pr-2 text-gray-950 transition hover:text-green-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:text-white dark:hover:text-green-300 dark:focus-visible:ring-offset-gray-950" aria-label="Awesome home">
+      <a href="{% url 'repos:search' %}" data-shortcut-link data-shortcut-key="h" data-shortcut-label="Home" class="group flex shrink-0 items-center gap-3 rounded-xl pr-2 text-gray-950 transition hover:text-green-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:text-white dark:hover:text-green-300 dark:focus-visible:ring-offset-gray-950" aria-label="Awesome home">
         <span class="flex h-10 w-10 items-center justify-center rounded-2xl border border-gray-200 bg-white shadow-sm transition group-hover:border-green-200 group-hover:bg-green-50 dark:border-gray-800 dark:bg-gray-900 dark:group-hover:border-green-900 dark:group-hover:bg-green-950">
           <img src="{% static 'brand/awesome-repos-mark.svg' %}" alt="" width="28" height="28" class="h-7 w-7" />
         </span>
-        <span class="hidden text-base font-black sm:block">Awesome</span>
+        <span class="hidden items-center gap-2 sm:flex">
+          <span class="text-base font-black">Awesome</span>
+          <kbd class="shortcut-kbd hidden lg:inline-flex">H</kbd>
+        </span>
       </a>
 
       <form method="get" action="{% url 'repos:search' %}" class="hidden min-w-0 flex-1 md:block lg:max-w-md xl:max-w-xl">
@@ -23,8 +26,9 @@
             name="q"
             value="{{ request.GET.q }}"
             placeholder="Search repositories"
-            class="h-11 w-full rounded-2xl border border-gray-200 bg-gray-50 pl-11 pr-4 text-sm font-medium text-gray-900 shadow-inner shadow-gray-200/40 transition placeholder:text-gray-400 focus:border-green-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-green-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-100 dark:shadow-black/20 dark:placeholder:text-gray-500 dark:focus:bg-gray-950"
+            class="h-11 w-full rounded-2xl border border-gray-200 bg-gray-50 pl-11 pr-14 text-sm font-medium text-gray-900 shadow-inner shadow-gray-200/40 transition placeholder:text-gray-400 focus:border-green-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-green-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-100 dark:shadow-black/20 dark:placeholder:text-gray-500 dark:focus:bg-gray-950"
           />
+          <kbd class="shortcut-kbd pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 lg:inline-flex">K</kbd>
         </div>
       </form>
 
@@ -32,48 +36,63 @@
         <a
           href="{% url 'repos:search' %}"
           data-shortcut-link
-          data-shortcut-key="g r"
+          data-shortcut-key="r"
           data-shortcut-label="Repositories"
           {% if current_namespace == "repos" and current_name == "search" or current_namespace == "repos" and current_name == "repo_detail" %}aria-current="page"{% endif %}
           class="rounded-full px-4 py-2.5 text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-950 {% if current_namespace == "repos" and current_name == "search" or current_namespace == "repos" and current_name == "repo_detail" %}bg-gray-950 text-white shadow-sm dark:bg-white dark:text-gray-950{% else %}text-gray-700 hover:bg-gray-100 hover:text-gray-950 dark:text-gray-300 dark:hover:bg-gray-900 dark:hover:text-white{% endif %}"
         >
-          Repos
+          <span class="shortcut-hint">
+            Repos
+            <kbd class="shortcut-kbd hidden xl:inline-flex">R</kbd>
+          </span>
         </a>
         <a
           href="{% url 'repos:list' %}"
           data-shortcut-link
-          data-shortcut-key="g l"
+          data-shortcut-key="l"
           data-shortcut-label="Awesome lists"
           {% if current_namespace == "repos" and current_name == "list" or current_namespace == "repos" and current_name == "list_detail" or current_namespace == "repos" and current_name == "request_list" %}aria-current="page"{% endif %}
           class="rounded-full px-4 py-2.5 text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-950 {% if current_namespace == "repos" and current_name == "list" or current_namespace == "repos" and current_name == "list_detail" or current_namespace == "repos" and current_name == "request_list" %}bg-gray-950 text-white shadow-sm dark:bg-white dark:text-gray-950{% else %}text-gray-700 hover:bg-gray-100 hover:text-gray-950 dark:text-gray-300 dark:hover:bg-gray-900 dark:hover:text-white{% endif %}"
         >
-          Lists
+          <span class="shortcut-hint">
+            Lists
+            <kbd class="shortcut-kbd hidden xl:inline-flex">L</kbd>
+          </span>
         </a>
         {% if user.is_authenticated %}
           <a
             href="{% url 'repos:starred' %}"
             data-shortcut-link
-            data-shortcut-key="g s"
+            data-shortcut-key="s"
             data-shortcut-label="Starred repositories"
             {% if current_namespace == "repos" and current_name == "starred" %}aria-current="page"{% endif %}
             class="rounded-full px-4 py-2.5 text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-950 {% if current_namespace == "repos" and current_name == "starred" %}bg-gray-950 text-white shadow-sm dark:bg-white dark:text-gray-950{% else %}text-gray-700 hover:bg-gray-100 hover:text-gray-950 dark:text-gray-300 dark:hover:bg-gray-900 dark:hover:text-white{% endif %}"
           >
-            Starred
+            <span class="shortcut-hint">
+              Starred
+              <kbd class="shortcut-kbd hidden xl:inline-flex">S</kbd>
+            </span>
           </a>
           <a
             href="{% url 'repos:liked' %}"
             data-shortcut-link
-            data-shortcut-key="g f"
+            data-shortcut-key="f"
             data-shortcut-label="Liked repositories"
             {% if current_namespace == "repos" and current_name == "liked" %}aria-current="page"{% endif %}
             class="rounded-full px-4 py-2.5 text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-950 {% if current_namespace == "repos" and current_name == "liked" %}bg-gray-950 text-white shadow-sm dark:bg-white dark:text-gray-950{% else %}text-gray-700 hover:bg-gray-100 hover:text-gray-950 dark:text-gray-300 dark:hover:bg-gray-900 dark:hover:text-white{% endif %}"
           >
-            Liked
+            <span class="shortcut-hint">
+              Liked
+              <kbd class="shortcut-kbd hidden xl:inline-flex">F</kbd>
+            </span>
           </a>
         {% endif %}
         {% if user.is_superuser %}
-          <a href="{% url 'admin_panel' %}" data-shortcut-link data-shortcut-key="g a" data-shortcut-label="Admin" class="rounded-full px-4 py-2.5 text-sm font-semibold text-green-700 transition hover:bg-green-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:text-green-300 dark:hover:bg-green-950 dark:focus-visible:ring-offset-gray-950">
-            Admin
+          <a href="{% url 'admin_panel' %}" data-shortcut-link data-shortcut-key="a" data-shortcut-label="Admin" class="rounded-full px-4 py-2.5 text-sm font-semibold text-green-700 transition hover:bg-green-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:text-green-300 dark:hover:bg-green-950 dark:focus-visible:ring-offset-gray-950">
+            <span class="shortcut-hint">
+              Admin
+              <kbd class="shortcut-kbd hidden xl:inline-flex">A</kbd>
+            </span>
           </a>
         {% endif %}
       </nav>
@@ -81,17 +100,8 @@
       <div class="hidden items-center gap-2 lg:flex">
         <button
           type="button"
-          data-shortcuts-open
-          class="inline-flex h-11 w-11 items-center justify-center rounded-full border border-gray-200 bg-white text-sm font-black text-gray-700 transition hover:bg-gray-50 hover:text-gray-950 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white dark:focus-visible:ring-offset-gray-950"
-          aria-label="Keyboard shortcuts"
-          title="Keyboard shortcuts"
-        >
-          <span aria-hidden="true">?</span>
-        </button>
-        <button
-          type="button"
           data-theme-toggle
-          class="inline-flex h-11 w-11 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-700 transition hover:bg-gray-50 hover:text-gray-950 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white dark:focus-visible:ring-offset-gray-950"
+          class="relative inline-flex h-11 w-11 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-700 transition hover:bg-gray-50 hover:text-gray-950 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white dark:focus-visible:ring-offset-gray-950"
           aria-label="Toggle theme"
         >
           <span class="sr-only" data-theme-label>Theme</span>
@@ -109,23 +119,25 @@
           <svg data-theme-icon="dark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="hidden h-5 w-5">
             <path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z" />
           </svg>
+          <kbd class="shortcut-kbd pointer-events-none absolute -right-1 -top-1 hidden lg:inline-flex">T</kbd>
         </button>
         {% if user.is_authenticated %}
           <a
             href="{% url 'settings' %}"
             data-shortcut-link
-            data-shortcut-key="g ,"
+            data-shortcut-key=","
             data-shortcut-label="Settings"
             aria-label="Settings"
             title="Settings"
             {% if current_name == "settings" %}aria-current="page"{% endif %}
-            class="inline-flex h-11 w-11 items-center justify-center rounded-full border transition focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-950 {% if current_name == "settings" %}border-gray-950 bg-gray-950 text-white dark:border-white dark:bg-white dark:text-gray-950{% else %}border-gray-200 bg-white text-gray-700 hover:bg-gray-50 hover:text-gray-950 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white{% endif %}"
+            class="relative inline-flex h-11 w-11 items-center justify-center rounded-full border transition focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-950 {% if current_name == "settings" %}border-gray-950 bg-gray-950 text-white dark:border-white dark:bg-white dark:text-gray-950{% else %}border-gray-200 bg-white text-gray-700 hover:bg-gray-50 hover:text-gray-950 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white{% endif %}"
           >
             <span class="sr-only">Settings</span>
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.52a2 2 0 0 1-1 1.72l-.15.1a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.72v-.52a2 2 0 0 1 1-1.72l.15-.1a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2Z" />
               <circle cx="12" cy="12" r="3" />
             </svg>
+            <kbd class="shortcut-kbd pointer-events-none absolute -right-1 -top-1 hidden lg:inline-flex">,</kbd>
           </a>
           <form method="post" action="{% url 'account_logout' %}">
             {% csrf_token %}
@@ -209,21 +221,16 @@
             {% endif %}
           </nav>
           <div class="flex items-center justify-between gap-3 border-t border-gray-200 p-4 dark:border-gray-800">
-            <div class="flex items-center gap-2">
-              <button type="button" data-shortcuts-open class="inline-flex h-11 w-11 items-center justify-center rounded-full border border-gray-200 bg-white text-sm font-black text-gray-900 transition hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-100 dark:hover:bg-gray-800" aria-label="Keyboard shortcuts" title="Keyboard shortcuts">
-                <span aria-hidden="true">?</span>
-              </button>
-              <button type="button" data-theme-toggle class="inline-flex min-h-11 items-center justify-center rounded-full border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-900 transition hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-100 dark:hover:bg-gray-800">
-                <span data-theme-label>Theme</span>
-                <svg data-theme-icon="light" xmlns="http://www.w3.org/2000/svg" class="ml-2 h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <circle cx="12" cy="12" r="4" />
-                  <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
-                </svg>
-                <svg data-theme-icon="dark" xmlns="http://www.w3.org/2000/svg" class="ml-2 hidden h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z" />
-                </svg>
-              </button>
-            </div>
+            <button type="button" data-theme-toggle class="inline-flex min-h-11 items-center justify-center rounded-full border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-900 transition hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-100 dark:hover:bg-gray-800">
+              <span data-theme-label>Theme</span>
+              <svg data-theme-icon="light" xmlns="http://www.w3.org/2000/svg" class="ml-2 h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="4" />
+                <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+              </svg>
+              <svg data-theme-icon="dark" xmlns="http://www.w3.org/2000/svg" class="ml-2 hidden h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z" />
+              </svg>
+            </button>
             {% if user.is_authenticated %}
               <form method="post" action="{% url 'account_logout' %}">
                 {% csrf_token %}
