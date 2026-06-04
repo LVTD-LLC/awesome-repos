@@ -341,6 +341,7 @@ def sponsor_success(request):
             cache.delete("awesome:active_sponsor_ad")
             queue_track_event(
                 event_name="sponsor_ad_details_submitted",
+                profile_id=_profile_id_for_request(request),
                 distinct_id=f"stripe_checkout:{session_id}",
                 properties={
                     "product": "sponsor_ads",
@@ -475,6 +476,7 @@ def highlighted_repo_success(request):
             cache.delete("awesome:active_highlighted_repo")
             queue_track_event(
                 event_name="highlighted_repo_details_submitted",
+                profile_id=_profile_id_for_request(request),
                 distinct_id=f"stripe_checkout:{session_id}",
                 properties={
                     "product": "highlighted_repo",

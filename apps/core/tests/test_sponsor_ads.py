@@ -119,7 +119,7 @@ class TestSponsorAdsCheckout:
         assert purchase.status == SponsorAdPurchase.Status.PAID
         assert b"This field is required" in response.content
 
-    def test_success_form_saves_active_ad_details(self, client, monkeypatch):
+    def test_success_form_saves_active_ad_details(self, auth_client, user, monkeypatch):
         purchase = SponsorAdPurchase.objects.create(
             stripe_checkout_session_id="cs_test_paid",
             status=SponsorAdPurchase.Status.PAID,
@@ -127,14 +127,19 @@ class TestSponsorAdsCheckout:
             amount_total=100000,
             currency="usd",
         )
+        events = []
         monkeypatch.setattr("apps.core.views.stripe_configured", lambda: False)
+        monkeypatch.setattr(
+            "apps.core.views.queue_track_event",
+            lambda **kwargs: events.append(kwargs),
+        )
         logo = SimpleUploadedFile(
             "logo.gif",
             b"GIF87a\x01\x00\x01\x00\x80\x00\x00\x00\x00\x00\xff\xff\xff,\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x02D\x01\x00;",
             content_type="image/gif",
         )
 
-        response = client.post(
+        response = auth_client.post(
             reverse("sponsor_success"),
             {
                 "session_id": purchase.stripe_checkout_session_id,
@@ -150,6 +155,18 @@ class TestSponsorAdsCheckout:
         assert purchase.startup_name == "Acme AI"
         assert purchase.short_description == "Reliable agent workflows for busy teams."
         assert purchase.details_submitted_at is not None
+        assert events == [
+            {
+                "event_name": "sponsor_ad_details_submitted",
+                "profile_id": user.profile.id,
+                "distinct_id": "stripe_checkout:cs_test_paid",
+                "properties": {
+                    "product": "sponsor_ads",
+                    "transaction_id": "cs_test_paid",
+                },
+                "source_function": "sponsor_success",
+            }
+        ]
 
     def test_active_sponsor_ad_caches_empty_result(self, django_assert_num_queries):
         from apps.core.context_processors import active_sponsor_ad
@@ -322,7 +339,12 @@ class TestHighlightedRepoCheckout:
             stripe_checkout_session_id="cs_test_highlight"
         ).exists()
 
-    def test_highlighted_success_form_saves_active_repo_details(self, client, monkeypatch):
+    def test_highlighted_success_form_saves_active_repo_details(
+        self,
+        auth_client,
+        user,
+        monkeypatch,
+    ):
         from apps.core.models import HighlightedRepoPurchase
 
         purchase = HighlightedRepoPurchase.objects.create(
@@ -332,9 +354,14 @@ class TestHighlightedRepoCheckout:
             amount_total=50000,
             currency="usd",
         )
+        events = []
         monkeypatch.setattr("apps.core.views.highlighted_repo_checkout_configured", lambda: False)
+        monkeypatch.setattr(
+            "apps.core.views.queue_track_event",
+            lambda **kwargs: events.append(kwargs),
+        )
 
-        response = client.post(
+        response = auth_client.post(
             reverse("highlighted_repo_success"),
             {
                 "session_id": purchase.stripe_checkout_session_id,
@@ -349,6 +376,18 @@ class TestHighlightedRepoCheckout:
         assert purchase.status == HighlightedRepoPurchase.Status.ACTIVE
         assert purchase.repo_full_name == "LVTD-LLC/awesome"
         assert purchase.active_until is not None
+        assert events == [
+            {
+                "event_name": "highlighted_repo_details_submitted",
+                "profile_id": user.profile.id,
+                "distinct_id": "stripe_checkout:cs_test_highlight_paid",
+                "properties": {
+                    "product": "highlighted_repo",
+                    "transaction_id": "cs_test_highlight_paid",
+                },
+                "source_function": "highlighted_repo_success",
+            }
+        ]
 
     def test_highlighted_success_form_does_not_reset_active_window(self, client, monkeypatch):
         from datetime import timedelta
