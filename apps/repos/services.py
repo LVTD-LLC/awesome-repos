@@ -15,6 +15,7 @@ from urllib.request import Request, urlopen
 
 from allauth.socialaccount.models import SocialToken
 from django.conf import settings
+from django.core.exceptions import ObjectDoesNotExist
 from django.db import connection, models, transaction
 from django.db.models import Count
 from django.db.models.functions import Coalesce
@@ -851,14 +852,29 @@ def visible_repository_queryset():
 def with_repository_like_state(queryset, user):
     if not user.is_authenticated:
         return queryset
-    return queryset.annotate(
-        is_liked=models.Exists(
+
+    annotations = {
+        "is_liked": models.Exists(
             RepositoryLike.objects.filter(
                 repository=models.OuterRef("pk"),
                 user=user,
             )
+        ),
+    }
+    try:
+        profile_pk = user.profile.pk
+    except (AttributeError, ObjectDoesNotExist):
+        profile_pk = None
+
+    if profile_pk is not None:
+        starred_link = UserStarredRepository.objects.filter(
+            repository=models.OuterRef("pk"),
+            profile_id=profile_pk,
         )
-    )
+        annotations["is_starred"] = models.Exists(starred_link)
+        annotations["user_starred_at"] = models.Subquery(starred_link.values("starred_at")[:1])
+
+    return queryset.annotate(**annotations)
 
 
 def detect_awesome_list_candidate(

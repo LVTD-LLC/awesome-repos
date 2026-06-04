@@ -180,7 +180,10 @@
                             </div>
                         </div>
                         <div class="flex shrink-0 items-start justify-between gap-3 text-left md:flex-col md:items-end md:text-right">
-                            {% include "repos/_repository_like_button.html" with repository=repo %}
+                            <div class="flex items-center gap-2 md:justify-end">
+                                {% include "repos/_repository_like_button.html" with repository=repo %}
+                                {% include "repos/_repository_starred_badge.html" with repository=repo %}
+                            </div>
                             <div>
                                 <div class="text-2xl font-bold">★ {{ repo.stars|intcomma }}</div>
                                 <div class="mt-1 flex flex-wrap justify-start gap-x-3 gap-y-1 md:justify-end">
