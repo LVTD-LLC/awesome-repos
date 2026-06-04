@@ -25,6 +25,7 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Awesome: added an admin-panel flow to create new awesome-list sources and queue their initial scan.
 - Awesome admin panel now shows GitHub API rate-limit status for the configured scanner token.
 - Awesome admin panel now lets superusers retry scans for existing awesome-list repos.
+- Awesome admin panel now shows each recent user's imported starred-repository count and starred-import status.
 - Awesome: added a daily scheduled task that queues a capped number of newly discovered repositories from awesome-list READMEs.
 - Awesome: added pgvector-backed repository embeddings from GitHub descriptions and READMEs via OpenRouter/PydanticAI.
 - Awesome search filters now expose semantic relevance mode for repository queries.
