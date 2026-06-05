@@ -801,7 +801,7 @@ def _parse_setup_cfg_dependencies(content: str) -> list[str]:
 def _literal_string_values(node: ast.AST) -> list[str]:
     if isinstance(node, ast.Constant) and isinstance(node.value, str):
         return [node.value]
-    if isinstance(node, (ast.List, ast.Tuple, ast.Set)):
+    if isinstance(node, ast.List | ast.Tuple | ast.Set):
         values = []
         for item in node.elts:
             values.extend(_literal_string_values(item))

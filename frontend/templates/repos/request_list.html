@@ -1,82 +1,81 @@
 {% extends "base_landing.html" %}
-
 {% block meta %}
-{% include "components/seo_meta.html" with title="Request an Awesome List · Awesome" description="Request a GitHub awesome list to be reviewed for indexing in the Awesome repository discovery catalog." canonical_path=request.path twitter_card="summary" %}
+    {% include "components/seo_meta.html" with title="Request an Awesome List · Awesome" description="Request a GitHub awesome list to be reviewed for indexing in the Awesome repository discovery catalog." canonical_path=request.path twitter_card="summary" %}
 {% endblock meta %}
-
 {% block content %}
-<section class="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
-  <div class="mb-8">
-    <a href="{% url 'repos:list' %}" class="text-sm font-semibold text-green-700 hover:underline dark:text-green-400">All awesome lists</a>
-    <p class="mt-6 text-sm font-semibold uppercase tracking-wide text-green-600">List requests</p>
-    <h1 class="mt-2 text-4xl font-bold tracking-tight text-gray-950 dark:text-white">Request an awesome list</h1>
-    <p class="mt-3 max-w-2xl text-gray-600 dark:text-gray-300">Send a GitHub awesome-list repository for review. Approved lists can be added to the scanner queue by an admin.</p>
-  </div>
-
-  <form method="post" class="rounded-2xl border border-gray-200 bg-gray-50 p-5 dark:border-gray-800 dark:bg-gray-900 sm:p-6">
-    {% csrf_token %}
-
-    <div class="space-y-5">
-      <div>
-        <label for="id_source_url" class="block text-sm font-semibold text-gray-800 dark:text-gray-200">GitHub awesome-list URL</label>
-        <input
-          id="id_source_url"
-          name="source_url"
-          type="url"
-          value="{{ form.source_url.value|default_if_none:'' }}"
-          placeholder="https://github.com/owner/awesome-projects"
-          class="mt-2 block w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 dark:placeholder:text-gray-500"
-          required
-        />
-        {% if form.source_url.errors %}
-          <p class="mt-2 text-sm text-red-600 dark:text-red-300">{{ form.source_url.errors|striptags }}</p>
-        {% endif %}
-      </div>
-
-      <div>
-        <label for="id_requester_email" class="block text-sm font-semibold text-gray-800 dark:text-gray-200">Email for follow-up</label>
-        <input
-          id="id_requester_email"
-          name="requester_email"
-          type="email"
-          value="{{ form.requester_email.value|default_if_none:'' }}"
-          placeholder="you@example.com"
-          class="mt-2 block w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 dark:placeholder:text-gray-500"
-        />
-        {% if form.requester_email.errors %}
-          <p class="mt-2 text-sm text-red-600 dark:text-red-300">{{ form.requester_email.errors|striptags }}</p>
-        {% endif %}
-      </div>
-
-      <div>
-        <label for="id_note" class="block text-sm font-semibold text-gray-800 dark:text-gray-200">Note</label>
-        <textarea
-          id="id_note"
-          name="note"
-          rows="4"
-          placeholder="What makes this list useful?"
-          class="mt-2 block w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 dark:placeholder:text-gray-500"
-        >{{ form.note.value|default_if_none:'' }}</textarea>
-        {% if form.note.errors %}
-          <p class="mt-2 text-sm text-red-600 dark:text-red-300">{{ form.note.errors|striptags }}</p>
-        {% endif %}
-      </div>
-
-      {% if form.non_field_errors %}
-        <div class="rounded-xl bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950 dark:text-red-200">
-          {{ form.non_field_errors|striptags }}
+    <section class="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
+        <div class="mb-8">
+            <a href="{% url 'repos:list' %}"
+               class="text-sm font-semibold text-green-700 hover:underline dark:text-green-400">All awesome lists</a>
+            <p class="mt-6 text-sm font-semibold uppercase tracking-wide text-green-600">List requests</p>
+            <h1 class="mt-2 text-4xl font-bold tracking-tight text-gray-950 dark:text-white">Request an awesome list</h1>
+            <p class="mt-3 max-w-2xl text-gray-600 dark:text-gray-300">
+                Send a GitHub awesome-list repository for review. Approved lists can be added to the scanner queue by an admin.
+            </p>
         </div>
-      {% endif %}
-
-      <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <button type="submit" class="inline-flex min-h-12 items-center justify-center rounded-xl bg-green-600 px-5 text-sm font-bold text-white transition hover:bg-green-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:bg-green-500 dark:text-gray-950 dark:hover:bg-green-400 dark:focus-visible:ring-offset-gray-950">
-          Request list
-        </button>
-        <a href="{% url 'repos:list' %}" class="inline-flex min-h-12 items-center justify-center rounded-xl border border-gray-300 px-5 text-sm font-semibold text-gray-900 transition hover:bg-gray-100 dark:border-gray-700 dark:text-gray-100 dark:hover:bg-gray-800">
-          Browse lists
-        </a>
-      </div>
-    </div>
-  </form>
-</section>
+        <form method="post"
+              class="rounded-2xl border border-gray-200 bg-gray-50 p-5 dark:border-gray-800 dark:bg-gray-900 sm:p-6">
+            {% csrf_token %}
+            <div class="space-y-5">
+                <div>
+                    <label for="id_source_url"
+                           class="block text-sm font-semibold text-gray-800 dark:text-gray-200">
+                        GitHub awesome-list URL
+                    </label>
+                    <input id="id_source_url"
+                           name="source_url"
+                           type="url"
+                           value="{{ form.source_url.value|default_if_none:'' }}"
+                           placeholder="https://github.com/owner/awesome-projects"
+                           class="mt-2 block w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 dark:placeholder:text-gray-500"
+                           required />
+                    {% if form.source_url.errors %}
+                        <p class="mt-2 text-sm text-red-600 dark:text-red-300">{{ form.source_url.errors|striptags }}</p>
+                    {% endif %}
+                </div>
+                <div>
+                    <label for="id_requester_email"
+                           class="block text-sm font-semibold text-gray-800 dark:text-gray-200">
+                        Email for follow-up
+                    </label>
+                    <input id="id_requester_email"
+                           name="requester_email"
+                           type="email"
+                           value="{{ form.requester_email.value|default_if_none:'' }}"
+                           placeholder="you@example.com"
+                           class="mt-2 block w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 dark:placeholder:text-gray-500" />
+                    {% if form.requester_email.errors %}
+                        <p class="mt-2 text-sm text-red-600 dark:text-red-300">{{ form.requester_email.errors|striptags }}</p>
+                    {% endif %}
+                </div>
+                <div>
+                    <label for="id_note"
+                           class="block text-sm font-semibold text-gray-800 dark:text-gray-200">Note</label>
+                    <textarea id="id_note"
+                              name="note"
+                              rows="4"
+                              placeholder="What makes this list useful?"
+                              class="mt-2 block w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 dark:placeholder:text-gray-500">{{ form.note.value|default_if_none:'' }}</textarea>
+                    {% if form.note.errors %}
+                        <p class="mt-2 text-sm text-red-600 dark:text-red-300">{{ form.note.errors|striptags }}</p>
+                    {% endif %}
+                </div>
+                {% if form.non_field_errors %}
+                    <div class="rounded-xl bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950 dark:text-red-200">
+                        {{ form.non_field_errors|striptags }}
+                    </div>
+                {% endif %}
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+                    <button type="submit"
+                            class="inline-flex min-h-12 items-center justify-center rounded-xl bg-green-600 px-5 text-sm font-bold text-white transition hover:bg-green-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:bg-green-500 dark:text-gray-950 dark:hover:bg-green-400 dark:focus-visible:ring-offset-gray-950">
+                        Request list
+                    </button>
+                    <a href="{% url 'repos:list' %}"
+                       class="inline-flex min-h-12 items-center justify-center rounded-xl border border-gray-300 px-5 text-sm font-semibold text-gray-900 transition hover:bg-gray-100 dark:border-gray-700 dark:text-gray-100 dark:hover:bg-gray-800">
+                        Browse lists
+                    </a>
+                </div>
+            </div>
+        </form>
+    </section>
 {% endblock content %}

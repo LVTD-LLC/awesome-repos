@@ -100,9 +100,7 @@ class SafeHTMLRenderer(HTMLParser):
                     break
             if href.startswith(("https://", "http://", "mailto:")):
                 self.parts.append(
-                    '<a href="'
-                    + html.escape(href, quote=True)
-                    + '" rel="noopener noreferrer">'
+                    '<a href="' + html.escape(href, quote=True) + '" rel="noopener noreferrer">'
                 )
             else:
                 self.parts.append("<a>")
@@ -142,8 +140,7 @@ def newsletter_ai_configured() -> bool:
         "google": ("GEMINI_API_KEY", "GOOGLE_API_KEY"),
     }
     return any(
-        os.environ.get(key)
-        for key in provider_env_keys.get(settings.NEWSLETTER_AI_PROVIDER, ())
+        os.environ.get(key) for key in provider_env_keys.get(settings.NEWSLETTER_AI_PROVIDER, ())
     )
 
 
@@ -224,9 +221,7 @@ def upsert_newsletter_subscription(
             subscription.email = normalized_email
             subscription.cadence = cadence
             subscription.unsubscribed_at = None
-            subscription.save(
-                update_fields=["email", "cadence", "unsubscribed_at", "updated_at"]
-            )
+            subscription.save(update_fields=["email", "cadence", "unsubscribed_at", "updated_at"])
     else:
         subscription.email = normalized_email
         subscription.cadence = cadence
@@ -556,9 +551,7 @@ def generate_commit_summary(text: str) -> str:
             "what changed, why a developer might care, and concrete product/API impact. "
             "Do not exaggerate or infer unrevealed intent."
         ),
-    ).run_sync(
-        "Return a concise structured commit summary for this commit.\n\n" + text
-    )
+    ).run_sync("Return a concise structured commit summary for this commit.\n\n" + text)
     return result.output.summary.strip()
 
 
@@ -946,9 +939,7 @@ def generate_due_newsletter_issues(
     sent = 0
     failed = 0
     skipped = 0
-    repositories = Repository.objects.filter(newsletter_tracking_enabled=True).order_by(
-        "full_name"
-    )
+    repositories = Repository.objects.filter(newsletter_tracking_enabled=True).order_by("full_name")
     for repository in repositories:
         issue = generate_repository_newsletter_issue(
             repository,

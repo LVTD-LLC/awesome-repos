@@ -1,253 +1,327 @@
 {% load static socialaccount %}
-
 {% with current_namespace=request.resolver_match.namespace current_name=request.resolver_match.url_name %}
-<header class="sticky top-0 z-40 border-b border-gray-200/80 bg-white/90 backdrop-blur-xl dark:border-gray-800/80 dark:bg-gray-950/90">
-  <div class="mx-auto w-full max-w-[104rem] px-4 sm:px-6 lg:px-8">
-    <div class="flex min-h-20 items-center gap-3">
-      <a href="{% url 'repos:search' %}" class="group flex shrink-0 items-center gap-3 rounded-xl pr-2 text-gray-950 transition hover:text-green-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:text-white dark:hover:text-green-300 dark:focus-visible:ring-offset-gray-950" aria-label="Awesome home">
-        <span class="flex h-10 w-10 items-center justify-center rounded-2xl border border-gray-200 bg-white shadow-sm transition group-hover:border-green-200 group-hover:bg-green-50 dark:border-gray-800 dark:bg-gray-900 dark:group-hover:border-green-900 dark:group-hover:bg-green-950">
-          <img src="{% static 'brand/awesome-repos-mark.svg' %}" alt="" width="28" height="28" class="h-7 w-7" />
-        </span>
-        <span class="hidden items-center gap-2 sm:flex">
-          <span class="text-base font-black">Awesome</span>
-        </span>
-      </a>
-
-      <form method="get" action="{% url 'repos:search' %}" class="hidden min-w-0 flex-1 md:block lg:max-w-md xl:max-w-xl">
-        <label for="site-nav-query" class="sr-only">Search repositories</label>
-        <div class="relative">
-          <svg class="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m21 21-4.35-4.35M11 18a7 7 0 1 1 0-14 7 7 0 0 1 0 14Z" />
-          </svg>
-          <input
-            id="site-nav-query"
-            data-shortcut-search
-            name="q"
-            value="{{ request.GET.q }}"
-            placeholder="Search repositories"
-            class="h-11 w-full rounded-2xl border border-gray-200 bg-gray-50 pl-11 pr-4 text-sm font-medium text-gray-900 shadow-inner shadow-gray-200/40 transition placeholder:text-gray-400 focus:border-green-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-green-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-100 dark:shadow-black/20 dark:placeholder:text-gray-500 dark:focus:bg-gray-950 lg:pr-14"
-          />
-          <span class="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 items-center gap-1 lg:flex" aria-hidden="true">
-            <kbd class="shortcut-kbd">/</kbd>
-          </span>
+    <header class="sticky top-0 z-40 border-b border-gray-200/80 bg-white/90 backdrop-blur-xl dark:border-gray-800/80 dark:bg-gray-950/90">
+        <div class="mx-auto w-full max-w-[104rem] px-4 sm:px-6 lg:px-8">
+            <div class="flex min-h-20 items-center gap-3">
+                <a href="{% url 'repos:search' %}"
+                   class="group flex shrink-0 items-center gap-3 rounded-xl pr-2 text-gray-950 transition hover:text-green-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:text-white dark:hover:text-green-300 dark:focus-visible:ring-offset-gray-950"
+                   aria-label="Awesome home">
+                    <span class="flex h-10 w-10 items-center justify-center rounded-2xl border border-gray-200 bg-white shadow-sm transition group-hover:border-green-200 group-hover:bg-green-50 dark:border-gray-800 dark:bg-gray-900 dark:group-hover:border-green-900 dark:group-hover:bg-green-950">
+                        <img src="{% static 'brand/awesome-repos-mark.svg' %}"
+                             alt=""
+                             width="28"
+                             height="28"
+                             class="h-7 w-7" />
+                    </span>
+                    <span class="hidden items-center gap-2 sm:flex">
+                        <span class="text-base font-black">Awesome</span>
+                    </span>
+                </a>
+                <form method="get"
+                      action="{% url 'repos:search' %}"
+                      class="hidden min-w-0 flex-1 md:block lg:max-w-md xl:max-w-xl">
+                    <label for="site-nav-query" class="sr-only">Search repositories</label>
+                    <div class="relative">
+                        <svg class="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500"
+                             xmlns="http://www.w3.org/2000/svg"
+                             fill="none"
+                             viewBox="0 0 24 24"
+                             stroke="currentColor"
+                             aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m21 21-4.35-4.35M11 18a7 7 0 1 1 0-14 7 7 0 0 1 0 14Z" />
+                        </svg>
+                        <input id="site-nav-query"
+                               data-shortcut-search
+                               name="q"
+                               value="{{ request.GET.q }}"
+                               placeholder="Search repositories"
+                               class="h-11 w-full rounded-2xl border border-gray-200 bg-gray-50 pl-11 pr-4 text-sm font-medium text-gray-900 shadow-inner shadow-gray-200/40 transition placeholder:text-gray-400 focus:border-green-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-green-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-100 dark:shadow-black/20 dark:placeholder:text-gray-500 dark:focus:bg-gray-950 lg:pr-14" />
+                        <span class="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 items-center gap-1 lg:flex"
+                              aria-hidden="true">
+                            <kbd class="shortcut-kbd">/</kbd>
+                        </span>
+                    </div>
+                </form>
+                <nav class="ml-auto hidden items-center gap-1 lg:flex"
+                     aria-label="Primary navigation">
+                    <a href="{% url 'repos:search' %}"
+                       data-shortcut-link
+                       data-shortcut-key="r"
+                       data-shortcut-label="Repositories"
+                       {% if current_namespace == "repos" and current_name == "search" or current_namespace == "repos" and current_name == "repo_detail" %}aria-current="page"{% endif %}
+                       class="rounded-full px-4 py-2.5 text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-950 {% if current_namespace == "repos" and current_name == "search" or current_namespace == "repos" and current_name == "repo_detail" %}bg-gray-950 text-white shadow-sm dark:bg-white dark:text-gray-950{% else %}text-gray-700 hover:bg-gray-100 hover:text-gray-950 dark:text-gray-300 dark:hover:bg-gray-900 dark:hover:text-white{% endif %}">
+                        <span class="shortcut-hint">
+                            Repos
+                            <kbd class="shortcut-kbd hidden xl:inline-flex" aria-hidden="true">R</kbd>
+                        </span>
+                    </a>
+                    <a href="{% url 'repos:list' %}"
+                       data-shortcut-link
+                       data-shortcut-key="l"
+                       data-shortcut-label="Awesome lists"
+                       {% if current_namespace == "repos" and current_name == "list" or current_namespace == "repos" and current_name == "list_detail" or current_namespace == "repos" and current_name == "request_list" %}aria-current="page"{% endif %}
+                       class="rounded-full px-4 py-2.5 text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-950 {% if current_namespace == "repos" and current_name == "list" or current_namespace == "repos" and current_name == "list_detail" or current_namespace == "repos" and current_name == "request_list" %}bg-gray-950 text-white shadow-sm dark:bg-white dark:text-gray-950{% else %}text-gray-700 hover:bg-gray-100 hover:text-gray-950 dark:text-gray-300 dark:hover:bg-gray-900 dark:hover:text-white{% endif %}">
+                        <span class="shortcut-hint">
+                            Lists
+                            <kbd class="shortcut-kbd hidden xl:inline-flex" aria-hidden="true">L</kbd>
+                        </span>
+                    </a>
+                    {% if user.is_authenticated %}
+                        <a href="{% url 'repos:starred' %}"
+                           data-shortcut-link
+                           data-shortcut-key="s"
+                           data-shortcut-label="Starred repositories"
+                           {% if current_namespace == "repos" and current_name == "starred" %}aria-current="page"{% endif %}
+                           class="rounded-full px-4 py-2.5 text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-950 {% if current_namespace == "repos" and current_name == "starred" %}bg-gray-950 text-white shadow-sm dark:bg-white dark:text-gray-950{% else %}text-gray-700 hover:bg-gray-100 hover:text-gray-950 dark:text-gray-300 dark:hover:bg-gray-900 dark:hover:text-white{% endif %}">
+                            <span class="shortcut-hint">
+                                Starred
+                                <kbd class="shortcut-kbd hidden xl:inline-flex" aria-hidden="true">S</kbd>
+                            </span>
+                        </a>
+                        <a href="{% url 'repos:liked' %}"
+                           data-shortcut-link
+                           data-shortcut-key="f"
+                           data-shortcut-label="Liked repositories"
+                           {% if current_namespace == "repos" and current_name == "liked" %}aria-current="page"{% endif %}
+                           class="rounded-full px-4 py-2.5 text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-950 {% if current_namespace == "repos" and current_name == "liked" %}bg-gray-950 text-white shadow-sm dark:bg-white dark:text-gray-950{% else %}text-gray-700 hover:bg-gray-100 hover:text-gray-950 dark:text-gray-300 dark:hover:bg-gray-900 dark:hover:text-white{% endif %}">
+                            <span class="shortcut-hint">
+                                Liked
+                                <kbd class="shortcut-kbd hidden xl:inline-flex" aria-hidden="true">F</kbd>
+                            </span>
+                        </a>
+                    {% endif %}
+                    {% if user.is_superuser %}
+                        <a href="{% url 'admin_panel' %}"
+                           data-shortcut-link
+                           data-shortcut-key="a"
+                           data-shortcut-label="Admin"
+                           class="rounded-full px-4 py-2.5 text-sm font-semibold text-green-700 transition hover:bg-green-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:text-green-300 dark:hover:bg-green-950 dark:focus-visible:ring-offset-gray-950">
+                            <span class="shortcut-hint">
+                                Admin
+                                <kbd class="shortcut-kbd hidden xl:inline-flex" aria-hidden="true">A</kbd>
+                            </span>
+                        </a>
+                    {% endif %}
+                </nav>
+                <div class="hidden items-center gap-2 lg:flex">
+                    <button type="button"
+                            data-theme-toggle
+                            class="relative inline-flex h-11 w-11 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-700 transition hover:bg-gray-50 hover:text-gray-950 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white dark:focus-visible:ring-offset-gray-950"
+                            aria-label="Toggle theme">
+                        <span class="sr-only" data-theme-label>Theme</span>
+                        <svg data-theme-icon="light"
+                             xmlns="http://www.w3.org/2000/svg"
+                             viewBox="0 0 24 24"
+                             fill="none"
+                             stroke="currentColor"
+                             stroke-width="2"
+                             stroke-linecap="round"
+                             stroke-linejoin="round"
+                             class="h-5 w-5">
+                            <circle cx="12" cy="12" r="4" />
+                            <path d="M12 2v2" />
+                            <path d="M12 20v2" />
+                            <path d="M4.93 4.93l1.41 1.41" />
+                            <path d="M17.66 17.66l1.41 1.41" />
+                            <path d="M2 12h2" />
+                            <path d="M20 12h2" />
+                            <path d="M4.93 19.07l1.41-1.41" />
+                            <path d="M17.66 6.34l1.41-1.41" />
+                        </svg>
+                        <svg data-theme-icon="dark"
+                             xmlns="http://www.w3.org/2000/svg"
+                             viewBox="0 0 24 24"
+                             fill="none"
+                             stroke="currentColor"
+                             stroke-width="2"
+                             stroke-linecap="round"
+                             stroke-linejoin="round"
+                             class="hidden h-5 w-5">
+                            <path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z" />
+                        </svg>
+                        <kbd class="shortcut-kbd pointer-events-none absolute -right-1 -top-1 hidden lg:inline-flex"
+                             aria-hidden="true">T</kbd>
+                    </button>
+                    {% if user.is_authenticated %}
+                        <a href="{% url 'settings' %}"
+                           data-shortcut-link
+                           data-shortcut-key=","
+                           data-shortcut-label="Settings"
+                           aria-label="Settings"
+                           title="Settings"
+                           {% if current_name == "settings" %}aria-current="page"{% endif %}
+                           class="relative inline-flex h-11 w-11 items-center justify-center rounded-full border transition focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-950 {% if current_name == "settings" %}border-gray-950 bg-gray-950 text-white dark:border-white dark:bg-white dark:text-gray-950{% else %}border-gray-200 bg-white text-gray-700 hover:bg-gray-50 hover:text-gray-950 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white{% endif %}">
+                            <span class="sr-only">Settings</span>
+                            <svg xmlns="http://www.w3.org/2000/svg"
+                                 class="h-5 w-5"
+                                 viewBox="0 0 24 24"
+                                 fill="none"
+                                 stroke="currentColor"
+                                 stroke-width="2"
+                                 stroke-linecap="round"
+                                 stroke-linejoin="round"
+                                 aria-hidden="true">
+                                <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.52a2 2 0 0 1-1 1.72l-.15.1a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.72v-.52a2 2 0 0 1 1-1.72l.15-.1a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2Z" />
+                                <circle cx="12" cy="12" r="3" />
+                            </svg>
+                            <kbd class="shortcut-kbd pointer-events-none absolute -right-1 -top-1 hidden lg:inline-flex"
+                                 aria-hidden="true">,</kbd>
+                        </a>
+                        <form method="post" action="{% url 'account_logout' %}">
+                            {% csrf_token %}
+                            <button type="submit"
+                                    class="inline-flex min-h-11 items-center justify-center rounded-full border border-gray-300 bg-white px-4 text-sm font-semibold text-gray-900 transition hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:hover:bg-gray-800 dark:focus-visible:ring-offset-gray-950">
+                                Sign out
+                            </button>
+                        </form>
+                    {% else %}
+                        {% if 'github' in available_social_providers %}
+                            <a href="{% provider_login_url 'github' process='login' %}"
+                               class="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-gray-950 px-4 text-sm font-semibold text-white transition hover:bg-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:bg-white dark:text-gray-950 dark:hover:bg-gray-100 dark:focus-visible:ring-offset-gray-950">
+                                <svg class="h-4 w-4 fill-current" viewBox="0 0 20 20" aria-hidden="true">
+                                    <path fill-rule="evenodd" d="M10 0C4.477 0 0 4.484 0 10.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0110 4.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.203 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.942.359.31.678.921.678 1.856 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0020 10.017C20 4.484 15.522 0 10 0z" clip-rule="evenodd" />
+                                </svg>
+                                Sign in
+                            </a>
+                        {% else %}
+                            <a href="{% url 'account_login' %}"
+                               class="inline-flex min-h-11 items-center justify-center rounded-full bg-green-600 px-4 text-sm font-semibold text-white transition hover:bg-green-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:bg-green-500 dark:text-gray-950 dark:hover:bg-green-400 dark:focus-visible:ring-offset-gray-950">
+                                Sign in
+                            </a>
+                        {% endif %}
+                    {% endif %}
+                </div>
+                <div class="ml-auto lg:hidden"
+                     x-data="{ open: false }"
+                     @keydown.escape.window="open = false"
+                     @click.outside="open = false">
+                    <button type="button"
+                            class="inline-flex h-11 w-11 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-900 transition hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-gray-800 dark:bg-gray-900 dark:text-gray-100 dark:hover:bg-gray-800 dark:focus-visible:ring-offset-gray-950"
+                            aria-label="Toggle navigation menu"
+                            :aria-expanded="open.toString()"
+                            @click.stop="open = !open">
+                        <svg x-show="!open"
+                             xmlns="http://www.w3.org/2000/svg"
+                             class="h-5 w-5"
+                             fill="none"
+                             viewBox="0 0 24 24"
+                             stroke="currentColor"
+                             aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7h16M4 12h16M4 17h16" />
+                        </svg>
+                        <svg x-cloak
+                             x-show="open"
+                             xmlns="http://www.w3.org/2000/svg"
+                             class="h-5 w-5"
+                             fill="none"
+                             viewBox="0 0 24 24"
+                             stroke="currentColor"
+                             aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                    <div x-cloak
+                         x-show="open"
+                         x-transition
+                         class="absolute left-4 right-4 top-full mt-3 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl shadow-gray-950/10 dark:border-gray-800 dark:bg-gray-950 dark:shadow-black/40">
+                        <div class="border-b border-gray-200 p-4 dark:border-gray-800">
+                            <form method="get" action="{% url 'repos:search' %}">
+                                <label for="site-nav-mobile-query" class="sr-only">Search repositories</label>
+                                <div class="relative">
+                                    <svg class="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500"
+                                         xmlns="http://www.w3.org/2000/svg"
+                                         fill="none"
+                                         viewBox="0 0 24 24"
+                                         stroke="currentColor"
+                                         aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m21 21-4.35-4.35M11 18a7 7 0 1 1 0-14 7 7 0 0 1 0 14Z" />
+                                    </svg>
+                                    <input id="site-nav-mobile-query"
+                                           data-shortcut-search
+                                           name="q"
+                                           value="{{ request.GET.q }}"
+                                           placeholder="Search repositories"
+                                           class="h-12 w-full rounded-xl border border-gray-200 bg-gray-50 pl-11 pr-4 text-sm font-medium text-gray-900 placeholder:text-gray-400 focus:border-green-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-green-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500" />
+                                </div>
+                            </form>
+                        </div>
+                        <nav class="grid gap-1 p-3" aria-label="Mobile navigation">
+                            <a href="{% url 'repos:search' %}"
+                               class="rounded-xl px-3 py-3 text-sm font-semibold {% if current_namespace == "repos" and current_name == "search" or current_namespace == "repos" and current_name == "repo_detail" %}bg-gray-950 text-white dark:bg-white dark:text-gray-950{% else %}text-gray-800 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-900{% endif %}">
+                                Repos
+                            </a>
+                            <a href="{% url 'repos:list' %}"
+                               class="rounded-xl px-3 py-3 text-sm font-semibold {% if current_namespace == "repos" and current_name == "list" or current_namespace == "repos" and current_name == "list_detail" or current_namespace == "repos" and current_name == "request_list" %}bg-gray-950 text-white dark:bg-white dark:text-gray-950{% else %}text-gray-800 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-900{% endif %}">
+                                Lists
+                            </a>
+                            {% if user.is_authenticated %}
+                                <a href="{% url 'repos:starred' %}"
+                                   class="rounded-xl px-3 py-3 text-sm font-semibold {% if current_namespace == "repos" and current_name == "starred" %}bg-gray-950 text-white dark:bg-white dark:text-gray-950{% else %}text-gray-800 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-900{% endif %}">
+                                    Starred
+                                </a>
+                                <a href="{% url 'repos:liked' %}"
+                                   class="rounded-xl px-3 py-3 text-sm font-semibold {% if current_namespace == "repos" and current_name == "liked" %}bg-gray-950 text-white dark:bg-white dark:text-gray-950{% else %}text-gray-800 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-900{% endif %}">
+                                    Liked
+                                </a>
+                                <a href="{% url 'settings' %}"
+                                   class="rounded-xl px-3 py-3 text-sm font-semibold {% if current_name == "settings" %}bg-gray-950 text-white dark:bg-white dark:text-gray-950{% else %}text-gray-800 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-900{% endif %}">
+                                    Settings
+                                </a>
+                            {% endif %}
+                            {% if user.is_superuser %}
+                                <a href="{% url 'admin_panel' %}"
+                                   class="rounded-xl px-3 py-3 text-sm font-semibold text-green-700 hover:bg-green-50 dark:text-green-300 dark:hover:bg-green-950">
+                                    Admin
+                                </a>
+                            {% endif %}
+                        </nav>
+                        <div class="flex items-center justify-between gap-3 border-t border-gray-200 p-4 dark:border-gray-800">
+                            <button type="button"
+                                    data-theme-toggle
+                                    class="inline-flex min-h-11 items-center justify-center rounded-full border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-900 transition hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-100 dark:hover:bg-gray-800">
+                                <span data-theme-label>Theme</span>
+                                <svg data-theme-icon="light"
+                                     xmlns="http://www.w3.org/2000/svg"
+                                     class="ml-2 h-4 w-4"
+                                     viewBox="0 0 24 24"
+                                     fill="none"
+                                     stroke="currentColor"
+                                     stroke-width="2"
+                                     stroke-linecap="round"
+                                     stroke-linejoin="round">
+                                    <circle cx="12" cy="12" r="4" />
+                                    <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+                                </svg>
+                                <svg data-theme-icon="dark"
+                                     xmlns="http://www.w3.org/2000/svg"
+                                     class="ml-2 hidden h-4 w-4"
+                                     viewBox="0 0 24 24"
+                                     fill="none"
+                                     stroke="currentColor"
+                                     stroke-width="2"
+                                     stroke-linecap="round"
+                                     stroke-linejoin="round">
+                                    <path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z" />
+                                </svg>
+                            </button>
+                            {% if user.is_authenticated %}
+                                <form method="post" action="{% url 'account_logout' %}">
+                                    {% csrf_token %}
+                                    <button type="submit"
+                                            class="inline-flex min-h-11 items-center justify-center rounded-full border border-gray-300 px-4 text-sm font-semibold text-gray-900 transition hover:bg-gray-50 dark:border-gray-700 dark:text-gray-100 dark:hover:bg-gray-900">
+                                        Sign out
+                                    </button>
+                                </form>
+                            {% else %}
+                                <a href="{% url 'account_login' %}"
+                                   class="inline-flex min-h-11 items-center justify-center rounded-full bg-green-600 px-4 text-sm font-semibold text-white transition hover:bg-green-700 dark:bg-green-500 dark:text-gray-950 dark:hover:bg-green-400">
+                                    Sign in
+                                </a>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
-      </form>
-
-      <nav class="ml-auto hidden items-center gap-1 lg:flex" aria-label="Primary navigation">
-        <a
-          href="{% url 'repos:search' %}"
-          data-shortcut-link
-          data-shortcut-key="r"
-          data-shortcut-label="Repositories"
-          {% if current_namespace == "repos" and current_name == "search" or current_namespace == "repos" and current_name == "repo_detail" %}aria-current="page"{% endif %}
-          class="rounded-full px-4 py-2.5 text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-950 {% if current_namespace == "repos" and current_name == "search" or current_namespace == "repos" and current_name == "repo_detail" %}bg-gray-950 text-white shadow-sm dark:bg-white dark:text-gray-950{% else %}text-gray-700 hover:bg-gray-100 hover:text-gray-950 dark:text-gray-300 dark:hover:bg-gray-900 dark:hover:text-white{% endif %}"
-        >
-          <span class="shortcut-hint">
-            Repos
-            <kbd class="shortcut-kbd hidden xl:inline-flex" aria-hidden="true">R</kbd>
-          </span>
-        </a>
-        <a
-          href="{% url 'repos:list' %}"
-          data-shortcut-link
-          data-shortcut-key="l"
-          data-shortcut-label="Awesome lists"
-          {% if current_namespace == "repos" and current_name == "list" or current_namespace == "repos" and current_name == "list_detail" or current_namespace == "repos" and current_name == "request_list" %}aria-current="page"{% endif %}
-          class="rounded-full px-4 py-2.5 text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-950 {% if current_namespace == "repos" and current_name == "list" or current_namespace == "repos" and current_name == "list_detail" or current_namespace == "repos" and current_name == "request_list" %}bg-gray-950 text-white shadow-sm dark:bg-white dark:text-gray-950{% else %}text-gray-700 hover:bg-gray-100 hover:text-gray-950 dark:text-gray-300 dark:hover:bg-gray-900 dark:hover:text-white{% endif %}"
-        >
-          <span class="shortcut-hint">
-            Lists
-            <kbd class="shortcut-kbd hidden xl:inline-flex" aria-hidden="true">L</kbd>
-          </span>
-        </a>
-        {% if user.is_authenticated %}
-          <a
-            href="{% url 'repos:starred' %}"
-            data-shortcut-link
-            data-shortcut-key="s"
-            data-shortcut-label="Starred repositories"
-            {% if current_namespace == "repos" and current_name == "starred" %}aria-current="page"{% endif %}
-            class="rounded-full px-4 py-2.5 text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-950 {% if current_namespace == "repos" and current_name == "starred" %}bg-gray-950 text-white shadow-sm dark:bg-white dark:text-gray-950{% else %}text-gray-700 hover:bg-gray-100 hover:text-gray-950 dark:text-gray-300 dark:hover:bg-gray-900 dark:hover:text-white{% endif %}"
-          >
-            <span class="shortcut-hint">
-              Starred
-              <kbd class="shortcut-kbd hidden xl:inline-flex" aria-hidden="true">S</kbd>
-            </span>
-          </a>
-          <a
-            href="{% url 'repos:liked' %}"
-            data-shortcut-link
-            data-shortcut-key="f"
-            data-shortcut-label="Liked repositories"
-            {% if current_namespace == "repos" and current_name == "liked" %}aria-current="page"{% endif %}
-            class="rounded-full px-4 py-2.5 text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-950 {% if current_namespace == "repos" and current_name == "liked" %}bg-gray-950 text-white shadow-sm dark:bg-white dark:text-gray-950{% else %}text-gray-700 hover:bg-gray-100 hover:text-gray-950 dark:text-gray-300 dark:hover:bg-gray-900 dark:hover:text-white{% endif %}"
-          >
-            <span class="shortcut-hint">
-              Liked
-              <kbd class="shortcut-kbd hidden xl:inline-flex" aria-hidden="true">F</kbd>
-            </span>
-          </a>
-        {% endif %}
-        {% if user.is_superuser %}
-          <a href="{% url 'admin_panel' %}" data-shortcut-link data-shortcut-key="a" data-shortcut-label="Admin" class="rounded-full px-4 py-2.5 text-sm font-semibold text-green-700 transition hover:bg-green-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:text-green-300 dark:hover:bg-green-950 dark:focus-visible:ring-offset-gray-950">
-            <span class="shortcut-hint">
-              Admin
-              <kbd class="shortcut-kbd hidden xl:inline-flex" aria-hidden="true">A</kbd>
-            </span>
-          </a>
-        {% endif %}
-      </nav>
-
-      <div class="hidden items-center gap-2 lg:flex">
-        <button
-          type="button"
-          data-theme-toggle
-          class="relative inline-flex h-11 w-11 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-700 transition hover:bg-gray-50 hover:text-gray-950 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white dark:focus-visible:ring-offset-gray-950"
-          aria-label="Toggle theme"
-        >
-          <span class="sr-only" data-theme-label>Theme</span>
-          <svg data-theme-icon="light" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5">
-            <circle cx="12" cy="12" r="4" />
-            <path d="M12 2v2" />
-            <path d="M12 20v2" />
-            <path d="M4.93 4.93l1.41 1.41" />
-            <path d="M17.66 17.66l1.41 1.41" />
-            <path d="M2 12h2" />
-            <path d="M20 12h2" />
-            <path d="M4.93 19.07l1.41-1.41" />
-            <path d="M17.66 6.34l1.41-1.41" />
-          </svg>
-          <svg data-theme-icon="dark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="hidden h-5 w-5">
-            <path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z" />
-          </svg>
-          <kbd class="shortcut-kbd pointer-events-none absolute -right-1 -top-1 hidden lg:inline-flex" aria-hidden="true">T</kbd>
-        </button>
-        {% if user.is_authenticated %}
-          <a
-            href="{% url 'settings' %}"
-            data-shortcut-link
-            data-shortcut-key=","
-            data-shortcut-label="Settings"
-            aria-label="Settings"
-            title="Settings"
-            {% if current_name == "settings" %}aria-current="page"{% endif %}
-            class="relative inline-flex h-11 w-11 items-center justify-center rounded-full border transition focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-950 {% if current_name == "settings" %}border-gray-950 bg-gray-950 text-white dark:border-white dark:bg-white dark:text-gray-950{% else %}border-gray-200 bg-white text-gray-700 hover:bg-gray-50 hover:text-gray-950 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white{% endif %}"
-          >
-            <span class="sr-only">Settings</span>
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.52a2 2 0 0 1-1 1.72l-.15.1a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.72v-.52a2 2 0 0 1 1-1.72l.15-.1a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2Z" />
-              <circle cx="12" cy="12" r="3" />
-            </svg>
-            <kbd class="shortcut-kbd pointer-events-none absolute -right-1 -top-1 hidden lg:inline-flex" aria-hidden="true">,</kbd>
-          </a>
-          <form method="post" action="{% url 'account_logout' %}">
-            {% csrf_token %}
-            <button type="submit" class="inline-flex min-h-11 items-center justify-center rounded-full border border-gray-300 bg-white px-4 text-sm font-semibold text-gray-900 transition hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:hover:bg-gray-800 dark:focus-visible:ring-offset-gray-950">
-              Sign out
-            </button>
-          </form>
-        {% else %}
-          {% if 'github' in available_social_providers %}
-            <a href="{% provider_login_url 'github' process='login' %}" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-gray-950 px-4 text-sm font-semibold text-white transition hover:bg-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:bg-white dark:text-gray-950 dark:hover:bg-gray-100 dark:focus-visible:ring-offset-gray-950">
-              <svg class="h-4 w-4 fill-current" viewBox="0 0 20 20" aria-hidden="true">
-                <path fill-rule="evenodd" d="M10 0C4.477 0 0 4.484 0 10.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0110 4.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.203 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.942.359.31.678.921.678 1.856 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0020 10.017C20 4.484 15.522 0 10 0z" clip-rule="evenodd" />
-              </svg>
-              Sign in
-            </a>
-          {% else %}
-            <a href="{% url 'account_login' %}" class="inline-flex min-h-11 items-center justify-center rounded-full bg-green-600 px-4 text-sm font-semibold text-white transition hover:bg-green-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:bg-green-500 dark:text-gray-950 dark:hover:bg-green-400 dark:focus-visible:ring-offset-gray-950">
-              Sign in
-            </a>
-          {% endif %}
-        {% endif %}
-      </div>
-
-      <div class="ml-auto lg:hidden" x-data="{ open: false }" @keydown.escape.window="open = false" @click.outside="open = false">
-        <button
-          type="button"
-          class="inline-flex h-11 w-11 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-900 transition hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-gray-800 dark:bg-gray-900 dark:text-gray-100 dark:hover:bg-gray-800 dark:focus-visible:ring-offset-gray-950"
-          aria-label="Toggle navigation menu"
-          :aria-expanded="open.toString()"
-          @click.stop="open = !open"
-        >
-          <svg x-show="!open" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7h16M4 12h16M4 17h16" />
-          </svg>
-          <svg x-cloak x-show="open" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-
-        <div x-cloak x-show="open" x-transition class="absolute left-4 right-4 top-full mt-3 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl shadow-gray-950/10 dark:border-gray-800 dark:bg-gray-950 dark:shadow-black/40">
-          <div class="border-b border-gray-200 p-4 dark:border-gray-800">
-            <form method="get" action="{% url 'repos:search' %}">
-              <label for="site-nav-mobile-query" class="sr-only">Search repositories</label>
-              <div class="relative">
-                <svg class="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m21 21-4.35-4.35M11 18a7 7 0 1 1 0-14 7 7 0 0 1 0 14Z" />
-                </svg>
-                <input
-                  id="site-nav-mobile-query"
-                  data-shortcut-search
-                  name="q"
-                  value="{{ request.GET.q }}"
-                  placeholder="Search repositories"
-                  class="h-12 w-full rounded-xl border border-gray-200 bg-gray-50 pl-11 pr-4 text-sm font-medium text-gray-900 placeholder:text-gray-400 focus:border-green-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-green-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500"
-                />
-              </div>
-            </form>
-          </div>
-          <nav class="grid gap-1 p-3" aria-label="Mobile navigation">
-            <a href="{% url 'repos:search' %}" class="rounded-xl px-3 py-3 text-sm font-semibold {% if current_namespace == "repos" and current_name == "search" or current_namespace == "repos" and current_name == "repo_detail" %}bg-gray-950 text-white dark:bg-white dark:text-gray-950{% else %}text-gray-800 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-900{% endif %}">
-              Repos
-            </a>
-            <a href="{% url 'repos:list' %}" class="rounded-xl px-3 py-3 text-sm font-semibold {% if current_namespace == "repos" and current_name == "list" or current_namespace == "repos" and current_name == "list_detail" or current_namespace == "repos" and current_name == "request_list" %}bg-gray-950 text-white dark:bg-white dark:text-gray-950{% else %}text-gray-800 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-900{% endif %}">
-              Lists
-            </a>
-            {% if user.is_authenticated %}
-              <a href="{% url 'repos:starred' %}" class="rounded-xl px-3 py-3 text-sm font-semibold {% if current_namespace == "repos" and current_name == "starred" %}bg-gray-950 text-white dark:bg-white dark:text-gray-950{% else %}text-gray-800 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-900{% endif %}">
-                Starred
-              </a>
-              <a href="{% url 'repos:liked' %}" class="rounded-xl px-3 py-3 text-sm font-semibold {% if current_namespace == "repos" and current_name == "liked" %}bg-gray-950 text-white dark:bg-white dark:text-gray-950{% else %}text-gray-800 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-900{% endif %}">
-                Liked
-              </a>
-              <a href="{% url 'settings' %}" class="rounded-xl px-3 py-3 text-sm font-semibold {% if current_name == "settings" %}bg-gray-950 text-white dark:bg-white dark:text-gray-950{% else %}text-gray-800 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-900{% endif %}">
-                Settings
-              </a>
-            {% endif %}
-            {% if user.is_superuser %}
-              <a href="{% url 'admin_panel' %}" class="rounded-xl px-3 py-3 text-sm font-semibold text-green-700 hover:bg-green-50 dark:text-green-300 dark:hover:bg-green-950">
-                Admin
-              </a>
-            {% endif %}
-          </nav>
-          <div class="flex items-center justify-between gap-3 border-t border-gray-200 p-4 dark:border-gray-800">
-            <button type="button" data-theme-toggle class="inline-flex min-h-11 items-center justify-center rounded-full border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-900 transition hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-100 dark:hover:bg-gray-800">
-              <span data-theme-label>Theme</span>
-              <svg data-theme-icon="light" xmlns="http://www.w3.org/2000/svg" class="ml-2 h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="4" />
-                <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
-              </svg>
-              <svg data-theme-icon="dark" xmlns="http://www.w3.org/2000/svg" class="ml-2 hidden h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z" />
-              </svg>
-            </button>
-            {% if user.is_authenticated %}
-              <form method="post" action="{% url 'account_logout' %}">
-                {% csrf_token %}
-                <button type="submit" class="inline-flex min-h-11 items-center justify-center rounded-full border border-gray-300 px-4 text-sm font-semibold text-gray-900 transition hover:bg-gray-50 dark:border-gray-700 dark:text-gray-100 dark:hover:bg-gray-900">
-                  Sign out
-                </button>
-              </form>
-            {% else %}
-              <a href="{% url 'account_login' %}" class="inline-flex min-h-11 items-center justify-center rounded-full bg-green-600 px-4 text-sm font-semibold text-white transition hover:bg-green-700 dark:bg-green-500 dark:text-gray-950 dark:hover:bg-green-400">
-                Sign in
-              </a>
-            {% endif %}
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</header>
+    </header>
 {% endwith %}

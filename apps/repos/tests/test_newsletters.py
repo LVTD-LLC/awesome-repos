@@ -227,9 +227,7 @@ def test_superuser_can_subscribe_from_repository_detail(
 def test_poll_repository_commits_stores_bounded_commit_data(repository, monkeypatch):
     repository.newsletter_tracking_enabled = True
     repository.newsletter_tracking_started_at = datetime(2026, 5, 25, tzinfo=UTC)
-    repository.save(
-        update_fields=["newsletter_tracking_enabled", "newsletter_tracking_started_at"]
-    )
+    repository.save(update_fields=["newsletter_tracking_enabled", "newsletter_tracking_started_at"])
     monkeypatch.setattr(
         "apps.repos.newsletters.fetch_repository_commit_page",
         lambda repository, branch, since, page: ([{"sha": "abc123"}], ""),
@@ -266,9 +264,7 @@ def test_poll_repository_commits_records_rate_limit_without_advancing_watermark(
 ):
     repository.newsletter_tracking_enabled = True
     repository.newsletter_tracking_started_at = datetime(2026, 5, 25, tzinfo=UTC)
-    repository.save(
-        update_fields=["newsletter_tracking_enabled", "newsletter_tracking_started_at"]
-    )
+    repository.save(update_fields=["newsletter_tracking_enabled", "newsletter_tracking_started_at"])
 
     def fail_rate_limit(*args, **kwargs):
         raise GitHubAPIError("rate limit exceeded", status_code=403, rate_limit_remaining="0")
@@ -290,9 +286,7 @@ def test_poll_repository_commits_rechecks_rate_limit_before_commit_details(
 ):
     repository.newsletter_tracking_enabled = True
     repository.newsletter_tracking_started_at = datetime(2026, 5, 25, tzinfo=UTC)
-    repository.save(
-        update_fields=["newsletter_tracking_enabled", "newsletter_tracking_started_at"]
-    )
+    repository.save(update_fields=["newsletter_tracking_enabled", "newsletter_tracking_started_at"])
     detail_calls = []
     budget_checks = {"count": 0}
 
@@ -708,10 +702,7 @@ def test_render_newsletter_markdown_preserves_blockquotes_and_query_links():
 
     assert "<blockquote>" in rendered
     assert "Important release note" in rendered
-    assert (
-        'href="https://example.com/changes?repo=django&amp;cadence=weekly"'
-        in rendered
-    )
+    assert 'href="https://example.com/changes?repo=django&amp;cadence=weekly"' in rendered
     assert "&amp;amp;" not in rendered
 
 

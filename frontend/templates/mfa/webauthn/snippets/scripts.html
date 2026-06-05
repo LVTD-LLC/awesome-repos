@@ -1,7 +1,8 @@
-
 {% load i18n static %}
 <noscript>
-  <p class="mt-4 rounded-md border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-800 dark:border-yellow-900/60 dark:bg-yellow-950/30 dark:text-yellow-200">{% translate "Passkey setup requires JavaScript." %}</p>
+    <p class="mt-4 rounded-md border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-800 dark:border-yellow-900/60 dark:bg-yellow-950/30 dark:text-yellow-200">
+        {% translate "Passkey setup requires JavaScript." %}
+    </p>
 </noscript>
 <script src="{% static 'mfa/js/webauthn-json.js' %}"></script>
 <script src="{% static 'mfa/js/webauthn.js' %}"></script>
@@ -16,5 +17,3 @@
     console.error(event.detail && event.detail.exception ? event.detail.exception : event);
   });
 </script>
-
-

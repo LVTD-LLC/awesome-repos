@@ -1,5 +1,5 @@
 {% if chatwoot_website_token and chatwoot_base_url %}
-<script>
+    <script>
   (function (d, t) {
     var BASE_URL = "{{ chatwoot_base_url|escapejs }}";
     var g = d.createElement(t);
@@ -15,5 +15,5 @@
       });
     };
   })(document, "script");
-</script>
+    </script>
 {% endif %}

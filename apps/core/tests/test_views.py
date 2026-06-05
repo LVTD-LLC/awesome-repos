@@ -377,9 +377,7 @@ def test_admin_panel_shows_profile_starred_repo_counts_and_import_status(
         password="password123",
     )
     enabled_user.profile.github_starred_repos_import_enabled = True
-    enabled_user.profile.save(
-        update_fields=["github_starred_repos_import_enabled", "updated_at"]
-    )
+    enabled_user.profile.save(update_fields=["github_starred_repos_import_enabled", "updated_at"])
     first_repo = Repository.objects.create(
         full_name="django/django",
         owner="django",

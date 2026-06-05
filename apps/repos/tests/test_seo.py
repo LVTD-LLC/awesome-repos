@@ -58,9 +58,7 @@ def test_repository_detail_has_page_specific_metadata_and_schema(client):
         '<meta name="description" content="The Web framework for perfectionists with deadlines." />'
         in content
     )
-    assert (
-        '<link rel="canonical" href="https://testserver/repos/django/django/" />' in content
-    )
+    assert '<link rel="canonical" href="https://testserver/repos/django/django/" />' in content
     assert '<meta property="og:type" content="article" />' in content
     assert '"@type": "SoftwareSourceCode"' in content
     assert '"codeRepository": "https://github.com/django/django"' in content
@@ -81,10 +79,7 @@ def test_awesome_list_detail_has_page_specific_metadata_and_schema(client):
     assert response.status_code == 200
     content = response_text(response)
     assert "<title>Awesome Django · Awesome</title>" in content
-    assert (
-        '<meta name="description" content="Curated Django packages and resources." />'
-        in content
-    )
+    assert '<meta name="description" content="Curated Django packages and resources." />' in content
     assert '<link rel="canonical" href="https://testserver/lists/awesome-django/" />' in content
     assert '"@type": "CollectionPage"' in content
     assert '"url": "https://testserver/lists/awesome-django/"' in content
@@ -150,13 +145,11 @@ def test_newsletter_issue_detail_has_unique_seo_description(client):
     assert "<title>Django weekly update · Awesome</title>" in content
     assert (
         '<meta name="description" content="django/django weekly update: Django weekly update '
-        'covering 3 commits from 2026-05-25 to 2026-05-31." />'
-        in content
+        'covering 3 commits from 2026-05-25 to 2026-05-31." />' in content
     )
     assert (
         '<link rel="canonical" '
-        'href="https://testserver/repos/django/django/newsletters/weekly/2026-05-25/" />'
-        in content
+        'href="https://testserver/repos/django/django/newsletters/weekly/2026-05-25/" />' in content
     )
 
 
@@ -167,9 +160,7 @@ def test_robots_txt_allows_crawling_and_advertises_sitemap(client):
     assert response.status_code == 200
     assert response["Content-Type"].startswith("text/plain")
     assert response_text(response) == (
-        "User-agent: *\n"
-        "Allow: /\n"
-        "Sitemap: https://awesome.example/sitemap.xml\n"
+        "User-agent: *\nAllow: /\nSitemap: https://awesome.example/sitemap.xml\n"
     )
 
 

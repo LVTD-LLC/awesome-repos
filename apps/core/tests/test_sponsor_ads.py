@@ -32,7 +32,6 @@ class TestSponsorAdsCheckout:
         assert captured["data"]["customer_creation"] == "always"
         assert "customer_update[name]" not in captured["data"]
 
-
     @override_settings(STRIPE_SECRET_KEY="sk_test", STRIPE_AWESOME_ADS_PRICE_ID="price_test")
     def test_checkout_wraps_stripe_network_errors(self, monkeypatch):
         from apps.core.payments import StripeRequestError
@@ -328,7 +327,10 @@ class TestHighlightedRepoCheckout:
 
         monkeypatch.setattr(
             "apps.core.views.create_highlighted_repo_checkout_session",
-            lambda **kwargs: {"id": "cs_test_highlight", "url": "https://checkout.stripe.com/c/pay"},
+            lambda **kwargs: {
+                "id": "cs_test_highlight",
+                "url": "https://checkout.stripe.com/c/pay",
+            },
         )
 
         response = client.post(reverse("highlighted_repo_checkout"))
@@ -553,7 +555,10 @@ class TestRemoveAdsCheckout:
         client.force_login(user)
         monkeypatch.setattr(
             "apps.core.views.create_remove_ads_checkout_session",
-            lambda **kwargs: {"id": "cs_test_remove_ads", "url": "https://checkout.stripe.com/c/pay"},
+            lambda **kwargs: {
+                "id": "cs_test_remove_ads",
+                "url": "https://checkout.stripe.com/c/pay",
+            },
         )
 
         response = client.post(reverse("remove_ads_checkout"))

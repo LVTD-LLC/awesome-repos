@@ -108,6 +108,20 @@ from apps.repos.views import (
 LOC_MEM_CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
 
 
+def assert_option_label_with_count(content: str | bytes, label: str, count: int) -> None:
+    text = content.decode() if isinstance(content, bytes) else content
+    assert re.search(rf"{re.escape(label)}\s*\({count}\)", text)
+
+
+def assert_repository_detail_link(content: str, full_name: str) -> None:
+    path = f"/repos/{full_name}/"
+    assert re.search(
+        rf'<a\b(?=[^>]*\bhref="{re.escape(path)}")'
+        r'(?=[^>]*\bclass="[^"]*\btext-lg\b[^"]*\bfont-bold\b)[^>]*>',
+        content,
+    )
+
+
 @pytest.fixture(autouse=True)
 def disable_repository_tagging(settings, monkeypatch):
     settings.REPOSITORY_TAGGING_ENABLED = False
@@ -1134,8 +1148,8 @@ def test_starred_repository_search_uses_shared_repository_filters(auth_client, p
     assert "django/django" in content
     assert "nodejs/node" not in content
     assert "example/django-tool" not in content
-    assert "Awesome Django (1)" in content
-    assert "web-framework (1)" in content
+    assert_option_label_with_count(content, "Awesome Django", 1)
+    assert_option_label_with_count(content, "web-framework", 1)
     assert "Sort: Forks" in content
     assert 'aria-label="Remove Sort filter: Forks"' in content
     assert 'aria-label="Remove Framework filter: django"' in content
@@ -4224,9 +4238,10 @@ def test_repository_search_filters_growth_unmaintained_and_sort_direction():
         unknown_baseline,
         fast,
     ]
-    assert list(
-        repository_search_queryset({"updated_days": "30", "unmaintained_days": "365"})
-    ) == [unknown_baseline, fast]
+    assert list(repository_search_queryset({"updated_days": "30", "unmaintained_days": "365"})) == [
+        unknown_baseline,
+        fast,
+    ]
 
     repos = list(repository_search_queryset({"sort": "velocity"}))
     assert repos == [fast, slow, unknown_baseline]
@@ -4245,9 +4260,11 @@ def test_repository_search_filters_growth_unmaintained_and_sort_direction():
         unknown_baseline,
     ]
 
-    assert list(
-        repository_search_queryset({"sort": "stars", "sort_direction": "asc"})
-    ) == [slow, fast, unknown_baseline]
+    assert list(repository_search_queryset({"sort": "stars", "sort_direction": "asc"})) == [
+        slow,
+        fast,
+        unknown_baseline,
+    ]
     assert list(repository_search_queryset({"sort": "stars", "direction": "asc"})) == [
         unknown_baseline,
         fast,
@@ -5039,9 +5056,9 @@ def test_search_page_renders(client):
     assert b"What does Star growth mean?" in content
     assert b"GitHub star growth since Awesome first tracked the repository" in content
     assert b"Direction" in content
-    assert b"django (1)" in content
+    assert_option_label_with_count(content, "django", 1)
     assert b'href="/?topic=django"' in content
-    assert b"web-framework (1)" in content
+    assert_option_label_with_count(content, "web-framework", 1)
     assert b"data-page-ad-shell" in content
     assert b"data-page-content" in content
     assert b"max-w-none" in content
@@ -5065,7 +5082,7 @@ def test_search_page_renders(client):
         active_list.id
     ]
     assert response.context["awesome_lists"][0].repo_count == 1
-    assert b"Awesome Django (1)" in content
+    assert_option_label_with_count(content, "Awesome Django", 1)
     assert b"Awesome Django (2)" not in content
     assert b"Inactive List" not in content
 
@@ -5669,7 +5686,7 @@ def test_awesome_list_detail_page_renders_activity_metrics(client):
     assert b'data-ad-rail="right"' not in response.content
     assert 'href="/repos/django/django/" class="block rounded-2xl' not in content
     assert "<article " in content
-    assert 'href="/repos/django/django/" class="text-lg font-bold' in content
+    assert_repository_detail_link(content, "django/django")
 
 
 @pytest.mark.django_db
@@ -5808,9 +5825,9 @@ def test_awesome_list_detail_page_filters_repositories(client):
     assert "django/django" in content
     assert "nodejs/node" not in content
     assert "first commit" in content
-    assert "django (1)" in content
-    assert "Django (1)" in content
-    assert "web-framework (1)" in content
+    assert_option_label_with_count(content, "django", 1)
+    assert_option_label_with_count(content, "Django", 1)
+    assert_option_label_with_count(content, "web-framework", 1)
     assert 'name="mode"' in content
     assert 'name="list"' not in content
     assert 'class="md:col-span-2 lg:col-span-1 min-w-0"' in content

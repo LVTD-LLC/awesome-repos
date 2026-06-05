@@ -133,7 +133,7 @@ envVarGroups:
       - key: ALLOW_SIGNUPS
         value: "True"
 
-      
+
       # Optional. If not specified, local FileSystemStorage is used for media files.
       - key: AWS_S3_ENDPOINT_URL
         value: ""
@@ -141,7 +141,7 @@ envVarGroups:
         value: ""
       - key: AWS_SECRET_ACCESS_KEY
         value: ""
-      
+
 
       # Basic email setup - can be configured later
       - key: MAILGUN_API_KEY
