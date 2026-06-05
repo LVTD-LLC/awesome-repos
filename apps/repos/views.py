@@ -1,3 +1,5 @@
+from urllib.parse import urlencode
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -17,6 +19,7 @@ from django_q.tasks import async_task
 
 from apps.core.analytics import queue_track_event
 from apps.core.models import Profile
+from apps.repos.badges import repository_badge_svg
 from apps.repos.cache import (
     PUBLIC_REPOSITORY_FILTER_OPTIONS_CACHE_KEY,
     PUBLIC_REPOSITORY_FILTER_OPTIONS_CACHE_TIMEOUT_SECONDS,
@@ -367,6 +370,89 @@ def toggle_repository_like(request, owner: str, name: str):
         )
 
     return redirect(next_url)
+
+
+def repository_badge(request, owner: str, name: str):
+    repository = get_object_or_404(
+        Repository.objects.annotate(awesome_count=Count("awesome_items", distinct=True)),
+        full_name=f"{owner}/{name}",
+    )
+    try:
+        days = int(request.GET.get("days", "7"))
+    except ValueError:
+        days = 7
+    svg = repository_badge_svg(
+        repository,
+        metric=request.GET.get("metric", "stars"),
+        theme=request.GET.get("theme", "light"),
+        variant=request.GET.get("variant", "history"),
+        days=days,
+    )
+    response = HttpResponse(svg, content_type="image/svg+xml; charset=utf-8")
+    response["Cache-Control"] = "public, max-age=3600"
+    response["X-Content-Type-Options"] = "nosniff"
+    return response
+
+
+REPOSITORY_BADGE_EMBED_OPTIONS = (
+    {
+        "key": "star-history",
+        "label": "Star history",
+        "query": {"metric": "stars"},
+    },
+    {
+        "key": "commit-history",
+        "label": "Commit history",
+        "query": {"metric": "commits"},
+    },
+    {
+        "key": "star-growth-7",
+        "label": "7-day star growth",
+        "query": {"metric": "stars", "variant": "growth", "days": "7"},
+    },
+    {
+        "key": "star-growth-30",
+        "label": "30-day star growth",
+        "query": {"metric": "stars", "variant": "growth", "days": "30"},
+    },
+    {
+        "key": "commit-velocity-7",
+        "label": "7-day commit velocity",
+        "query": {"metric": "commits", "variant": "growth", "days": "7"},
+    },
+    {
+        "key": "commit-velocity-30",
+        "label": "30-day commit velocity",
+        "query": {"metric": "commits", "variant": "growth", "days": "30"},
+    },
+)
+
+
+def repository_badge_url(request, repository: Repository, query: dict[str, str]) -> str:
+    path = reverse("repos:repo_badge", kwargs={"owner": repository.owner, "name": repository.name})
+    url = request.build_absolute_uri(path)
+    if query:
+        url = f"{url}?{urlencode(query)}"
+    return url
+
+
+def repository_badge_embed_context(request, repository: Repository) -> dict:
+    detail_url = request.build_absolute_uri(repository.get_absolute_url())
+    options = []
+    for option in REPOSITORY_BADGE_EMBED_OPTIONS:
+        badge_url = repository_badge_url(request, repository, option["query"])
+        alt_text = f"{repository.full_name} {option['label']} on Awesome"
+        markdown_alt = alt_text.replace("\\", "\\\\").replace("]", "\\]")
+        options.append(
+            {
+                "key": option["key"],
+                "label": option["label"],
+                "badge_url": badge_url,
+                "badge_markdown": f"[![{markdown_alt}]({badge_url})]({detail_url})",
+            }
+        )
+
+    return {"options": options}
 
 
 def awesome_list_request_client_ip(request) -> str:
@@ -890,6 +976,7 @@ class RepositoryDetailView(DetailView):
         context["ai_development_signal_summary"] = _ai_development_signal_summary(
             self.object.ai_development_signals
         )
+        context["badge_embed"] = repository_badge_embed_context(self.request, self.object)
         context["newsletter_issues"] = self.object.newsletter_issues.filter(
             published_at__isnull=False,
         )[:5]

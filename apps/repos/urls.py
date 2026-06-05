@@ -47,6 +47,11 @@ urlpatterns = [
         views.toggle_repository_like,
         name="repo_like_toggle",
     ),
+    path(
+        "repos/<str:owner>/<str:name>/badge.svg",
+        views.repository_badge,
+        name="repo_badge",
+    ),
     path("repos/<str:owner>/<str:name>/", views.RepositoryDetailView.as_view(), name="repo_detail"),
     path("liked/", views.LikedRepositoryListView.as_view(), name="liked"),
     path("lists/", views.AwesomeListListView.as_view(), name="list"),
