@@ -34,6 +34,10 @@ def chatwoot_settings(request):
     }
 
 
+def site_metadata(request):
+    return {"site_url": settings.SITE_URL.rstrip("/")}
+
+
 def user_has_removed_ads(request):
     if not getattr(request, "user", None) or not request.user.is_authenticated:
         return False

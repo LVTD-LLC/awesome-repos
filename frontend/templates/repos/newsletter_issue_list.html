@@ -1,5 +1,9 @@
 {% extends "base_landing.html" %}
-{% block meta %}<title>{{ repository.full_name }} newsletters · Awesome</title>{% endblock meta %}
+{% block meta %}
+  {% with meta_title=repository.full_name|add:" newsletters · Awesome" %}
+    {% include "components/seo_meta.html" with title=meta_title description=newsletter_list_meta_description canonical_path=request.path og_type="article" %}
+  {% endwith %}
+{% endblock meta %}
 {% block content %}
 <section class="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
   <a href="{{ repository.get_absolute_url }}" class="text-sm font-semibold text-green-700 hover:underline">← Back to {{ repository.full_name }}</a>

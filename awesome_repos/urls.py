@@ -17,11 +17,24 @@ Including another URLconf
 from django.conf import settings
 from django.contrib import admin
 from django.contrib.sitemaps.views import sitemap
+from django.http import HttpResponse
 from django.urls import include, path
 from django.views.generic import TemplateView
 
 from apps.pages.views import AccountSignupByPasskeyView, AccountSignupView
 from awesome_repos.sitemaps import sitemaps
+
+
+def robots_txt(_request):
+    site_url = settings.SITE_URL.rstrip("/")
+    lines = [
+        "User-agent: *",
+        "Allow: /",
+        f"Sitemap: {site_url}/sitemap.xml",
+        "",
+    ]
+    return HttpResponse("\n".join(lines), content_type="text/plain")
+
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -44,6 +57,7 @@ urlpatterns += [
     path("uses", TemplateView.as_view(template_name="pages/uses.html"), name="uses"),
     path("mcp", include("apps.mcp_server.urls")),
     path("api/", include("apps.api.urls")),
+    path("robots.txt", robots_txt, name="robots_txt"),
     path("", include("apps.repos.urls")),
     path("", include("apps.pages.urls")),
     path("", include("apps.core.urls")),

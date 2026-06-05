@@ -2,8 +2,9 @@
 {% load humanize repo_stack_tags static %}
 
 {% block meta %}
-<title>{{ awesome_list.name }} · Awesome</title>
-<meta name="description" content="Activity and repository data for {{ awesome_list.name }}." />
+  {% with meta_title=awesome_list.name|add:" · Awesome" meta_description=awesome_list.description|default:"Activity, repository coverage, topics, and indexed GitHub projects for this awesome list." %}
+    {% include "components/seo_meta.html" with title=meta_title description=meta_description canonical_path=awesome_list.get_absolute_url og_type="article" %}
+  {% endwith %}
 {% endblock meta %}
 
 {% block extra_head %}
@@ -257,3 +258,19 @@
 </section>
 {% include "components/highlighted_repo_modal.html" %}
 {% endblock content %}
+{% block schema %}
+<script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    "name": "{{ awesome_list.name|escapejs }}",
+    "description": "{{ awesome_list.description|default:'Awesome-list repository collection indexed by Awesome.'|truncatechars:300|escapejs }}",
+    "url": "{{ site_url }}{{ awesome_list.get_absolute_url }}",
+    "isPartOf": {
+      "@type": "WebSite",
+      "name": "Awesome",
+      "url": "{{ site_url }}/"
+    }
+  }
+</script>
+{% endblock schema %}

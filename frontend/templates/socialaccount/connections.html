@@ -2,7 +2,7 @@
 {% load socialaccount %}
 
 {% block meta %}
-<title>Connected accounts · Awesome</title>
+{% include "components/seo_meta.html" with title="Connected accounts · Awesome" description="Manage third-party sign-in providers connected to your Awesome account." robots="noindex, nofollow" canonical_path=request.path twitter_card="summary" %}
 {% endblock meta %}
 
 {% block content %}

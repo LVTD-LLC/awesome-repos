@@ -15,28 +15,7 @@
   <link rel="icon" type="image/svg+xml" href="{% static 'brand/awesome-repos-mark.svg' %}" />
 
   {% block meta %}
-  <title>Awesome</title>
-  <meta name="description" content="Search and monitor GitHub repositories listed across awesome lists." />
-  <meta name="keywords" content="django" />
-  <meta name="robots" content="index, follow" />
-  <link rel="canonical" href="https://{{ request.get_host }}/" />
-
-  <meta property="og:type" content="website" />
-  <meta property="og:title" content="Awesome" />
-  <meta property="og:url" content="https://{{ request.get_host }}/" />
-  <meta property="og:description" content="Search and monitor GitHub repositories listed across awesome lists." />
-  <meta property="og:image" content="https://{{ request.get_host }}{% static 'brand/awesome-repos-social.png' %}" />
-  <meta property="og:image:type" content="image/png" />
-  <meta property="og:image:width" content="1200" />
-  <meta property="og:image:height" content="630" />
-  <meta property="og:locale" content="en_US" />
-
-  <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:creator" content="@rasulkireev" />
-  <meta name="twitter:site" content="@rasulkireev" />
-  <meta name="twitter:title" content="Awesome" />
-  <meta name="twitter:description" content="Search and monitor GitHub repositories listed across awesome lists." />
-  <meta name="twitter:image" content="https://{{ request.get_host }}{% static 'brand/awesome-repos-social.png' %}" />
+  {% include "components/seo_meta.html" %}
   {% endblock meta %}
 
   
@@ -130,13 +109,18 @@
       "@context": "https://schema.org",
       "@type": "WebSite",
       "name": "Awesome",
-      "description": "Search and monitor GitHub repositories listed across awesome lists.",
-      "thumbnailUrl": "https://{{ request.get_host }}{% static 'brand/awesome-repos-social.png' %}",
-      "url": "https://{{ request.get_host }}/",
-      "author": {
-        "@type": "Person",
+      "description": "Search GitHub repositories discovered across curated awesome lists.",
+      "thumbnailUrl": "{{ site_url }}{% static 'brand/awesome-repos-social.png' %}",
+      "url": "{{ site_url }}/",
+      "publisher": {
+        "@type": "Organization",
         "name": "LVTD LLC",
         "url": "https://lvtd.dev"
+      },
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": "{{ site_url }}/?q={search_term_string}",
+        "query-input": "required name=search_term_string"
       }
     }
     </script>

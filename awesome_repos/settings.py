@@ -177,6 +177,7 @@ TEMPLATES = [
                 "apps.core.context_processors.mfa_recovery_codes_settings",
                 "apps.core.context_processors.posthog_api_key",
                 "apps.core.context_processors.chatwoot_settings",
+                "apps.core.context_processors.site_metadata",
                 "apps.core.context_processors.available_social_providers",
                 "apps.core.context_processors.ads_removed",
                 "apps.core.context_processors.active_sponsor_ad",

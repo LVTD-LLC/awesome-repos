@@ -1,6 +1,10 @@
 {% extends "base_landing.html" %}
 {% load humanize static repo_stack_tags %}
-{% block meta %}<title>{{ repository.full_name }} · Awesome</title>{% endblock meta %}
+{% block meta %}
+  {% with meta_title=repository.full_name|add:" · Awesome" meta_description=repository.description|default:"GitHub repository details, metadata, topics, stack signals, and awesome-list mentions indexed by Awesome." %}
+    {% include "components/seo_meta.html" with title=meta_title description=meta_description canonical_path=repository.get_absolute_url og_type="article" %}
+  {% endwith %}
+{% endblock meta %}
 {% block extra_head %}
   {% if performance.has_history %}
     <script defer src="{% static 'vendors/js/d3.min.js' %}"></script>
@@ -294,3 +298,16 @@
   </div>
 </section>
 {% endblock content %}
+{% block schema %}
+<script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareSourceCode",
+    "name": "{{ repository.full_name|escapejs }}",
+    "description": "{{ repository.description|default:'GitHub repository indexed by Awesome.'|truncatechars:300|escapejs }}",
+    "codeRepository": "{{ repository.url|escapejs }}",
+    "programmingLanguage": "{{ repository.language|default:''|escapejs }}",
+    "url": "{{ site_url }}{{ repository.get_absolute_url }}"
+  }
+</script>
+{% endblock schema %}

@@ -2,8 +2,7 @@
 {% load humanize %}
 
 {% block meta %}
-<title>Awesome Lists Directory · Awesome</title>
-<meta name="description" content="Browse awesome lists by stars, README repositories, commits, and scan freshness." />
+{% include "components/seo_meta.html" with title="Awesome Lists Directory · Awesome" description="Browse tracked GitHub awesome lists by stars, repository coverage, commit activity, and scan freshness." canonical_path=request.path %}
 {% endblock meta %}
 
 {% block content %}
