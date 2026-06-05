@@ -1,45 +1,54 @@
 {% extends "base_landing.html" %}
-
 {% block content %}
-<div class="mx-auto max-w-3xl px-4 py-12 sm:px-6 lg:px-8">
-  <div class="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-950 sm:p-8">
-    <p class="app-label-caps text-green-600 dark:text-green-400">Payment received</p>
-    <h1 class="mt-3 text-3xl font-black tracking-tight text-gray-950 dark:text-white">Send us your ad details</h1>
-    <p class="mt-4 text-sm leading-6 text-gray-600 dark:text-gray-300">
-      Add the small logo, startup name, and short description you want shown in the Awesome sponsor slot.
-    </p>
-
-    <div class="mt-6 rounded-2xl border border-green-200 bg-green-50 p-4 text-sm text-green-900 dark:border-green-900/60 dark:bg-green-950/30 dark:text-green-100">
-      Paid by {{ purchase.buyer_email|default:"your Stripe checkout email" }} for ${{ amount_dollars|floatformat:2 }} {{ purchase.currency|upper }}.
+    <div class="mx-auto max-w-3xl px-4 py-12 sm:px-6 lg:px-8">
+        <div class="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-950 sm:p-8">
+            <p class="app-label-caps text-green-600 dark:text-green-400">Payment received</p>
+            <h1 class="mt-3 text-3xl font-black tracking-tight text-gray-950 dark:text-white">Send us your ad details</h1>
+            <p class="mt-4 text-sm leading-6 text-gray-600 dark:text-gray-300">
+                Add the small logo, startup name, and short description you want shown in the Awesome sponsor slot.
+            </p>
+            <div class="mt-6 rounded-2xl border border-green-200 bg-green-50 p-4 text-sm text-green-900 dark:border-green-900/60 dark:bg-green-950/30 dark:text-green-100">
+                Paid by {{ purchase.buyer_email|default:"your Stripe checkout email" }} for ${{ amount_dollars|floatformat:2 }} {{ purchase.currency|upper }}.
+            </div>
+            <form method="post" enctype="multipart/form-data" class="mt-8 space-y-6">
+                {% csrf_token %}
+                <input type="hidden" name="session_id" value="{{ session_id }}">
+                <div>
+                    <label for="{{ form.logo.id_for_label }}"
+                           class="block text-sm font-bold text-gray-900 dark:text-gray-100">Small logo</label>
+                    <input id="{{ form.logo.id_for_label }}"
+                           type="file"
+                           name="{{ form.logo.html_name }}"
+                           accept="image/*"
+                           class="mt-2 block w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm text-gray-900 shadow-sm file:mr-4 file:rounded-lg file:border-0 file:bg-green-600 file:px-4 file:py-2 file:text-sm file:font-bold file:text-white hover:file:bg-green-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
+                    {% if form.logo.errors %}
+                        <p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ form.logo.errors|striptags }}</p>
+                    {% endif %}
+                </div>
+                <div>
+                    <label for="{{ form.startup_name.id_for_label }}"
+                           class="block text-sm font-bold text-gray-900 dark:text-gray-100">Startup name</label>
+                    {{ form.startup_name }}
+                    {% if form.startup_name.errors %}
+                        <p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ form.startup_name.errors|striptags }}</p>
+                    {% endif %}
+                </div>
+                <div>
+                    <label for="{{ form.short_description.id_for_label }}"
+                           class="block text-sm font-bold text-gray-900 dark:text-gray-100">Short description</label>
+                    {{ form.short_description }}
+                    <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                        Keep it under 180 characters. We’ll use this directly in the ad card.
+                    </p>
+                    {% if form.short_description.errors %}
+                        <p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ form.short_description.errors|striptags }}</p>
+                    {% endif %}
+                </div>
+                <button type="submit"
+                        class="inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-green-600 px-5 text-sm font-black text-white transition hover:bg-green-700 dark:bg-green-500 dark:text-gray-950 dark:hover:bg-green-400">
+                    Save ad details
+                </button>
+            </form>
+        </div>
     </div>
-
-    <form method="post" enctype="multipart/form-data" class="mt-8 space-y-6">
-      {% csrf_token %}
-      <input type="hidden" name="session_id" value="{{ session_id }}">
-
-      <div>
-        <label for="{{ form.logo.id_for_label }}" class="block text-sm font-bold text-gray-900 dark:text-gray-100">Small logo</label>
-        <input id="{{ form.logo.id_for_label }}" type="file" name="{{ form.logo.html_name }}" accept="image/*" class="mt-2 block w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm text-gray-900 shadow-sm file:mr-4 file:rounded-lg file:border-0 file:bg-green-600 file:px-4 file:py-2 file:text-sm file:font-bold file:text-white hover:file:bg-green-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
-        {% if form.logo.errors %}<p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ form.logo.errors|striptags }}</p>{% endif %}
-      </div>
-
-      <div>
-        <label for="{{ form.startup_name.id_for_label }}" class="block text-sm font-bold text-gray-900 dark:text-gray-100">Startup name</label>
-        {{ form.startup_name }}
-        {% if form.startup_name.errors %}<p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ form.startup_name.errors|striptags }}</p>{% endif %}
-      </div>
-
-      <div>
-        <label for="{{ form.short_description.id_for_label }}" class="block text-sm font-bold text-gray-900 dark:text-gray-100">Short description</label>
-        {{ form.short_description }}
-        <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">Keep it under 180 characters. We’ll use this directly in the ad card.</p>
-        {% if form.short_description.errors %}<p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ form.short_description.errors|striptags }}</p>{% endif %}
-      </div>
-
-      <button type="submit" class="inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-green-600 px-5 text-sm font-black text-white transition hover:bg-green-700 dark:bg-green-500 dark:text-gray-950 dark:hover:bg-green-400">
-        Save ad details
-      </button>
-    </form>
-  </div>
-</div>
 {% endblock content %}

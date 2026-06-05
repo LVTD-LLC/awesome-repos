@@ -2426,60 +2426,64 @@ def _annotate_repository_snapshot_metrics(qs):
         "captured_at",
         "id",
     )
-    return qs.annotate(
-        snapshot_count=Count("snapshots", distinct=True),
-        first_snapshot_stars=models.Subquery(
-            first_snapshot.values("stars")[:1],
-            output_field=models.PositiveIntegerField(),
-        ),
-        first_snapshot_commit_count=models.Subquery(
-            first_snapshot.values("commit_count")[:1],
-            output_field=models.PositiveIntegerField(),
-        ),
-    ).annotate(
-        stars_since_first=models.Case(
-            models.When(
-                first_snapshot_stars__isnull=False,
-                then=models.F("stars") - models.F("first_snapshot_stars"),
+    return (
+        qs.annotate(
+            snapshot_count=Count("snapshots", distinct=True),
+            first_snapshot_stars=models.Subquery(
+                first_snapshot.values("stars")[:1],
+                output_field=models.PositiveIntegerField(),
             ),
-            default=models.Value(0),
-            output_field=models.IntegerField(),
-        ),
-        commits_since_first=models.Case(
-            models.When(
-                commit_count__isnull=False,
-                first_snapshot_commit_count__isnull=False,
-                then=models.F("commit_count") - models.F("first_snapshot_commit_count"),
+            first_snapshot_commit_count=models.Subquery(
+                first_snapshot.values("commit_count")[:1],
+                output_field=models.PositiveIntegerField(),
             ),
-            default=models.Value(None),
-            output_field=models.IntegerField(),
-        ),
-    ).annotate(
-        stars_growth_percent=models.Case(
-            models.When(
-                first_snapshot_stars__gt=0,
-                then=models.ExpressionWrapper(
-                    (models.F("stars_since_first") * models.Value(100.0))
-                    / models.F("first_snapshot_stars"),
-                    output_field=models.FloatField(),
+        )
+        .annotate(
+            stars_since_first=models.Case(
+                models.When(
+                    first_snapshot_stars__isnull=False,
+                    then=models.F("stars") - models.F("first_snapshot_stars"),
                 ),
+                default=models.Value(0),
+                output_field=models.IntegerField(),
             ),
-            default=models.Value(None),
-            output_field=models.FloatField(),
-        ),
-        commits_growth_percent=models.Case(
-            models.When(
-                commit_count__isnull=False,
-                first_snapshot_commit_count__gt=0,
-                then=models.ExpressionWrapper(
-                    (models.F("commits_since_first") * models.Value(100.0))
-                    / models.F("first_snapshot_commit_count"),
-                    output_field=models.FloatField(),
+            commits_since_first=models.Case(
+                models.When(
+                    commit_count__isnull=False,
+                    first_snapshot_commit_count__isnull=False,
+                    then=models.F("commit_count") - models.F("first_snapshot_commit_count"),
                 ),
+                default=models.Value(None),
+                output_field=models.IntegerField(),
             ),
-            default=models.Value(None),
-            output_field=models.FloatField(),
-        ),
+        )
+        .annotate(
+            stars_growth_percent=models.Case(
+                models.When(
+                    first_snapshot_stars__gt=0,
+                    then=models.ExpressionWrapper(
+                        (models.F("stars_since_first") * models.Value(100.0))
+                        / models.F("first_snapshot_stars"),
+                        output_field=models.FloatField(),
+                    ),
+                ),
+                default=models.Value(None),
+                output_field=models.FloatField(),
+            ),
+            commits_growth_percent=models.Case(
+                models.When(
+                    commit_count__isnull=False,
+                    first_snapshot_commit_count__gt=0,
+                    then=models.ExpressionWrapper(
+                        (models.F("commits_since_first") * models.Value(100.0))
+                        / models.F("first_snapshot_commit_count"),
+                        output_field=models.FloatField(),
+                    ),
+                ),
+                default=models.Value(None),
+                output_field=models.FloatField(),
+            ),
+        )
     )
 
 

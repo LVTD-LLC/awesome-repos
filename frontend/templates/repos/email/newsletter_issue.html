@@ -1,19 +1,37 @@
-<!doctype html>
-<html>
-  <body style="margin:0;background:#f8fafc;color:#0f172a;font-family:Inter,Arial,sans-serif;">
-    <div style="max-width:680px;margin:0 auto;padding:32px 20px;">
-      <p style="margin:0 0 8px;color:#15803d;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">{{ repository.full_name }} · {{ issue.get_cadence_display }}</p>
-      <h1 style="margin:0 0 12px;font-size:28px;line-height:1.15;">{{ issue.title }}</h1>
-      <p style="margin:0 0 24px;color:#475569;">{{ issue.period_start|date:"M d, Y" }} – {{ issue.period_end|date:"M d, Y" }} · {{ issue.commit_count }} commit{{ issue.commit_count|pluralize }}</p>
-      <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:12px;padding:24px;">
-        {{ issue.content_html|safe }}
-      </div>
-      <p style="margin:24px 0 0;">
-        <a href="{{ issue_url }}" style="color:#15803d;font-weight:700;">Read on Awesome</a>
-      </p>
-      <p style="margin:24px 0 0;color:#64748b;font-size:13px;">
-        <a href="{{ unsubscribe_url }}" style="color:#64748b;">Unsubscribe</a>
-      </p>
-    </div>
-  </body>
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>{{ issue.title }}</title>
+        <meta name="description"
+              content="Repository newsletter update from Awesome.">
+    </head>
+    <body style="margin:0;
+                 background:#f8fafc;
+                 color:#0f172a;
+                 font-family:Inter,Arial,sans-serif">
+        <div style="max-width:680px;margin:0 auto;padding:32px 20px;">
+            <p style="margin:0 0 8px;
+                      color:#15803d;
+                      font-size:12px;
+                      font-weight:700;
+                      text-transform:uppercase;
+                      letter-spacing:.08em">{{ repository.full_name }} · {{ issue.get_cadence_display }}</p>
+            <h1 style="margin:0 0 12px;font-size:28px;line-height:1.15;">{{ issue.title }}</h1>
+            <p style="margin:0 0 24px;color:#475569;">
+                {{ issue.period_start|date:"M d, Y" }} – {{ issue.period_end|date:"M d, Y" }} · {{ issue.commit_count }} commit{{ issue.commit_count|pluralize }}
+            </p>
+            <div style="background:#ffffff;
+                        border:1px solid #e2e8f0;
+                        border-radius:12px;
+                        padding:24px">{{ issue.content_html|safe }}</div>
+            <p style="margin:24px 0 0;">
+                <a href="{{ issue_url }}" style="color:#15803d;font-weight:700;">Read on Awesome</a>
+            </p>
+            <p style="margin:24px 0 0;color:#64748b;font-size:13px;">
+                <a href="{{ unsubscribe_url }}" style="color:#64748b;">Unsubscribe</a>
+            </p>
+        </div>
+    </body>
 </html>

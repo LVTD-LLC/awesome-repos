@@ -1,232 +1,241 @@
 {% extends 'base_app.html' %}
 {% load humanize static %}
-
 {% block meta %}
-  <title>Admin Panel - Awesome</title>
+    {% include "components/seo_meta.html" with title="Admin Panel · Awesome" description="Admin tools for managing Awesome repository and awesome-list indexing." robots="noindex, nofollow" canonical_path=request.path twitter_card="summary" %}
 {% endblock meta %}
-
 {% block content %}
-  <div class="container px-4 py-8 mx-auto max-w-7xl bg-white lg:min-w-0 md:pt-10 lg:flex-1">
-    <div class="p-4 border-t border-b border-gray-200 sm:p-6 lg:p-8 xl:border-t-0">
-      <div class="flex flex-col gap-4 justify-between items-start sm:flex-row sm:items-center">
-        <h1 class="flex-1 pt-2 text-2xl font-bold text-gray-900">Admin Panel</h1>
-      </div>
-    </div>
-
-    <div class="px-6 py-8">
-      <div class="grid grid-cols-1 items-start gap-6 mb-8 lg:grid-cols-3">
-        <div class="p-6 bg-white rounded-lg border border-gray-200 shadow-sm">
-          <div class="flex justify-between items-start">
-            <div>
-              <h2 class="text-lg font-semibold text-gray-900">Add awesome list</h2>
-              <p class="mt-1 text-sm text-gray-600">Add a GitHub awesome-list repo and queue its first scan.</p>
+    <div class="container px-4 py-8 mx-auto max-w-7xl bg-white lg:min-w-0 md:pt-10 lg:flex-1">
+        <div class="p-4 border-t border-b border-gray-200 sm:p-6 lg:p-8 xl:border-t-0">
+            <div class="flex flex-col gap-4 justify-between items-start sm:flex-row sm:items-center">
+                <h1 class="flex-1 pt-2 text-2xl font-bold text-gray-900">Admin Panel</h1>
             </div>
-          </div>
-
-          <form method="post" class="mt-6 space-y-4">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="add_awesome_list" />
-
-            <div>
-              <label for="id_source_url" class="block text-sm font-medium text-gray-700">GitHub URL</label>
-              <input
-                id="id_source_url"
-                name="source_url"
-                type="url"
-                value="{{ awesome_list_form.source_url.value|default_if_none:'' }}"
-                placeholder="https://github.com/owner/awesome-repo"
-                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
-                required
-              />
-              {% if awesome_list_form.source_url.errors %}
-                <p class="mt-2 text-sm text-red-600">{{ awesome_list_form.source_url.errors|striptags }}</p>
-              {% endif %}
-            </div>
-
-            {% if awesome_list_form.non_field_errors %}
-              <div class="rounded-md bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950 dark:text-red-200">
-                {{ awesome_list_form.non_field_errors|striptags }}
-              </div>
-            {% endif %}
-
-            <button type="submit" class="rounded-full bg-green-600 px-5 py-3 text-sm font-semibold text-white hover:bg-green-700">
-              Add awesome list
-            </button>
-          </form>
         </div>
-
-        <div class="bg-white rounded-lg border border-gray-200 shadow-sm">
-          <div class="p-6 border-b border-gray-200">
-            <h2 class="text-lg font-semibold text-gray-900">GitHub API status</h2>
-            <p class="mt-1 text-sm text-gray-600">Current scanner rate limit from the configured token.</p>
-          </div>
-          <div class="p-6">
-            {% if github_rate_limit.ok %}
-            <div class="grid grid-cols-3 gap-3 text-center">
-              <div class="rounded-lg bg-green-50 p-3">
-                <p class="text-xs font-medium text-green-700">Remaining</p>
-                <p class="mt-1 text-2xl font-bold text-green-900">{{ github_rate_limit.core.remaining }}</p>
-              </div>
-              <div class="rounded-lg bg-gray-50 p-3">
-                <p class="text-xs font-medium text-gray-600">Used</p>
-                <p class="mt-1 text-2xl font-bold text-gray-900">{{ github_rate_limit.core.used }}</p>
-              </div>
-              <div class="rounded-lg bg-gray-50 p-3">
-                <p class="text-xs font-medium text-gray-600">Limit</p>
-                <p class="mt-1 text-2xl font-bold text-gray-900">{{ github_rate_limit.core.limit }}</p>
-              </div>
-            </div>
-            <p class="mt-4 text-xs text-gray-500">
-              Resets {% if github_rate_limit.core.reset_at %}{{ github_rate_limit.core.reset_at|date:"M d, H:i T" }}{% else %}soon{% endif %}.
-            </p>
-            {% else %}
-            <div class="rounded-md bg-yellow-50 p-3 text-sm text-yellow-800">
-              {{ github_rate_limit.error|default:"Unable to fetch GitHub API status." }}
-            </div>
-            <p class="mt-3 text-xs text-gray-500">
-              Set <code>GITHUB_TOKEN</code> in both web and worker environments to use authenticated limits.
-            </p>
-            {% endif %}
-          </div>
-        </div>
-
-        <div class="bg-white rounded-lg border border-gray-200 shadow-sm">
-          <div class="p-6 border-b border-gray-200">
-            <h2 class="text-lg font-semibold text-gray-900">Recent awesome lists</h2>
-          </div>
-          <div class="p-6">
-            <ul class="max-h-96 space-y-4 overflow-y-auto pr-2">
-              {% for awesome_list in recent_awesome_lists %}
-              <li class="pb-4 border-b border-gray-200 last:border-0 last:pb-0">
-                <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div class="min-w-0">
-                    <p class="text-sm font-medium text-gray-900">{{ awesome_list.name }}</p>
-                    <p class="mt-1 text-xs text-gray-500">
-                      {{ awesome_list.repo_full_name|default:awesome_list.source_url }} ·
-                      {{ awesome_list.item_count }} repo{{ awesome_list.item_count|pluralize }} ·
-                      {% if awesome_list.last_scanned_at %}{{ awesome_list.last_scanned_at|date:"M d, Y" }}{% else %}Not scanned yet{% endif %}
-                    </p>
-                    {% if awesome_list.last_error %}
-                    <p class="mt-2 text-xs text-red-600">{{ awesome_list.last_error }}</p>
-                    {% endif %}
-                  </div>
-                  <form method="post" class="shrink-0">
-                    {% csrf_token %}
-                    <input type="hidden" name="action" value="retry_awesome_list" />
-                    <input type="hidden" name="awesome_list_id" value="{{ awesome_list.id }}" />
-                    <button type="submit" class="rounded-full border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50">
-                      Retry scan
-                    </button>
-                  </form>
+        <div class="px-6 py-8">
+            <div class="grid grid-cols-1 items-start gap-6 mb-8 lg:grid-cols-3">
+                <div class="p-6 bg-white rounded-lg border border-gray-200 shadow-sm">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <h2 class="text-lg font-semibold text-gray-900">Add awesome list</h2>
+                            <p class="mt-1 text-sm text-gray-600">Add a GitHub awesome-list repo and queue its first scan.</p>
+                        </div>
+                    </div>
+                    <form method="post" class="mt-6 space-y-4">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="add_awesome_list" />
+                        <div>
+                            <label for="id_source_url" class="block text-sm font-medium text-gray-700">GitHub URL</label>
+                            <input id="id_source_url"
+                                   name="source_url"
+                                   type="url"
+                                   value="{{ awesome_list_form.source_url.value|default_if_none:'' }}"
+                                   placeholder="https://github.com/owner/awesome-repo"
+                                   class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+                                   required />
+                            {% if awesome_list_form.source_url.errors %}
+                                <p class="mt-2 text-sm text-red-600">{{ awesome_list_form.source_url.errors|striptags }}</p>
+                            {% endif %}
+                        </div>
+                        {% if awesome_list_form.non_field_errors %}
+                            <div class="rounded-md bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950 dark:text-red-200">
+                                {{ awesome_list_form.non_field_errors|striptags }}
+                            </div>
+                        {% endif %}
+                        <button type="submit"
+                                class="rounded-full bg-green-600 px-5 py-3 text-sm font-semibold text-white hover:bg-green-700">
+                            Add awesome list
+                        </button>
+                    </form>
                 </div>
-              </li>
-              {% empty %}
-              <li class="text-sm text-center text-gray-500">No awesome lists yet</li>
-              {% endfor %}
-            </ul>
-          </div>
-        </div>
-      </div>
-
-      <div class="grid grid-cols-1 gap-6 mb-8 md:grid-cols-2">
-        <div class="p-6 bg-white rounded-lg border border-gray-200 shadow-sm">
-          <div class="flex justify-between items-start">
-            <div>
-              <p class="text-sm font-medium text-gray-600">Total Users</p>
-              <p class="mt-2 text-3xl font-bold text-gray-900">{{ total_users }}</p>
+                <div class="bg-white rounded-lg border border-gray-200 shadow-sm">
+                    <div class="p-6 border-b border-gray-200">
+                        <h2 class="text-lg font-semibold text-gray-900">GitHub API status</h2>
+                        <p class="mt-1 text-sm text-gray-600">Current scanner rate limit from the configured token.</p>
+                    </div>
+                    <div class="p-6">
+                        {% if github_rate_limit.ok %}
+                            <div class="grid grid-cols-3 gap-3 text-center">
+                                <div class="rounded-lg bg-green-50 p-3">
+                                    <p class="text-xs font-medium text-green-700">Remaining</p>
+                                    <p class="mt-1 text-2xl font-bold text-green-900">{{ github_rate_limit.core.remaining }}</p>
+                                </div>
+                                <div class="rounded-lg bg-gray-50 p-3">
+                                    <p class="text-xs font-medium text-gray-600">Used</p>
+                                    <p class="mt-1 text-2xl font-bold text-gray-900">{{ github_rate_limit.core.used }}</p>
+                                </div>
+                                <div class="rounded-lg bg-gray-50 p-3">
+                                    <p class="text-xs font-medium text-gray-600">Limit</p>
+                                    <p class="mt-1 text-2xl font-bold text-gray-900">{{ github_rate_limit.core.limit }}</p>
+                                </div>
+                            </div>
+                            <p class="mt-4 text-xs text-gray-500">
+                                Resets
+                                {% if github_rate_limit.core.reset_at %}
+                                    {{ github_rate_limit.core.reset_at|date:"M d, H:i T" }}
+                                {% else %}
+                                    soon
+                                {% endif %}
+                                .
+                            </p>
+                        {% else %}
+                            <div class="rounded-md bg-yellow-50 p-3 text-sm text-yellow-800">
+                                {{ github_rate_limit.error|default:"Unable to fetch GitHub API status." }}
+                            </div>
+                            <p class="mt-3 text-xs text-gray-500">
+                                Set <code>GITHUB_TOKEN</code> in both web and worker environments to use authenticated limits.
+                            </p>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg border border-gray-200 shadow-sm">
+                    <div class="p-6 border-b border-gray-200">
+                        <h2 class="text-lg font-semibold text-gray-900">Recent awesome lists</h2>
+                    </div>
+                    <div class="p-6">
+                        <ul class="max-h-96 space-y-4 overflow-y-auto pr-2">
+                            {% for awesome_list in recent_awesome_lists %}
+                                <li class="pb-4 border-b border-gray-200 last:border-0 last:pb-0">
+                                    <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                        <div class="min-w-0">
+                                            <p class="text-sm font-medium text-gray-900">{{ awesome_list.name }}</p>
+                                            <p class="mt-1 text-xs text-gray-500">
+                                                {{ awesome_list.repo_full_name|default:awesome_list.source_url }} ·
+                                                {{ awesome_list.item_count }} repo{{ awesome_list.item_count|pluralize }} ·
+                                                {% if awesome_list.last_scanned_at %}
+                                                    {{ awesome_list.last_scanned_at|date:"M d, Y" }}
+                                                {% else %}
+                                                    Not scanned yet
+                                                {% endif %}
+                                            </p>
+                                            {% if awesome_list.last_error %}<p class="mt-2 text-xs text-red-600">{{ awesome_list.last_error }}</p>{% endif %}
+                                        </div>
+                                        <form method="post" class="shrink-0">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="action" value="retry_awesome_list" />
+                                            <input type="hidden" name="awesome_list_id" value="{{ awesome_list.id }}" />
+                                            <button type="submit"
+                                                    class="rounded-full border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50">
+                                                Retry scan
+                                            </button>
+                                        </form>
+                                    </div>
+                                </li>
+                            {% empty %}
+                                <li class="text-sm text-center text-gray-500">No awesome lists yet</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
             </div>
-            <div class="p-3 bg-blue-100 rounded-lg">
-              <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
-              </svg>
-            </div>
-          </div>
-          <div class="flex gap-4 mt-4 text-xs">
-            <span class="text-gray-600">Week: <strong class="text-gray-900">{{ new_users_week }}</strong></span>
-            <span class="text-gray-600">Month: <strong class="text-gray-900">{{ new_users_month }}</strong></span>
-          </div>
-        </div>
-
-        <div class="p-6 bg-white rounded-lg border border-gray-200 shadow-sm">
-          <div class="flex justify-between items-start">
-            <div>
-              <p class="text-sm font-medium text-gray-600">Total Profiles</p>
-              <p class="mt-2 text-3xl font-bold text-gray-900">{{ total_profiles }}</p>
-            </div>
-            <div class="p-3 bg-green-100 rounded-lg">
-              <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
-              </svg>
-            </div>
-          </div>
-          {% if total_users > 0 %}
-          <p class="mt-4 text-xs text-gray-600">
-            <strong class="text-gray-900">{{ total_profiles|floatformat:0 }}/{{ total_users }}</strong> users ({% widthratio total_profiles total_users 100 %}%)
-          </p>
-          {% endif %}
-        </div>
-
-      </div>
-      <div class="grid grid-cols-1 gap-6 mb-8">
-        <div class="bg-white rounded-lg border border-gray-200 shadow-sm">
-          <div class="p-6 border-b border-gray-200">
-            <h2 class="text-lg font-semibold text-gray-900">Recent Users</h2>
-          </div>
-          <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200">
-              <thead class="bg-gray-50">
-                <tr>
-                  <th class="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Email</th>
-                  <th class="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Username</th>
-                  <th class="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Starred repos</th>
-                  <th class="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Starred import</th>
-                  <th class="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Joined</th>
-                </tr>
-              </thead>
-              <tbody class="bg-white divide-y divide-gray-200">
-                {% for user in recent_users %}
-                <tr>
-                  <td class="px-6 py-4 text-sm text-gray-900 whitespace-nowrap">{{ user.email }}</td>
-                  <td class="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">{{ user.username }}</td>
-                  <td class="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">{{ user.starred_repository_count|intcomma }}</td>
-                  <td class="px-6 py-4 text-sm whitespace-nowrap">
-                    {% if user.profile.github_starred_repos_import_enabled %}
-                      <span class="inline-flex rounded-full bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-700">Enabled</span>
-                    {% else %}
-                      <span class="inline-flex rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-600">Disabled</span>
+            <div class="grid grid-cols-1 gap-6 mb-8 md:grid-cols-2">
+                <div class="p-6 bg-white rounded-lg border border-gray-200 shadow-sm">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-sm font-medium text-gray-600">Total Users</p>
+                            <p class="mt-2 text-3xl font-bold text-gray-900">{{ total_users }}</p>
+                        </div>
+                        <div class="p-3 bg-blue-100 rounded-lg">
+                            <svg class="w-6 h-6 text-blue-600"
+                                 fill="none"
+                                 stroke="currentColor"
+                                 viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z">
+                                </path>
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="flex gap-4 mt-4 text-xs">
+                        <span class="text-gray-600">Week: <strong class="text-gray-900">{{ new_users_week }}</strong></span>
+                        <span class="text-gray-600">Month: <strong class="text-gray-900">{{ new_users_month }}</strong></span>
+                    </div>
+                </div>
+                <div class="p-6 bg-white rounded-lg border border-gray-200 shadow-sm">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-sm font-medium text-gray-600">Total Profiles</p>
+                            <p class="mt-2 text-3xl font-bold text-gray-900">{{ total_profiles }}</p>
+                        </div>
+                        <div class="p-3 bg-green-100 rounded-lg">
+                            <svg class="w-6 h-6 text-green-600"
+                                 fill="none"
+                                 stroke="currentColor"
+                                 viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z">
+                                </path>
+                            </svg>
+                        </div>
+                    </div>
+                    {% if total_users > 0 %}
+                        <p class="mt-4 text-xs text-gray-600">
+                            <strong class="text-gray-900">{{ total_profiles|floatformat:0 }}/{{ total_users }}</strong> users ({% widthratio total_profiles total_users 100 %}%)
+                        </p>
                     {% endif %}
-                  </td>
-                  <td class="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">{{ user.date_joined|date:"M d, Y" }}</td>
-                </tr>
-                {% empty %}
-                <tr>
-                  <td colspan="5" class="px-6 py-4 text-sm text-center text-gray-500">No users yet</td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-      </div>
-
-      <div class="p-6 bg-blue-50 rounded-lg border border-blue-200">
-        <div class="flex items-start">
-          <div class="flex-shrink-0">
-            <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-            </svg>
-          </div>
-          <div class="ml-3">
-            <h3 class="text-sm font-medium text-blue-800">Quick Stats</h3>
-            <div class="mt-2 text-sm text-blue-700">
-              <p>Average Users per Day (Last 30 days): <strong>{{ avg_users_per_day|floatformat:1 }}</strong></p>
-              <p class="mt-1">Total Profiles: <strong>{{ total_profiles }}</strong></p>
+                </div>
             </div>
-          </div>
+            <div class="grid grid-cols-1 gap-6 mb-8">
+                <div class="bg-white rounded-lg border border-gray-200 shadow-sm">
+                    <div class="p-6 border-b border-gray-200">
+                        <h2 class="text-lg font-semibold text-gray-900">Recent Users</h2>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Email</th>
+                                    <th class="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Username</th>
+                                    <th class="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Starred repos</th>
+                                    <th class="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Starred import</th>
+                                    <th class="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Joined</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                {% for user in recent_users %}
+                                    <tr>
+                                        <td class="px-6 py-4 text-sm text-gray-900 whitespace-nowrap">{{ user.email }}</td>
+                                        <td class="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">{{ user.username }}</td>
+                                        <td class="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">{{ user.starred_repository_count|intcomma }}</td>
+                                        <td class="px-6 py-4 text-sm whitespace-nowrap">
+                                            {% if user.profile.github_starred_repos_import_enabled %}
+                                                <span class="inline-flex rounded-full bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-700">Enabled</span>
+                                            {% else %}
+                                                <span class="inline-flex rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-600">Disabled</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">{{ user.date_joined|date:"M d, Y" }}</td>
+                                    </tr>
+                                {% empty %}
+                                    <tr>
+                                        <td colspan="5" class="px-6 py-4 text-sm text-center text-gray-500">No users yet</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="p-6 bg-blue-50 rounded-lg border border-blue-200">
+                <div class="flex items-start">
+                    <div class="flex-shrink-0">
+                        <svg class="w-6 h-6 text-blue-600"
+                             fill="none"
+                             stroke="currentColor"
+                             viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z">
+                            </path>
+                        </svg>
+                    </div>
+                    <div class="ml-3">
+                        <h3 class="text-sm font-medium text-blue-800">Quick Stats</h3>
+                        <div class="mt-2 text-sm text-blue-700">
+                            <p>
+                                Average Users per Day (Last 30 days): <strong>{{ avg_users_per_day|floatformat:1 }}</strong>
+                            </p>
+                            <p class="mt-1">
+                                Total Profiles: <strong>{{ total_profiles }}</strong>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
-      </div>
     </div>
-
-  </div>
 {% endblock content %}

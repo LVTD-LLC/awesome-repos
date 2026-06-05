@@ -17,6 +17,7 @@ from django.views.decorators.http import require_POST
 from django.views.generic import DetailView, FormView, ListView
 from django_q.tasks import async_task
 
+from apps.core.analytics import queue_track_event
 from apps.core.models import Profile
 from apps.repos.badges import repository_badge_svg
 from apps.repos.cache import (
@@ -216,6 +217,11 @@ REPOSITORY_FILTER_VALUE_LABELS = {
     "ai_development": {"yes": "Has signals", "no": "No signals"},
     "sort_direction": {"asc": "Ascending", "desc": "Descending"},
 }
+REPOSITORY_PERCENT_FILTER_PARAM_NAMES = (
+    "min_velocity_percent",
+    "min_star_growth_percent",
+    "min_liability_percent",
+)
 
 
 def _require_superuser(request):
@@ -332,6 +338,18 @@ def toggle_repository_like(request, owner: str, name: str):
     else:
         like.delete()
         repository.is_liked = False
+
+    queue_track_event(
+        event_name="repository_liked" if created else "repository_unliked",
+        profile_id=request.user.profile.id,
+        properties={
+            "repository_id": repository.id,
+            "repository_full_name": repository.full_name,
+            "repository_language": repository.language,
+            "repository_stars": repository.stars,
+        },
+        source_function="toggle_repository_like",
+    )
 
     next_url = request.POST.get("next") or repository.get_absolute_url()
     if not url_has_allowed_host_and_scheme(
@@ -541,6 +559,24 @@ def repository_filter_remove_querystring(params, name: str) -> str:
     return next_params.urlencode()
 
 
+def _repository_filter_chip_value(
+    name: str,
+    value: str,
+    sort_labels: dict[str, str],
+) -> str | None:
+    if name == "updated_days":
+        return f"{value} days"
+    if name == "unmaintained_days":
+        return f"{value}+ days"
+    if name == "min_age_years":
+        return f"{value}+ years"
+    if name in REPOSITORY_PERCENT_FILTER_PARAM_NAMES:
+        return f"{value}%+"
+    if name == "sort":
+        return sort_labels.get(value)
+    return REPOSITORY_FILTER_VALUE_LABELS.get(name, {}).get(value, value)
+
+
 def active_repository_filter_chips(
     params,
     *,
@@ -556,24 +592,9 @@ def active_repository_filter_chips(
         value = (params.get(name) or "").strip()
         if not value:
             continue
-        if name == "updated_days":
-            value = f"{value} days"
-        elif name == "unmaintained_days":
-            value = f"{value}+ days"
-        elif name == "min_age_years":
-            value = f"{value}+ years"
-        elif name in {
-            "min_velocity_percent",
-            "min_star_growth_percent",
-            "min_liability_percent",
-        }:
-            value = f"{value}%+"
-        elif name == "sort":
-            if value not in resolved_sort_labels:
-                continue
-            value = resolved_sort_labels[value]
-        else:
-            value = REPOSITORY_FILTER_VALUE_LABELS.get(name, {}).get(value, value)
+        value = _repository_filter_chip_value(name, value, resolved_sort_labels)
+        if value is None:
+            continue
         chips.append(
             {
                 "label": REPOSITORY_FILTER_LABELS[name],
@@ -695,6 +716,30 @@ class RepositorySearchView(ListView):
         context["repositories"] = attach_repository_snapshot_counts(context["repositories"])
         context["object_list"] = context["repositories"]
         context["page_obj"].object_list = context["repositories"]
+        search_page = self.request.GET.get("page") or "1"
+        if (
+            self.request.user.is_authenticated
+            and repository_filters_applied(
+                self.request.GET,
+                include_sort=True,
+            )
+            and search_page == "1"
+        ):
+            params = repository_search_params(self.request)
+            queue_track_event(
+                event_name="search_performed",
+                profile_id=self.request.user.profile.id,
+                properties={
+                    "query": params.get("q", ""),
+                    "mode": params.get("mode", ""),
+                    "results_count": context["page_obj"].paginator.count,
+                    "sort": params.get("sort", ""),
+                    "sort_direction": params.get("sort_direction", ""),
+                    "search_scope": "public_repositories",
+                    "filters_applied": repository_filters_applied(params, include_sort=False),
+                },
+                source_function="RepositorySearchView",
+            )
         visible_repositories = visible_repository_queryset()
         filter_options = public_repository_filter_options()
         search_url = reverse("repos:search")
@@ -745,12 +790,10 @@ class UserStarredRepositorySearchView(LoginRequiredMixin, ListView):
 
     def starred_repository_queryset(self):
         profile = self.get_profile()
-        return (
-            self.base_starred_repository_queryset().annotate(
-                user_starred_at=Max(
-                    "starred_by_profiles__starred_at",
-                    filter=Q(starred_by_profiles__profile=profile),
-                )
+        return self.base_starred_repository_queryset().annotate(
+            user_starred_at=Max(
+                "starred_by_profiles__starred_at",
+                filter=Q(starred_by_profiles__profile=profile),
             )
         )
 
@@ -975,6 +1018,10 @@ class RepositoryNewsletterIssueListView(ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["repository"] = self.repository
+        context["newsletter_list_meta_description"] = (
+            f"{self.repository.full_name} repository newsletter archive with generated "
+            "weekly and monthly change updates plus RSS feeds from tracked commits."
+        )
         return context
 
 
@@ -993,6 +1040,17 @@ class RepositoryNewsletterIssueDetailView(DetailView):
     def get_object(self, queryset=None):
         queryset = self.get_queryset() if queryset is None else queryset
         return get_object_or_404(queryset, slug=self.kwargs["slug"])
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        issue = self.object
+        context["newsletter_issue_meta_description"] = (
+            f"{issue.repository.full_name} {issue.get_cadence_display().lower()} update: "
+            f"{issue.title} covering {issue.commit_count} commit"
+            f"{'' if issue.commit_count == 1 else 's'} from "
+            f"{issue.period_start:%Y-%m-%d} to {issue.period_end:%Y-%m-%d}."
+        )
+        return context
 
 
 class RepositoryNewsletterFeed(Feed):

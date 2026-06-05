@@ -1,8 +1,6 @@
 import posthog
-
-
-from django.conf import settings
 from django.apps import AppConfig
+from django.conf import settings
 
 from awesome_repos.utils import get_awesome_repos_logger
 
@@ -17,12 +15,9 @@ class CoreConfig(AppConfig):
     def ready(self):
         import apps.core.signals  # noqa
 
-        
-
         if settings.POSTHOG_API_KEY:
             posthog.api_key = settings.POSTHOG_API_KEY
             posthog.host = "https://us.i.posthog.com"
 
         if settings.ENVIRONMENT == "dev":
             posthog.debug = True
-        

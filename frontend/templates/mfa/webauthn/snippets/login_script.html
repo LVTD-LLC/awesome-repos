@@ -1,4 +1,3 @@
-
 {% include "mfa/webauthn/snippets/scripts.html" %}
 <form id="mfa_login" action="{% url 'mfa_login_webauthn' %}" method="post">
     {% csrf_token %}
@@ -52,5 +51,3 @@
     });
   });
 </script>
-
-
