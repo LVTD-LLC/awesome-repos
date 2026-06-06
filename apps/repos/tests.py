@@ -5380,6 +5380,113 @@ def test_repository_pages_render_liked_heart_for_authenticated_user(auth_client,
 
 
 @pytest.mark.django_db
+def test_repository_pages_render_starred_badge_for_authenticated_user(
+    auth_client,
+    user,
+    profile,
+    django_user_model,
+):
+    repo = Repository.objects.create(
+        full_name="django/django",
+        owner="django",
+        name="django",
+        url="https://github.com/django/django",
+        description="The Web framework",
+        stars=80000,
+    )
+    other_repo = Repository.objects.create(
+        full_name="pallets/flask",
+        owner="pallets",
+        name="flask",
+        url="https://github.com/pallets/flask",
+        description="A lightweight WSGI framework",
+        stars=70000,
+    )
+    awesome_list = AwesomeList.objects.create(
+        name="Awesome Django",
+        slug="awesome-django",
+        source_url="https://github.com/wsvincent/awesome-django",
+    )
+    AwesomeListItem.objects.create(awesome_list=awesome_list, repository=repo)
+    AwesomeListItem.objects.create(awesome_list=awesome_list, repository=other_repo)
+    other_user = django_user_model.objects.create_user(
+        username="other-starred",
+        email="other-starred@example.com",
+        password="password123",
+    )
+    RepositoryLike.objects.create(user=user, repository=repo)
+    UserStarredRepository.objects.create(
+        profile=profile,
+        repository=repo,
+        starred_at=datetime(2026, 5, 1, tzinfo=UTC),
+    )
+    UserStarredRepository.objects.create(profile=other_user.profile, repository=other_repo)
+
+    response = auth_client.get(reverse("repos:search"))
+
+    assert response.status_code == 200
+    assert b"Starred django/django on GitHub" in response.content
+    assert b"Starred pallets/flask on GitHub" not in response.content
+
+    response = auth_client.get(reverse("repos:starred"))
+
+    assert response.status_code == 200
+    assert b"Starred django/django on GitHub on 2026-05-01" in response.content
+    assert b"pallets/flask" not in response.content
+
+    response = auth_client.get(reverse("repos:list_detail", kwargs={"slug": awesome_list.slug}))
+
+    assert response.status_code == 200
+    assert b"Starred django/django on GitHub" in response.content
+    assert b"Starred pallets/flask on GitHub" not in response.content
+
+    response = auth_client.get(reverse("repos:liked"))
+
+    assert response.status_code == 200
+    assert b"Starred django/django on GitHub" in response.content
+
+    response = auth_client.get(
+        reverse("repos:repo_detail", kwargs={"owner": repo.owner, "name": repo.name})
+    )
+
+    assert response.status_code == 200
+    assert b"Starred django/django on GitHub" in response.content
+
+    response = auth_client.get(
+        reverse(
+            "repos:repo_detail",
+            kwargs={"owner": other_repo.owner, "name": other_repo.name},
+        )
+    )
+
+    assert response.status_code == 200
+    assert b"Starred pallets/flask on GitHub" not in response.content
+
+
+@pytest.mark.django_db
+def test_repository_pages_hide_starred_badge_when_authenticated_user_has_no_profile(
+    auth_client,
+    user,
+):
+    repo = Repository.objects.create(
+        full_name="django/django",
+        owner="django",
+        name="django",
+        url="https://github.com/django/django",
+        description="The Web framework",
+    )
+    user.profile.delete()
+
+    response = auth_client.get(
+        reverse("repos:repo_detail", kwargs={"owner": repo.owner, "name": repo.name})
+    )
+
+    assert response.status_code == 200
+    assert b"django/django" in response.content
+    assert b"Starred django/django on GitHub" not in response.content
+
+
+@pytest.mark.django_db
 def test_repository_search_is_root_page(client):
     response = client.get(reverse("repos:search"))
 

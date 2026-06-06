@@ -269,7 +269,10 @@
                                     </div>
                                 </div>
                                 <div class="flex shrink-0 items-start justify-between gap-3 text-left sm:flex-col sm:items-end sm:text-right">
-                                    {% include "repos/_repository_like_button.html" with repository=repo %}
+                                    <div class="flex items-center gap-2 sm:justify-end">
+                                        {% include "repos/_repository_like_button.html" with repository=repo %}
+                                        {% include "repos/_repository_starred_badge.html" with repository=repo %}
+                                    </div>
                                     <div>
                                         <div class="font-semibold">★ {{ repo.stars|intcomma }}</div>
                                         <div class="mt-1 flex flex-wrap justify-start gap-x-3 gap-y-1 sm:justify-end">

@@ -4,6 +4,7 @@ from allauth.mfa import app_settings as mfa_app_settings
 from allauth.socialaccount.models import SocialApp
 from django.conf import settings
 from django.core.cache import cache
+from django.core.exceptions import ObjectDoesNotExist
 from django.utils import timezone
 
 from apps.core.choices import ProfileStates
@@ -15,7 +16,10 @@ logger = get_awesome_repos_logger(__name__)
 
 def current_state(request):
     if request.user.is_authenticated:
-        return {"current_state": request.user.profile.current_state}
+        try:
+            return {"current_state": request.user.profile.current_state}
+        except ObjectDoesNotExist:
+            return {"current_state": ProfileStates.STRANGER}
     return {"current_state": ProfileStates.STRANGER}
 
 
