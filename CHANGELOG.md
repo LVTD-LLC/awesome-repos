@@ -118,6 +118,7 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Superuser-only admin blog API for creating, listing, reading, updating, patching, deleting, reviewing, and publishing blog posts when the blog app is generated.
 
 ### Removed
+- Awesome: removed shareable repository badge embed cards from repository detail pages.
 - Awesome: removed the feedback collection widget, API endpoint, admin feedback stats, and stored feedback model.
 - Stimulus, Webpack, `python-webpack-boilerplate`, manifest loading, and generated Webpack configuration.
 

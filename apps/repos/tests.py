@@ -6391,7 +6391,7 @@ def test_repository_badge_svg_renders_commit_velocity_periods(client):
 
 
 @pytest.mark.django_db
-def test_repository_detail_page_renders_share_badge_embed_snippets(client):
+def test_repository_detail_page_omits_share_badge_embed_snippets(client):
     Repository.objects.create(
         full_name="django/django",
         owner="django",
@@ -6410,22 +6410,9 @@ def test_repository_detail_page_renders_share_badge_embed_snippets(client):
     assert response.status_code == 200
     badge_path = reverse("repos:repo_badge", kwargs={"owner": "django", "name": "django"})
     content = response.content.decode()
-    assert "Share badges" in content
-    assert "Star history" in content
-    assert "Commit history" in content
-    assert "7-day star growth" in content
-    assert "30-day star growth" in content
-    assert "7-day commit velocity" in content
-    assert "30-day commit velocity" in content
-    assert (
-        f"[![django/django Star history on Awesome](http://testserver{badge_path}?metric=stars)]"
-        "(http://testserver/repos/django/django/)"
-    ) in content
-    assert (
-        f"http://testserver{badge_path}?metric=commits&amp;variant=growth&amp;days=30"
-    ) in content
-    assert 'data-copy-source="#repo-badge-markdown-star-history"' in content
-    assert 'data-copy-source="#repo-badge-markdown-commit-velocity-30"' in content
+    assert "Share badges" not in content
+    assert f"http://testserver{badge_path}" not in content
+    assert "repo-badge-markdown" not in content
 
 
 @pytest.mark.django_db

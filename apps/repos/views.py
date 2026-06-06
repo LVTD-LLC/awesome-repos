@@ -1,5 +1,3 @@
-from urllib.parse import urlencode
-
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -392,67 +390,6 @@ def repository_badge(request, owner: str, name: str):
     response["Cache-Control"] = "public, max-age=3600"
     response["X-Content-Type-Options"] = "nosniff"
     return response
-
-
-REPOSITORY_BADGE_EMBED_OPTIONS = (
-    {
-        "key": "star-history",
-        "label": "Star history",
-        "query": {"metric": "stars"},
-    },
-    {
-        "key": "commit-history",
-        "label": "Commit history",
-        "query": {"metric": "commits"},
-    },
-    {
-        "key": "star-growth-7",
-        "label": "7-day star growth",
-        "query": {"metric": "stars", "variant": "growth", "days": "7"},
-    },
-    {
-        "key": "star-growth-30",
-        "label": "30-day star growth",
-        "query": {"metric": "stars", "variant": "growth", "days": "30"},
-    },
-    {
-        "key": "commit-velocity-7",
-        "label": "7-day commit velocity",
-        "query": {"metric": "commits", "variant": "growth", "days": "7"},
-    },
-    {
-        "key": "commit-velocity-30",
-        "label": "30-day commit velocity",
-        "query": {"metric": "commits", "variant": "growth", "days": "30"},
-    },
-)
-
-
-def repository_badge_url(request, repository: Repository, query: dict[str, str]) -> str:
-    path = reverse("repos:repo_badge", kwargs={"owner": repository.owner, "name": repository.name})
-    url = request.build_absolute_uri(path)
-    if query:
-        url = f"{url}?{urlencode(query)}"
-    return url
-
-
-def repository_badge_embed_context(request, repository: Repository) -> dict:
-    detail_url = request.build_absolute_uri(repository.get_absolute_url())
-    options = []
-    for option in REPOSITORY_BADGE_EMBED_OPTIONS:
-        badge_url = repository_badge_url(request, repository, option["query"])
-        alt_text = f"{repository.full_name} {option['label']} on Awesome"
-        markdown_alt = alt_text.replace("\\", "\\\\").replace("]", "\\]")
-        options.append(
-            {
-                "key": option["key"],
-                "label": option["label"],
-                "badge_url": badge_url,
-                "badge_markdown": f"[![{markdown_alt}]({badge_url})]({detail_url})",
-            }
-        )
-
-    return {"options": options}
 
 
 def awesome_list_request_client_ip(request) -> str:
@@ -976,7 +913,6 @@ class RepositoryDetailView(DetailView):
         context["ai_development_signal_summary"] = _ai_development_signal_summary(
             self.object.ai_development_signals
         )
-        context["badge_embed"] = repository_badge_embed_context(self.request, self.object)
         context["newsletter_issues"] = self.object.newsletter_issues.filter(
             published_at__isnull=False,
         )[:5]
