@@ -105,7 +105,11 @@
                     <div>
                         <dt class="text-xs font-medium text-gray-500 dark:text-gray-400">Commits</dt>
                         <dd class="mt-0.5 font-semibold text-gray-900 dark:text-gray-100">
-                            {{ repo.commit_count|default_if_none:"Unknown"|intcomma }}
+                            {% if repo.commit_count != None %}
+                                {{ repo.commit_count|intcomma }} commit{{ repo.commit_count|pluralize }}
+                            {% else %}
+                                Unknown
+                            {% endif %}
                         </dd>
                     </div>
                     <div class="col-span-2 border-t border-gray-200 pt-3 dark:border-gray-800"
