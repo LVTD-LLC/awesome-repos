@@ -864,7 +864,7 @@ def with_repository_like_state(queryset, user):
     }
     try:
         profile_pk = user.profile.pk
-    except (AttributeError, ObjectDoesNotExist):
+    except AttributeError, ObjectDoesNotExist:
         profile_pk = None
 
     if profile_pk is not None:

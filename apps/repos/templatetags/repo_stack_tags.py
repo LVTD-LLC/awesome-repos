@@ -16,7 +16,7 @@ def signed_intcomma(value) -> str:
         return "n/a"
     try:
         number = int(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return "n/a"
     sign = "+" if number > 0 else ""
     return f"{sign}{number:,}"
@@ -28,7 +28,7 @@ def signed_percent(value) -> str:
         return "n/a"
     try:
         number = float(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return "n/a"
     if abs(number) < 0.05:
         number = 0
