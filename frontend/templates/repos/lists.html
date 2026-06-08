@@ -56,52 +56,136 @@
             </div>
         </dl>
         <form method="get"
-              class="mb-6 rounded-2xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-900">
-            <div class="grid gap-3 md:grid-cols-6">
-                <input name="q"
-                       value="{{ request.GET.q }}"
-                       placeholder="Search list name, repo, topic"
-                       class="rounded-xl border border-gray-300 bg-white px-4 py-3 md:col-span-3 dark:border-gray-700 dark:bg-gray-950" />
-                <select name="sort"
-                        class="rounded-xl border border-gray-300 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-950">
-                    <option value="stars"
-                            {% if request.GET.sort == "stars" or not request.GET.sort %}selected{% endif %}>
-                        Sort by stars
-                    </option>
-                    <option value="repos" {% if request.GET.sort == "repos" %}selected{% endif %}>README repo count</option>
-                    <option value="indexed"
-                            {% if request.GET.sort == "indexed" %}selected{% endif %}>Indexed repos</option>
-                    <option value="commits"
-                            {% if request.GET.sort == "commits" %}selected{% endif %}>Commit count</option>
-                    <option value="recent"
-                            {% if request.GET.sort == "recent" %}selected{% endif %}>Recently pushed</option>
-                    <option value="oldest"
-                            {% if request.GET.sort == "oldest" %}selected{% endif %}>Oldest first commit</option>
-                    <option value="scanned"
-                            {% if request.GET.sort == "scanned" %}selected{% endif %}>Recently scanned</option>
-                    <option value="name" {% if request.GET.sort == "name" %}selected{% endif %}>Name</option>
-                </select>
-                <div>
-                    <select name="min_age_years"
-                            class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-950">
-                        <option value="">Any age</option>
-                        <option value="1"
-                                {% if request.GET.min_age_years == "1" %}selected{% endif %}>1+ years old</option>
-                        <option value="3"
-                                {% if request.GET.min_age_years == "3" %}selected{% endif %}>3+ years old</option>
-                        <option value="5"
-                                {% if request.GET.min_age_years == "5" %}selected{% endif %}>5+ years old</option>
-                        <option value="10"
-                                {% if request.GET.min_age_years == "10" %}selected{% endif %}>10+ years old</option>
-                    </select>
-                    <p class="mt-2 text-xs leading-5 text-gray-500 dark:text-gray-400">Uses known first-commit dates only.</p>
+              action="{% url 'repos:list' %}"
+              class="mb-6 overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
+            <div class="flex flex-col gap-3 border-b border-gray-200 bg-gray-50 px-4 py-4 dark:border-gray-800 dark:bg-gray-950/60 sm:flex-row sm:items-start sm:justify-between sm:px-5">
+                <div class="min-w-0">
+                    <h2 class="text-lg font-bold tracking-tight text-gray-950 dark:text-white">Search lists</h2>
+                    <p class="mt-1 max-w-2xl text-sm leading-6 text-gray-600 dark:text-gray-300">
+                        Search by list name, GitHub owner, description, or topic. Sort by the signal that matters for your review.
+                    </p>
                 </div>
-                <button class="rounded-xl bg-green-600 px-5 py-3 font-semibold text-white hover:bg-green-700">Apply</button>
+                {% if active_list_filter_count %}
+                    <a href="{% url 'repos:list' %}"
+                       class="inline-flex min-h-10 shrink-0 items-center justify-center rounded-xl border border-gray-300 bg-white px-4 text-sm font-semibold text-gray-900 transition hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:hover:bg-gray-800 dark:focus-visible:ring-offset-gray-950">
+                        Clear filters
+                    </a>
+                {% endif %}
+            </div>
+            <div class="p-4 sm:p-5">
+                <div class="grid gap-4 lg:grid-cols-12">
+                    <div class="lg:col-span-6">
+                        <label for="list-search-query"
+                               class="block text-sm font-semibold text-gray-800 dark:text-gray-200">
+                            Search term
+                        </label>
+                        <div class="relative mt-2">
+                            <svg class="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-500 dark:text-gray-400"
+                                 xmlns="http://www.w3.org/2000/svg"
+                                 fill="none"
+                                 viewBox="0 0 24 24"
+                                 stroke-width="1.8"
+                                 stroke="currentColor"
+                                 aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-4.35-4.35m1.1-5.4a6.5 6.5 0 1 1-13 0 6.5 6.5 0 0 1 13 0Z" />
+                            </svg>
+                            <input id="list-search-query"
+                                   name="q"
+                                   value="{{ request.GET.q }}"
+                                   placeholder="awesome-django, react, self-hosted"
+                                   class="block min-h-12 w-full rounded-xl border border-gray-300 bg-white py-3 pl-11 pr-4 text-base text-gray-950 shadow-sm placeholder:text-gray-500 focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 dark:placeholder:text-gray-400 sm:text-sm" />
+                        </div>
+                    </div>
+                    <div class="lg:col-span-3">
+                        <label for="list-sort"
+                               class="block text-sm font-semibold text-gray-800 dark:text-gray-200">Sort</label>
+                        <select id="list-sort"
+                                name="sort"
+                                class="mt-2 block min-h-12 w-full rounded-xl border border-gray-300 bg-white px-3 py-3 text-sm font-medium text-gray-950 shadow-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100">
+                            <option value="stars"
+                                    {% if request.GET.sort == "stars" or not request.GET.sort %}selected{% endif %}>
+                                Most starred
+                            </option>
+                            <option value="repos" {% if request.GET.sort == "repos" %}selected{% endif %}>README repo count</option>
+                            <option value="indexed"
+                                    {% if request.GET.sort == "indexed" %}selected{% endif %}>Indexed repos</option>
+                            <option value="commits"
+                                    {% if request.GET.sort == "commits" %}selected{% endif %}>Commit count</option>
+                            <option value="recent"
+                                    {% if request.GET.sort == "recent" %}selected{% endif %}>Recently pushed</option>
+                            <option value="oldest"
+                                    {% if request.GET.sort == "oldest" %}selected{% endif %}>Oldest first commit</option>
+                            <option value="scanned"
+                                    {% if request.GET.sort == "scanned" %}selected{% endif %}>Recently scanned</option>
+                            <option value="name" {% if request.GET.sort == "name" %}selected{% endif %}>Name</option>
+                        </select>
+                    </div>
+                    <div class="lg:col-span-3">
+                        <label for="list-min-age"
+                               class="block text-sm font-semibold text-gray-800 dark:text-gray-200">
+                            List history
+                        </label>
+                        <select id="list-min-age"
+                                name="min_age_years"
+                                aria-describedby="list-min-age-help"
+                                class="mt-2 block min-h-12 w-full rounded-xl border border-gray-300 bg-white px-3 py-3 text-sm font-medium text-gray-950 shadow-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100">
+                            <option value="">Any age</option>
+                            <option value="1"
+                                    {% if request.GET.min_age_years == "1" %}selected{% endif %}>1+ years old</option>
+                            <option value="3"
+                                    {% if request.GET.min_age_years == "3" %}selected{% endif %}>3+ years old</option>
+                            <option value="5"
+                                    {% if request.GET.min_age_years == "5" %}selected{% endif %}>5+ years old</option>
+                            <option value="10"
+                                    {% if request.GET.min_age_years == "10" %}selected{% endif %}>10+ years old</option>
+                        </select>
+                        <p id="list-min-age-help"
+                           class="mt-2 text-xs leading-5 text-gray-600 dark:text-gray-300">Uses known first-commit dates.</p>
+                    </div>
+                </div>
+                <div class="mt-5 flex flex-col-reverse gap-3 border-t border-gray-200 pt-4 dark:border-gray-800 sm:flex-row sm:items-center sm:justify-between">
+                    <p class="text-sm leading-6 text-gray-600 dark:text-gray-300">
+                        Sort shown: <span class="font-semibold text-gray-900 dark:text-gray-100">{{ selected_list_sort_label }}</span>
+                    </p>
+                    <div class="flex flex-col gap-3 sm:flex-row sm:justify-end">
+                        <a href="{% url 'repos:list' %}"
+                           class="inline-flex min-h-11 items-center justify-center rounded-xl border border-gray-300 bg-white px-5 py-2.5 text-sm font-semibold text-gray-900 shadow-sm transition hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 dark:hover:bg-gray-800 dark:focus-visible:ring-offset-gray-900">
+                            Reset
+                        </a>
+                        <button type="submit"
+                                class="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-green-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-green-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:bg-green-500 dark:text-gray-950 dark:hover:bg-green-400 dark:focus-visible:ring-offset-gray-900">
+                            <svg class="h-4 w-4"
+                                 xmlns="http://www.w3.org/2000/svg"
+                                 fill="none"
+                                 viewBox="0 0 24 24"
+                                 stroke-width="2"
+                                 stroke="currentColor"
+                                 aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-4.35-4.35m1.1-5.4a6.5 6.5 0 1 1-13 0 6.5 6.5 0 0 1 13 0Z" />
+                            </svg>
+                            Search lists
+                        </button>
+                    </div>
+                </div>
             </div>
         </form>
-        <div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div class="text-sm font-semibold text-gray-950 dark:text-white">
-                {{ page_obj.paginator.count|intcomma }} list{{ page_obj.paginator.count|pluralize }} shown
+        <div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+                <div class="text-sm font-semibold text-gray-950 dark:text-white">
+                    {{ page_obj.paginator.count|intcomma }} list{{ page_obj.paginator.count|pluralize }} shown
+                </div>
+                <div class="mt-2 flex flex-wrap gap-2 text-xs text-gray-600 dark:text-gray-300">
+                    {% for filter in active_list_filters %}
+                        <span class="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1.5 dark:border-gray-800 dark:bg-gray-900">
+                            <span class="font-semibold text-gray-500 dark:text-gray-400">{{ filter.label }}</span>
+                            <span class="font-semibold text-gray-900 dark:text-gray-100">{{ filter.value }}</span>
+                        </span>
+                    {% empty %}
+                        <span class="inline-flex items-center rounded-full bg-gray-100 px-3 py-1.5 font-semibold text-gray-700 dark:bg-gray-900 dark:text-gray-200">
+                            Sorted by {{ selected_list_sort_label }}
+                        </span>
+                    {% endfor %}
+                </div>
             </div>
             {% if awesome_lists %}
                 <span class="shortcut-hint hidden text-xs font-black uppercase text-gray-500 dark:text-gray-400 lg:inline-flex"
@@ -193,8 +277,22 @@
                     </div>
                 </article>
             {% empty %}
-                <div class="rounded-2xl border border-dashed border-gray-300 p-10 text-center dark:border-gray-700">
-                    No awesome lists match this search yet.
+                <div class="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-10 text-center dark:border-gray-700 dark:bg-gray-900/60">
+                    <h2 class="text-lg font-bold text-gray-950 dark:text-white">No lists found</h2>
+                    <p class="mx-auto mt-2 max-w-md text-sm leading-6 text-gray-600 dark:text-gray-300">
+                        Try a broader keyword, remove the history filter, or request the list if it is missing from the catalog.
+                    </p>
+                    <div class="mt-5 flex flex-col gap-3 sm:flex-row sm:justify-center">
+                        <a href="{% url 'repos:list' %}"
+                           class="inline-flex min-h-11 items-center justify-center rounded-xl border border-gray-300 bg-white px-5 py-2.5 text-sm font-semibold text-gray-900 shadow-sm transition hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-50 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 dark:hover:bg-gray-800 dark:focus-visible:ring-offset-gray-900">
+                            Clear search
+                        </a>
+                        <a href="{% url 'repos:request_list' %}"
+                           @click.prevent="openRequestList()"
+                           class="inline-flex min-h-11 items-center justify-center rounded-xl bg-green-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-green-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-50 dark:bg-green-500 dark:text-gray-950 dark:hover:bg-green-400 dark:focus-visible:ring-offset-gray-900">
+                            Request a list
+                        </a>
+                    </div>
                 </div>
             {% endfor %}
         </div>

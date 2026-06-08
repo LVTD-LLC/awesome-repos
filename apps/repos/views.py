@@ -46,6 +46,7 @@ from apps.repos.services import (
     awesome_list_directory_totals,
     awesome_list_history_chart_data,
     awesome_list_repository_queryset,
+    minimum_age_cutoff,
     repository_history_chart_data,
     repository_json_value_counts,
     repository_performance_summary,
@@ -846,8 +847,33 @@ class AwesomeListListView(ListView):
         params = self.request.GET.copy()
         params.pop("page", None)
         totals = awesome_list_directory_totals()
+        sort_labels = {
+            "stars": "Most starred",
+            "repos": "README repo count",
+            "indexed": "Indexed repos",
+            "commits": "Commit count",
+            "recent": "Recently pushed",
+            "oldest": "Oldest first commit",
+            "scanned": "Recently scanned",
+            "name": "Name",
+        }
+        requested_sort = params.get("sort")
+        selected_sort = requested_sort if requested_sort in sort_labels else "stars"
+        selected_sort_label = sort_labels.get(selected_sort, sort_labels["stars"])
+        active_filters = []
+        search_query = (params.get("q") or "").strip()
+        if search_query:
+            active_filters.append({"label": "Search", "value": search_query})
+        if requested_sort and selected_sort != "stars":
+            active_filters.append({"label": "Sort", "value": selected_sort_label})
+        min_age_years = params.get("min_age_years")
+        if min_age_years and minimum_age_cutoff(params):
+            active_filters.append({"label": "History", "value": f"{min_age_years}+ years old"})
         context["params"] = params
         context["querystring"] = params.urlencode()
+        context["active_list_filters"] = active_filters
+        context["active_list_filter_count"] = len(active_filters)
+        context["selected_list_sort_label"] = selected_sort_label
         context["total_lists"] = totals["total_lists"]
         context["total_indexed_links"] = totals["total_indexed_links"]
         context["total_readme_repositories"] = totals["total_readme_repositories"]
