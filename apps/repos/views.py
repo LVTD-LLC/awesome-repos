@@ -47,6 +47,7 @@ from apps.repos.services import (
     awesome_list_directory_totals,
     awesome_list_history_chart_data,
     awesome_list_repository_queryset,
+    minimum_age_cutoff,
     repository_history_chart_data,
     repository_json_value_counts,
     repository_performance_summary,
@@ -926,7 +927,7 @@ class AwesomeListListView(ListView):
         if requested_sort and selected_sort != "stars":
             active_filters.append({"label": "Sort", "value": selected_sort_label})
         min_age_years = params.get("min_age_years")
-        if min_age_years:
+        if min_age_years and minimum_age_cutoff(params):
             active_filters.append({"label": "History", "value": f"{min_age_years}+ years old"})
         context["params"] = params
         context["querystring"] = params.urlencode()
