@@ -57,6 +57,7 @@ RepositorySortMap = Mapping[str, tuple[str, RepositorySortDirection]]
 GITHUB_API_VERSION = "2026-03-10"
 GITHUB_DEFAULT_ACCEPT = "application/vnd.github+json"
 GITHUB_STARRED_ACCEPT = "application/vnd.github.star+json"
+REPOSITORY_RECENT_GROWTH_DAYS = 7
 
 GITHUB_REPO_RE = re.compile(
     r"https?://github\.com/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)(?:[/#?][^\s)\]>'\"]*)?",
@@ -2445,6 +2446,20 @@ def _annotate_repository_snapshot_metrics(qs):
         "captured_at",
         "id",
     )
+    latest_snapshot = RepositorySnapshot.objects.filter(repository=models.OuterRef("pk")).order_by(
+        "-captured_at",
+        "-id",
+    )
+    recent_growth_window_start = models.ExpressionWrapper(
+        models.OuterRef("latest_snapshot_captured_at")
+        - models.Value(timezone.timedelta(days=REPOSITORY_RECENT_GROWTH_DAYS)),
+        output_field=models.DateTimeField(),
+    )
+    recent_baseline_snapshot = RepositorySnapshot.objects.filter(
+        repository=models.OuterRef("pk"),
+        captured_at__gte=recent_growth_window_start,
+        captured_at__lt=models.OuterRef("latest_snapshot_captured_at"),
+    ).order_by("captured_at", "id")
     return (
         qs.annotate(
             snapshot_count=Count("snapshots", distinct=True),
@@ -2454,6 +2469,18 @@ def _annotate_repository_snapshot_metrics(qs):
             ),
             first_snapshot_commit_count=models.Subquery(
                 first_snapshot.values("commit_count")[:1],
+                output_field=models.PositiveIntegerField(),
+            ),
+            latest_snapshot_captured_at=models.Subquery(
+                latest_snapshot.values("captured_at")[:1],
+                output_field=models.DateTimeField(),
+            ),
+            recent_baseline_stars=models.Subquery(
+                recent_baseline_snapshot.values("stars")[:1],
+                output_field=models.PositiveIntegerField(),
+            ),
+            recent_baseline_commit_count=models.Subquery(
+                recent_baseline_snapshot.values("commit_count")[:1],
                 output_field=models.PositiveIntegerField(),
             ),
         )
@@ -2475,14 +2502,31 @@ def _annotate_repository_snapshot_metrics(qs):
                 default=models.Value(None),
                 output_field=models.IntegerField(),
             ),
+            stars_since_recent=models.Case(
+                models.When(
+                    recent_baseline_stars__isnull=False,
+                    then=models.F("stars") - models.F("recent_baseline_stars"),
+                ),
+                default=models.Value(None),
+                output_field=models.IntegerField(),
+            ),
+            commits_since_recent=models.Case(
+                models.When(
+                    commit_count__isnull=False,
+                    recent_baseline_commit_count__isnull=False,
+                    then=models.F("commit_count") - models.F("recent_baseline_commit_count"),
+                ),
+                default=models.Value(None),
+                output_field=models.IntegerField(),
+            ),
         )
         .annotate(
             stars_growth_percent=models.Case(
                 models.When(
-                    first_snapshot_stars__gt=0,
+                    recent_baseline_stars__gt=0,
                     then=models.ExpressionWrapper(
-                        (models.F("stars_since_first") * models.Value(100.0))
-                        / models.F("first_snapshot_stars"),
+                        (models.F("stars_since_recent") * models.Value(100.0))
+                        / models.F("recent_baseline_stars"),
                         output_field=models.FloatField(),
                     ),
                 ),
@@ -2492,10 +2536,10 @@ def _annotate_repository_snapshot_metrics(qs):
             commits_growth_percent=models.Case(
                 models.When(
                     commit_count__isnull=False,
-                    first_snapshot_commit_count__gt=0,
+                    recent_baseline_commit_count__gt=0,
                     then=models.ExpressionWrapper(
-                        (models.F("commits_since_first") * models.Value(100.0))
-                        / models.F("first_snapshot_commit_count"),
+                        (models.F("commits_since_recent") * models.Value(100.0))
+                        / models.F("recent_baseline_commit_count"),
                         output_field=models.FloatField(),
                     ),
                 ),

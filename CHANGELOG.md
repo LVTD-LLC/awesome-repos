@@ -63,6 +63,7 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Awesome: show a GitHub-star badge next to the liked heart when a repository is in the signed-in user's imported starred repos.
 
 ### Changed
+- Awesome: repository velocity and star-growth filters now require observed recent capture history instead of falling back to all-time tracked growth.
 - Awesome: expanded analytics coverage for search, repository likes, starred imports, and checkout events while avoiding email-based PostHog identification.
 - Awesome: optimized root and starred repository search pages by skipping unused history-growth annotations and caching public filter metadata.
 - Awesome: refined Sentry performance instrumentation with configurable HTTP/background trace sampling, Django middleware/cache spans, and separate breadcrumb/event/log levels.

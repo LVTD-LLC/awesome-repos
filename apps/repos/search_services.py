@@ -177,6 +177,8 @@ def serialize_repository_summary(repository: Repository) -> dict:
         "snapshot_count": getattr(repository, "snapshot_count", None),
         "stars_since_first": getattr(repository, "stars_since_first", None),
         "commits_since_first": getattr(repository, "commits_since_first", None),
+        "stars_since_recent": getattr(repository, "stars_since_recent", None),
+        "commits_since_recent": getattr(repository, "commits_since_recent", None),
         "stars_growth_percent": getattr(repository, "stars_growth_percent", None),
         "commits_growth_percent": getattr(repository, "commits_growth_percent", None),
         "github_created_at": repository.github_created_at,

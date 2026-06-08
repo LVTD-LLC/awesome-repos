@@ -4262,25 +4262,64 @@ def test_repository_search_filters_growth_unmaintained_and_sort_direction():
         commit_count=200,
         github_pushed_at=now - timedelta(days=800),
     )
-    for repository in (fast, slow, unknown_baseline):
+    old_growth = Repository.objects.create(
+        full_name="owner/old-growth",
+        owner="owner",
+        name="old-growth",
+        url="https://github.com/owner/old-growth",
+        stars=250,
+        commit_count=250,
+        github_pushed_at=now - timedelta(days=10),
+    )
+    for repository in (fast, slow, unknown_baseline, old_growth):
         AwesomeListItem.objects.create(awesome_list=awesome_list, repository=repository)
     RepositorySnapshot.objects.create(
         repository=fast,
-        captured_at=now - timedelta(days=30),
+        captured_at=now - timedelta(days=6),
+        stars=100,
+        commit_count=100,
+    )
+    RepositorySnapshot.objects.create(
+        repository=fast,
+        captured_at=now - timedelta(days=1),
+        stars=140,
+        commit_count=140,
+    )
+    RepositorySnapshot.objects.create(
+        repository=slow,
+        captured_at=now - timedelta(days=6),
         stars=100,
         commit_count=100,
     )
     RepositorySnapshot.objects.create(
         repository=slow,
-        captured_at=now - timedelta(days=30),
+        captured_at=now - timedelta(days=1),
+        stars=110,
+        commit_count=102,
+    )
+    RepositorySnapshot.objects.create(
+        repository=unknown_baseline,
+        captured_at=now - timedelta(days=6),
+        stars=0,
+        commit_count=0,
+    )
+    RepositorySnapshot.objects.create(
+        repository=unknown_baseline,
+        captured_at=now - timedelta(days=1),
+        stars=150,
+        commit_count=150,
+    )
+    RepositorySnapshot.objects.create(
+        repository=old_growth,
+        captured_at=now - timedelta(days=12),
         stars=100,
         commit_count=100,
     )
     RepositorySnapshot.objects.create(
-        repository=unknown_baseline,
-        captured_at=now - timedelta(days=30),
-        stars=0,
-        commit_count=0,
+        repository=old_growth,
+        captured_at=now - timedelta(days=1),
+        stars=250,
+        commit_count=250,
     )
 
     assert list(repository_search_queryset({"min_velocity_percent": "40"})) == [fast]
@@ -4296,7 +4335,7 @@ def test_repository_search_filters_growth_unmaintained_and_sort_direction():
     ]
 
     repos = list(repository_search_queryset({"sort": "velocity"}))
-    assert repos == [fast, slow, unknown_baseline]
+    assert repos == [fast, slow, old_growth, unknown_baseline]
     assert repos[0].commits_growth_percent == 50
     assert repos[0].stars_growth_percent == 50
     assert repos[2].commits_growth_percent is None
@@ -4304,11 +4343,13 @@ def test_repository_search_filters_growth_unmaintained_and_sort_direction():
     assert list(repository_search_queryset({"sort": "star_growth"})) == [
         fast,
         slow,
+        old_growth,
         unknown_baseline,
     ]
     assert list(repository_search_queryset({"sort": "liability"})) == [
         fast,
         slow,
+        old_growth,
         unknown_baseline,
     ]
 
@@ -4316,8 +4357,10 @@ def test_repository_search_filters_growth_unmaintained_and_sort_direction():
         slow,
         fast,
         unknown_baseline,
+        old_growth,
     ]
     assert list(repository_search_queryset({"sort": "stars", "direction": "asc"})) == [
+        old_growth,
         unknown_baseline,
         fast,
         slow,
@@ -4751,6 +4794,10 @@ def test_repository_search_queryset_annotates_tracked_growth():
     assert result.first_snapshot_commit_count == 50
     assert result.stars_since_first == 25
     assert result.commits_since_first == 30
+    assert result.stars_since_recent == 25
+    assert result.commits_since_recent == 30
+    assert result.stars_growth_percent == 50
+    assert result.commits_growth_percent == 60
 
 
 @pytest.mark.django_db
@@ -5117,9 +5164,15 @@ def test_search_page_renders(client):
     assert b"Any detected framework" in content
     assert b"Commit velocity" in content
     assert b"What does Commit velocity mean?" in content
-    assert b"commit-count growth since Awesome first tracked the repository" in content
+    assert (
+        b"observed commit-count growth over the repository's latest 7-day capture window"
+        in content
+    )
     assert b"What does Star growth mean?" in content
-    assert b"GitHub star growth since Awesome first tracked the repository" in content
+    assert (
+        b"observed GitHub star growth over the repository's latest 7-day capture window"
+        in content
+    )
     assert b"Direction" in content
     assert_option_label_with_count(content, "django", 1)
     assert b'href="/?topic=django"' in content
@@ -5697,7 +5750,9 @@ def test_awesome_list_list_page_renders_activity_metrics(client):
 
     assert response.status_code == 200
     assert {"label": "History", "value": "10+ years old"} in response.context["active_list_filters"]
-    assert {"label": "Sort", "value": "Oldest first commit"} in response.context["active_list_filters"]
+    assert {"label": "Sort", "value": "Oldest first commit"} in response.context[
+        "active_list_filters"
+    ]
     assert response.context["selected_list_sort_label"] == "Oldest first commit"
     assert response.context["awesome_lists"][0].indexed_repo_count == 1
     assert response.context["total_indexed_links"] == 1

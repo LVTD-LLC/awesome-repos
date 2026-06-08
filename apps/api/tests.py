@@ -138,9 +138,15 @@ def test_repository_search_api_uses_existing_filters(client, profile):
     )
     RepositorySnapshot.objects.create(
         repository=django_repo,
-        captured_at=timezone.now() - timedelta(days=30),
+        captured_at=timezone.now() - timedelta(days=6),
         stars=60000,
         commit_count=100,
+    )
+    RepositorySnapshot.objects.create(
+        repository=django_repo,
+        captured_at=timezone.now() - timedelta(days=1),
+        stars=88000,
+        commit_count=140,
     )
     Repository.objects.create(
         full_name="expressjs/express",
@@ -183,6 +189,8 @@ def test_repository_search_api_uses_existing_filters(client, profile):
     assert payload["results"][0]["stack_signals"][0]["label"] == "Django"
     assert payload["results"][0]["awesome_count"] == 1
     assert payload["results"][0]["awesome_lists"][0]["slug"] == "awesome-django"
+    assert payload["results"][0]["stars_since_recent"] == 30000
+    assert payload["results"][0]["commits_since_recent"] == 50
     assert payload["results"][0]["stars_growth_percent"] == 50
     assert payload["results"][0]["commits_growth_percent"] == 50
 
