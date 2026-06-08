@@ -7,7 +7,7 @@ import os
 import re
 import time
 from collections.abc import Collection, Mapping
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Literal
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode, urlparse
@@ -48,6 +48,7 @@ from apps.repos.tags import (
 from awesome_repos.utils import get_awesome_repos_logger
 
 logger = get_awesome_repos_logger(__name__)
+RECENT_REPOSITORY_GROWTH_DAYS = 7
 # Process-local snapshot from the most recent GitHub response. Treat this as a
 # best-effort hint; callers must still handle actual 403/429 responses.
 _github_rate_limit_state: dict[str, str] = {}
@@ -1771,7 +1772,7 @@ def awesome_list_repository_history_chart_data(
     if limit <= 0:
         return []
 
-    cutoff = timezone.now() - timezone.timedelta(days=limit)
+    cutoff = timezone.now() - timedelta(days=limit)
     list_snapshots = RepositorySnapshot.objects.filter(
         repository__awesome_items__awesome_list=awesome_list
     )
@@ -2353,10 +2354,10 @@ def _apply_repository_state_filters(qs, params):
         else None
     )
     if updated_days and updated_days <= MAX_UPDATED_DAYS_FILTER and not valid_unmaintained_days:
-        cutoff = timezone.now() - timezone.timedelta(days=updated_days)
+        cutoff = timezone.now() - timedelta(days=updated_days)
         qs = qs.filter(github_pushed_at__gte=cutoff)
     if valid_unmaintained_days:
-        cutoff = timezone.now() - timezone.timedelta(days=valid_unmaintained_days)
+        cutoff = timezone.now() - timedelta(days=valid_unmaintained_days)
         qs = qs.filter(github_pushed_at__lte=cutoff)
     age_cutoff = minimum_age_cutoff(params)
     if age_cutoff:
@@ -2495,6 +2496,80 @@ def _annotate_repository_snapshot_metrics(qs):
                     then=models.ExpressionWrapper(
                         (models.F("commits_since_first") * models.Value(100.0))
                         / models.F("first_snapshot_commit_count"),
+                        output_field=models.FloatField(),
+                    ),
+                ),
+                default=models.Value(None),
+                output_field=models.FloatField(),
+            ),
+        )
+    )
+
+
+def annotate_repository_recent_growth_metrics(qs):
+    cutoff = timezone.now() - timedelta(days=RECENT_REPOSITORY_GROWTH_DAYS)
+    recent_snapshot = RepositorySnapshot.objects.filter(
+        repository=models.OuterRef("pk"),
+        captured_at__gte=cutoff,
+    ).order_by("captured_at", "id")
+    return (
+        qs.annotate(
+            growth_window_days=models.Value(
+                RECENT_REPOSITORY_GROWTH_DAYS,
+                output_field=models.IntegerField(),
+            ),
+            growth_baseline_7d_at=models.Subquery(
+                recent_snapshot.values("captured_at")[:1],
+                output_field=models.DateTimeField(),
+            ),
+            growth_baseline_7d_stars=models.Subquery(
+                recent_snapshot.values("stars")[:1],
+                output_field=models.PositiveIntegerField(),
+            ),
+            growth_baseline_7d_commit_count=models.Subquery(
+                recent_snapshot.values("commit_count")[:1],
+                output_field=models.PositiveIntegerField(),
+            ),
+        )
+        .annotate(
+            stars_growth_7d=models.Case(
+                models.When(
+                    growth_baseline_7d_at__isnull=False,
+                    then=models.F("stars") - models.F("growth_baseline_7d_stars"),
+                ),
+                default=models.Value(None),
+                output_field=models.IntegerField(),
+            ),
+            commits_growth_7d=models.Case(
+                models.When(
+                    growth_baseline_7d_at__isnull=False,
+                    commit_count__isnull=False,
+                    growth_baseline_7d_commit_count__isnull=False,
+                    then=models.F("commit_count") - models.F("growth_baseline_7d_commit_count"),
+                ),
+                default=models.Value(None),
+                output_field=models.IntegerField(),
+            ),
+        )
+        .annotate(
+            stars_growth_7d_percent=models.Case(
+                models.When(
+                    growth_baseline_7d_stars__gt=0,
+                    then=models.ExpressionWrapper(
+                        (models.F("stars_growth_7d") * models.Value(100.0))
+                        / models.F("growth_baseline_7d_stars"),
+                        output_field=models.FloatField(),
+                    ),
+                ),
+                default=models.Value(None),
+                output_field=models.FloatField(),
+            ),
+            commits_growth_7d_percent=models.Case(
+                models.When(
+                    growth_baseline_7d_commit_count__gt=0,
+                    then=models.ExpressionWrapper(
+                        (models.F("commits_growth_7d") * models.Value(100.0))
+                        / models.F("growth_baseline_7d_commit_count"),
                         output_field=models.FloatField(),
                     ),
                 ),

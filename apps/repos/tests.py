@@ -42,6 +42,7 @@ from apps.repos.services import (
     GitHubAPIError,
     active_awesome_list_source_repository_name_set,
     add_repository_to_awesome_list,
+    annotate_repository_recent_growth_metrics,
     attach_awesome_list_commit_count,
     awesome_list_history_chart_data,
     awesome_list_repository_history_chart_data,
@@ -4036,6 +4037,57 @@ def test_awesome_list_repository_queryset_skips_snapshot_metrics():
 
 
 @pytest.mark.django_db
+def test_repository_recent_growth_metrics_use_last_7_day_snapshots():
+    now = timezone.now()
+    growing = Repository.objects.create(
+        full_name="owner/growing",
+        owner="owner",
+        name="growing",
+        url="https://github.com/owner/growing",
+        stars=115,
+        commit_count=230,
+    )
+    stale = Repository.objects.create(
+        full_name="owner/stale",
+        owner="owner",
+        name="stale",
+        url="https://github.com/owner/stale",
+        stars=300,
+        commit_count=400,
+    )
+    RepositorySnapshot.objects.create(
+        repository=growing,
+        captured_at=now - timedelta(days=12),
+        stars=20,
+        commit_count=20,
+    )
+    RepositorySnapshot.objects.create(
+        repository=growing,
+        captured_at=now - timedelta(days=6),
+        stars=100,
+        commit_count=200,
+    )
+    RepositorySnapshot.objects.create(
+        repository=stale,
+        captured_at=now - timedelta(days=8),
+        stars=250,
+        commit_count=300,
+    )
+
+    repositories = {
+        repo.full_name: repo
+        for repo in annotate_repository_recent_growth_metrics(Repository.objects.all())
+    }
+
+    assert repositories["owner/growing"].stars_growth_7d == 15
+    assert repositories["owner/growing"].commits_growth_7d == 30
+    assert repositories["owner/growing"].stars_growth_7d_percent == pytest.approx(15)
+    assert repositories["owner/growing"].commits_growth_7d_percent == pytest.approx(15)
+    assert repositories["owner/stale"].stars_growth_7d is None
+    assert repositories["owner/stale"].commits_growth_7d is None
+
+
+@pytest.mark.django_db
 def test_search_page_skips_full_snapshot_metrics_for_default_queryset(client, monkeypatch):
     from apps.repos import views as repo_views
 
@@ -5031,6 +5083,13 @@ def test_search_page_renders(client):
         topics=["django", "python"],
         generated_tags=["web-framework"],
         stars=80000,
+        commit_count=90100,
+    )
+    RepositorySnapshot.objects.create(
+        repository=repo,
+        captured_at=timezone.now() - timedelta(days=6),
+        stars=79000,
+        commit_count=90000,
     )
     hidden_repo = Repository.objects.create(
         full_name="wsvincent/awesome-django",
@@ -5045,6 +5104,12 @@ def test_search_page_renders(client):
     content = response.content
     assert response.status_code == 200
     assert b"django/django" in content
+    assert b"Star growth, last 7 days" in content
+    assert b"+1,000" in content
+    assert b"+1.3%" in content
+    assert b"Commit velocity, last 7 days" in content
+    assert b"+100" in content
+    assert b"+0.1%" in content
     assert b"Find repositories" in content
     assert b"Tune results" in content
     assert b"More filters" in content

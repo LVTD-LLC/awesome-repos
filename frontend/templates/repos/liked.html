@@ -93,57 +93,7 @@
         <div class="space-y-3">
             {% include "components/highlighted_repo_slot.html" %}
             {% for repo in repositories %}
-                <article class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition hover:border-green-300 dark:border-gray-800 dark:bg-gray-950 dark:hover:border-green-800"
-                         data-shortcut-list-item>
-                    <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                        <div class="min-w-0">
-                            <a href="{{ repo.get_absolute_url }}"
-                               class="text-xl font-bold text-gray-950 hover:text-green-700 dark:text-white dark:hover:text-green-300"
-                               data-shortcut-list-target>{{ repo.full_name }}</a>
-                            <p class="mt-2 max-w-3xl text-sm leading-6 text-gray-600 dark:text-gray-300">
-                                {{ repo.description|default:"No description." }}
-                            </p>
-                            <div class="mt-3 flex flex-wrap gap-2 text-xs text-gray-600 dark:text-gray-400">
-                                {% if repo.language %}
-                                    <span class="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-900">{{ repo.language }}</span>
-                                {% endif %}
-                                {% for topic in repo.topics|slice:":4" %}
-                                    <a href="{% url 'repos:search' %}?topic={{ topic|urlencode }}"
-                                       class="rounded-full bg-blue-50 px-3 py-1 text-blue-700 transition hover:bg-blue-100 dark:bg-blue-950 dark:text-blue-200 dark:hover:bg-blue-900">#{{ topic }}</a>
-                                {% endfor %}
-                                {% for tag in repo.generated_tags|slice:":4" %}
-                                    <span class="rounded-full bg-green-50 px-3 py-1 text-green-700 dark:bg-green-950 dark:text-green-200">{{ tag }}</span>
-                                {% endfor %}
-                                {% if repo.github_pushed_at %}
-                                    <span class="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-900">pushed {{ repo.github_pushed_at|date:"Y-m-d" }}</span>
-                                {% endif %}
-                                <span class="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-900">{{ repo.awesome_count }} list mention{{ repo.awesome_count|pluralize }}</span>
-                                {% if repo.is_archived %}<span class="rounded-full bg-yellow-100 px-3 py-1 text-yellow-800">archived</span>{% endif %}
-                            </div>
-                        </div>
-                        <div class="flex shrink-0 items-center justify-between gap-4 sm:flex-col sm:items-end">
-                            <div class="flex items-center gap-2 sm:justify-end">
-                                {% include "repos/_repository_like_button.html" with repository=repo disable_hx=True %}
-                                {% include "repos/_repository_starred_badge.html" with repository=repo %}
-                            </div>
-                            <div class="text-right">
-                                <div class="font-semibold text-gray-950 dark:text-white">★ {{ repo.stars|intcomma }}</div>
-                                <div class="mt-1 flex flex-wrap justify-end gap-x-3 gap-y-1">
-                                    {% if repo.homepage_url and repo.homepage_url != repo.url %}
-                                        <a href="{{ repo.homepage_url }}"
-                                           target="_blank"
-                                           rel="noopener"
-                                           class="text-sm font-semibold text-blue-700 hover:underline dark:text-blue-300">Website ↗</a>
-                                    {% endif %}
-                                    <a href="{{ repo.url }}"
-                                       target="_blank"
-                                       rel="noopener"
-                                       class="text-sm font-semibold text-green-700 hover:underline dark:text-green-300">GitHub ↗</a>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </article>
+                {% include "repos/_repository_list_card.html" with disable_like_hx=True %}
             {% empty %}
                 <div class="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-10 text-center dark:border-gray-700 dark:bg-gray-900">
                     <h2 class="text-xl font-bold text-gray-950 dark:text-white">No liked repositories yet</h2>

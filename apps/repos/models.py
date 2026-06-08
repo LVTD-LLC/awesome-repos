@@ -258,6 +258,7 @@ class RepositorySnapshot(BaseModel):
         ordering = ["-captured_at", "-id"]
         indexes = [
             models.Index(fields=["repository", "-captured_at"]),
+            models.Index(fields=["repository", "captured_at", "id"], name="repo_snap_growth_idx"),
             models.Index(fields=["-captured_at"]),
         ]
 

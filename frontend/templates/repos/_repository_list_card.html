@@ -1,0 +1,172 @@
+{% load humanize repo_stack_tags %}
+{% url 'repos:search' as repository_search_url %}
+{% with repo_search_url=search_action_url|default:repository_search_url growth_days=repo.growth_window_days|default:7 %}
+    <article class="group rounded-2xl border border-gray-200 bg-white p-4 transition-colors hover:border-green-300 hover:bg-gray-50/70 dark:border-gray-800 dark:bg-gray-950 dark:hover:border-green-800 dark:hover:bg-gray-900/60"
+             data-shortcut-list-item>
+        <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">
+            <div class="min-w-0">
+                <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <div class="min-w-0">
+                        <a href="{{ repo.get_absolute_url }}"
+                           class="block truncate text-lg font-bold tracking-tight text-gray-950 transition-colors hover:text-green-700 focus:outline-none focus-visible:rounded-md focus-visible:ring-2 focus-visible:ring-green-500 dark:text-white dark:hover:text-green-300"
+                           data-shortcut-list-target>{{ repo.full_name }}</a>
+                        <p class="mt-1 line-clamp-2 max-w-3xl text-sm leading-6 text-gray-600 dark:text-gray-300">
+                            {{ repo.description|default:"No description." }}
+                        </p>
+                    </div>
+                    <div class="flex shrink-0 items-center gap-2">
+                        {% if repo.is_archived %}
+                            <span class="rounded-full bg-yellow-100 px-2.5 py-1 text-xs font-semibold text-yellow-900 dark:bg-yellow-900/40 dark:text-yellow-100">Archived</span>
+                        {% endif %}
+                        {% if repo.uses_ai_for_development %}
+                            <span class="rounded-full bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-800 dark:bg-green-950 dark:text-green-200">AI dev</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="mt-3 flex flex-wrap gap-1.5 text-xs text-gray-700 dark:text-gray-300">
+                    {% if repo.language %}
+                        <span class="rounded-full bg-gray-100 px-2.5 py-1 font-medium dark:bg-gray-900">{{ repo.language }}</span>
+                    {% endif %}
+                    {% for signal in repo.stack_signals|slice:":3" %}
+                        <a href="{{ repo_search_url }}?stack={{ signal.slug|urlencode }}"
+                           class="rounded-full bg-purple-50 px-2.5 py-1 font-medium text-purple-800 transition hover:bg-purple-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 dark:bg-purple-950 dark:text-purple-100 dark:hover:bg-purple-900">{{ signal.label }}</a>
+                    {% endfor %}
+                    {% for manager in repo.package_managers|slice:":2" %}
+                        <span class="rounded-full bg-gray-100 px-2.5 py-1 font-medium dark:bg-gray-900">{{ manager|package_manager_label }}</span>
+                    {% endfor %}
+                    {% for topic in repo.topics|slice:":4" %}
+                        <a href="{{ repo_search_url }}?topic={{ topic|urlencode }}"
+                           class="rounded-full bg-blue-50 px-2.5 py-1 font-medium text-blue-800 transition hover:bg-blue-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:bg-blue-950 dark:text-blue-100 dark:hover:bg-blue-900">#{{ topic }}</a>
+                    {% endfor %}
+                    {% for tag in repo.generated_tags|slice:":3" %}
+                        <span class="rounded-full bg-green-50 px-2.5 py-1 font-medium text-green-800 dark:bg-green-950 dark:text-green-100">{{ tag }}</span>
+                    {% endfor %}
+                </div>
+
+                <dl class="mt-4 grid gap-x-4 gap-y-2 border-t border-gray-200 pt-3 text-xs text-gray-600 dark:border-gray-800 dark:text-gray-300 sm:grid-cols-2 xl:grid-cols-4">
+                    <div>
+                        <dt class="font-medium text-gray-500 dark:text-gray-400">Updated</dt>
+                        <dd class="mt-0.5 font-semibold text-gray-900 dark:text-gray-100">
+                            {{ repo.github_pushed_at|date:"Y-m-d"|default:"Unknown" }}
+                        </dd>
+                    </div>
+                    <div>
+                        <dt class="font-medium text-gray-500 dark:text-gray-400">Lists</dt>
+                        <dd class="mt-0.5 font-semibold text-gray-900 dark:text-gray-100">
+                            {{ repo.awesome_count }} list mention{{ repo.awesome_count|pluralize }}
+                        </dd>
+                    </div>
+                    <div>
+                        <dt class="font-medium text-gray-500 dark:text-gray-400">First commit</dt>
+                        <dd class="mt-0.5 font-semibold text-gray-900 dark:text-gray-100">
+                            {{ repo.first_commit_at|date:"Y-m-d"|default:"Unknown" }}
+                        </dd>
+                    </div>
+                    {% if is_personal_starred_search and repo.user_starred_at %}
+                        <div>
+                            <dt class="font-medium text-gray-500 dark:text-gray-400">Saved</dt>
+                            <dd class="mt-0.5 font-semibold text-gray-900 dark:text-gray-100">
+                                starred {{ repo.user_starred_at|date:"Y-m-d" }}
+                            </dd>
+                        </div>
+                    {% elif repo.snapshot_count %}
+                        <div>
+                            <dt class="font-medium text-gray-500 dark:text-gray-400">History</dt>
+                            <dd class="mt-0.5 font-semibold text-gray-900 dark:text-gray-100">
+                                {{ repo.snapshot_count }} history point{{ repo.snapshot_count|pluralize }}
+                            </dd>
+                        </div>
+                    {% endif %}
+                </dl>
+            </div>
+
+            <div class="border-t border-gray-200 pt-4 dark:border-gray-800 lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0">
+                <div class="flex items-start justify-between gap-3">
+                    <div class="flex items-center gap-2">
+                        {% include "repos/_repository_like_button.html" with repository=repo disable_hx=disable_like_hx %}
+                        {% include "repos/_repository_starred_badge.html" with repository=repo %}
+                    </div>
+                    <div class="text-right">
+                        <div class="text-xl font-black tracking-tight text-gray-950 dark:text-white">
+                            {{ repo.stars|intcomma }}
+                        </div>
+                        <div class="text-xs font-medium text-gray-500 dark:text-gray-400">stars</div>
+                    </div>
+                </div>
+
+                <dl class="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+                    <div>
+                        <dt class="text-xs font-medium text-gray-500 dark:text-gray-400">Forks</dt>
+                        <dd class="mt-0.5 font-semibold text-gray-900 dark:text-gray-100">
+                            {{ repo.forks|intcomma }}
+                        </dd>
+                    </div>
+                    <div>
+                        <dt class="text-xs font-medium text-gray-500 dark:text-gray-400">Commits</dt>
+                        <dd class="mt-0.5 font-semibold text-gray-900 dark:text-gray-100">
+                            {% if repo.commit_count != None %}
+                                {{ repo.commit_count|intcomma }} commit{{ repo.commit_count|pluralize }}
+                            {% else %}
+                                Unknown
+                            {% endif %}
+                        </dd>
+                    </div>
+                    <div class="col-span-2 border-t border-gray-200 pt-3 dark:border-gray-800"
+                         aria-label="Star growth in the last {{ growth_days }} days for {{ repo.full_name }}">
+                        <dt class="text-xs font-medium text-gray-500 dark:text-gray-400">Star growth, last {{ growth_days }} days</dt>
+                        <dd class="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                            {% if repo.stars_growth_7d != None %}
+                                <span class="text-base font-black {% if repo.stars_growth_7d > 0 %}text-green-700 dark:text-green-300{% elif repo.stars_growth_7d < 0 %}text-red-700 dark:text-red-300{% else %}text-gray-900 dark:text-gray-100{% endif %}">
+                                    {{ repo.stars_growth_7d|signed_intcomma }}
+                                </span>
+                                <span class="text-xs font-semibold text-gray-600 dark:text-gray-300">
+                                    {% if repo.stars_growth_7d_percent != None %}
+                                        {{ repo.stars_growth_7d_percent|signed_percent }}
+                                    {% else %}
+                                        percent n/a
+                                    {% endif %}
+                                </span>
+                            {% else %}
+                                <span class="text-sm font-semibold text-gray-500 dark:text-gray-400">No 7-day history</span>
+                            {% endif %}
+                        </dd>
+                    </div>
+                    <div class="col-span-2 border-t border-gray-200 pt-3 dark:border-gray-800"
+                         aria-label="Commit velocity in the last {{ growth_days }} days for {{ repo.full_name }}">
+                        <dt class="text-xs font-medium text-gray-500 dark:text-gray-400">Commit velocity, last {{ growth_days }} days</dt>
+                        <dd class="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                            {% if repo.commits_growth_7d != None %}
+                                <span class="text-base font-black {% if repo.commits_growth_7d > 0 %}text-green-700 dark:text-green-300{% elif repo.commits_growth_7d < 0 %}text-red-700 dark:text-red-300{% else %}text-gray-900 dark:text-gray-100{% endif %}">
+                                    {{ repo.commits_growth_7d|signed_intcomma }}
+                                </span>
+                                <span class="text-xs font-semibold text-gray-600 dark:text-gray-300">
+                                    {% if repo.commits_growth_7d_percent != None %}
+                                        {{ repo.commits_growth_7d_percent|signed_percent }}
+                                    {% else %}
+                                        percent n/a
+                                    {% endif %}
+                                </span>
+                            {% else %}
+                                <span class="text-sm font-semibold text-gray-500 dark:text-gray-400">No 7-day history</span>
+                            {% endif %}
+                        </dd>
+                    </div>
+                </dl>
+
+                <div class="mt-4 flex flex-wrap justify-end gap-x-3 gap-y-1 border-t border-gray-200 pt-3 text-sm font-semibold dark:border-gray-800">
+                    {% if repo.homepage_url and repo.homepage_url != repo.url %}
+                        <a href="{{ repo.homepage_url }}"
+                           target="_blank"
+                           rel="noopener"
+                           class="text-blue-700 hover:underline dark:text-blue-300">Website</a>
+                    {% endif %}
+                    <a href="{{ repo.url }}"
+                       target="_blank"
+                       rel="noopener"
+                       class="text-green-700 hover:underline dark:text-green-300">GitHub</a>
+                </div>
+            </div>
+        </div>
+    </article>
+{% endwith %}
