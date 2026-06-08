@@ -42,6 +42,7 @@ from apps.repos.search_services import (
     visible_awesome_list_item_count,
 )
 from apps.repos.services import (
+    annotate_repository_recent_growth_metrics,
     awesome_list_directory_totals,
     awesome_list_history_chart_data,
     awesome_list_repository_queryset,
@@ -638,11 +639,12 @@ class RepositorySearchView(ListView):
     paginate_by = 30
 
     def get_queryset(self):
+        queryset = repository_search_queryset(
+            self.request.GET,
+            include_snapshot_metrics=False,
+        )
         return with_repository_like_state(
-            repository_search_queryset(
-                self.request.GET,
-                include_snapshot_metrics=False,
-            ),
+            annotate_repository_recent_growth_metrics(queryset),
             self.request.user,
         ).prefetch_related(
             "awesome_items__awesome_list",
@@ -735,13 +737,14 @@ class UserStarredRepositorySearchView(LoginRequiredMixin, ListView):
         )
 
     def get_queryset(self):
+        queryset = repository_search_queryset(
+            self.request.GET,
+            queryset=self.starred_repository_queryset(),
+            include_snapshot_metrics=False,
+            extra_sort_map={"starred": ("user_starred_at", "desc")},
+        )
         return with_repository_like_state(
-            repository_search_queryset(
-                self.request.GET,
-                queryset=self.starred_repository_queryset(),
-                include_snapshot_metrics=False,
-                extra_sort_map={"starred": ("user_starred_at", "desc")},
-            ),
+            annotate_repository_recent_growth_metrics(queryset),
             self.request.user,
         ).prefetch_related("awesome_items__awesome_list")
 
@@ -812,7 +815,7 @@ class LikedRepositoryListView(LoginRequiredMixin, ListView):
             queryset=self.liked_repository_queryset(),
         )
         queryset = with_repository_like_state(
-            liked_queryset,
+            annotate_repository_recent_growth_metrics(liked_queryset),
             self.request.user,
         ).prefetch_related("awesome_items__awesome_list")
         if sort in {"", "liked"}:
@@ -1060,7 +1063,9 @@ class AwesomeListDetailView(DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         repos = with_repository_like_state(
-            awesome_list_repository_queryset(self.object, self.request.GET),
+            annotate_repository_recent_growth_metrics(
+                awesome_list_repository_queryset(self.object, self.request.GET)
+            ),
             self.request.user,
         )
         all_list_repos = visible_repository_queryset().filter(

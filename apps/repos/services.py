@@ -48,6 +48,7 @@ from apps.repos.tags import (
 from awesome_repos.utils import get_awesome_repos_logger
 
 logger = get_awesome_repos_logger(__name__)
+RECENT_REPOSITORY_GROWTH_DAYS = 7
 # Process-local snapshot from the most recent GitHub response. Treat this as a
 # best-effort hint; callers must still handle actual 403/429 responses.
 _github_rate_limit_state: dict[str, str] = {}
@@ -2495,6 +2496,77 @@ def _annotate_repository_snapshot_metrics(qs):
                     then=models.ExpressionWrapper(
                         (models.F("commits_since_first") * models.Value(100.0))
                         / models.F("first_snapshot_commit_count"),
+                        output_field=models.FloatField(),
+                    ),
+                ),
+                default=models.Value(None),
+                output_field=models.FloatField(),
+            ),
+        )
+    )
+
+
+def annotate_repository_recent_growth_metrics(qs, *, days: int = RECENT_REPOSITORY_GROWTH_DAYS):
+    cutoff = timezone.now() - timezone.timedelta(days=days)
+    recent_snapshot = RepositorySnapshot.objects.filter(
+        repository=models.OuterRef("pk"),
+        captured_at__gte=cutoff,
+    ).order_by("captured_at", "id")
+    return (
+        qs.annotate(
+            growth_window_days=models.Value(days, output_field=models.IntegerField()),
+            growth_baseline_7d_at=models.Subquery(
+                recent_snapshot.values("captured_at")[:1],
+                output_field=models.DateTimeField(),
+            ),
+            growth_baseline_7d_stars=models.Subquery(
+                recent_snapshot.values("stars")[:1],
+                output_field=models.PositiveIntegerField(),
+            ),
+            growth_baseline_7d_commit_count=models.Subquery(
+                recent_snapshot.values("commit_count")[:1],
+                output_field=models.PositiveIntegerField(),
+            ),
+        )
+        .annotate(
+            stars_growth_7d=models.Case(
+                models.When(
+                    growth_baseline_7d_at__isnull=False,
+                    then=models.F("stars") - models.F("growth_baseline_7d_stars"),
+                ),
+                default=models.Value(None),
+                output_field=models.IntegerField(),
+            ),
+            commits_growth_7d=models.Case(
+                models.When(
+                    growth_baseline_7d_at__isnull=False,
+                    commit_count__isnull=False,
+                    growth_baseline_7d_commit_count__isnull=False,
+                    then=models.F("commit_count") - models.F("growth_baseline_7d_commit_count"),
+                ),
+                default=models.Value(None),
+                output_field=models.IntegerField(),
+            ),
+        )
+        .annotate(
+            stars_growth_7d_percent=models.Case(
+                models.When(
+                    growth_baseline_7d_stars__gt=0,
+                    then=models.ExpressionWrapper(
+                        (models.F("stars_growth_7d") * models.Value(100.0))
+                        / models.F("growth_baseline_7d_stars"),
+                        output_field=models.FloatField(),
+                    ),
+                ),
+                default=models.Value(None),
+                output_field=models.FloatField(),
+            ),
+            commits_growth_7d_percent=models.Case(
+                models.When(
+                    growth_baseline_7d_commit_count__gt=0,
+                    then=models.ExpressionWrapper(
+                        (models.F("commits_growth_7d") * models.Value(100.0))
+                        / models.F("growth_baseline_7d_commit_count"),
                         output_field=models.FloatField(),
                     ),
                 ),
