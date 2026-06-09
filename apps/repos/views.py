@@ -140,6 +140,33 @@ def _ai_development_signal_summary(signals):
     }
 
 
+def _json_positive_int(value) -> int:
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        return 0
+    return max(number, 0)
+
+
+def _repository_detail_summary(repository, awesome_list_items) -> dict:
+    dependency_files = [
+        item for item in (repository.dependency_files or []) if isinstance(item, dict)
+    ]
+    dependency_total = sum(
+        _json_positive_int(item.get("dependency_count")) for item in dependency_files
+    )
+    return {
+        "awesome_list_count": len(awesome_list_items),
+        "dependency_file_count": len(dependency_files),
+        "dependency_total": dependency_total,
+        "ecosystem_count": len(repository.dependency_ecosystems or []),
+        "generated_tag_count": len(repository.generated_tags or []),
+        "package_manager_count": len(repository.package_managers or []),
+        "stack_signal_count": len(repository.stack_signals or []),
+        "topic_count": len(repository.topics or []),
+    }
+
+
 REPOSITORY_FILTER_PARAM_NAMES = (
     "q",
     "mode",
@@ -931,12 +958,19 @@ class RepositoryDetailView(DetailView):
     def get_object(self, queryset=None):
         full_name = f"{self.kwargs['owner']}/{self.kwargs['name']}"
         queryset = Repository.objects.prefetch_related("awesome_items__awesome_list")
+        queryset = annotate_repository_recent_growth_metrics(queryset)
         queryset = with_repository_like_state(queryset, self.request.user)
         return get_object_or_404(queryset, full_name=full_name)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        awesome_list_items = list(self.object.awesome_items.all())
         performance = repository_performance_summary(self.object)
+        context["awesome_list_items"] = awesome_list_items
+        context["repository_detail_summary"] = _repository_detail_summary(
+            self.object,
+            awesome_list_items,
+        )
         context["performance"] = performance
         if performance["has_history"]:
             context["repository_history_chart_data"] = repository_history_chart_data(self.object)
@@ -947,6 +981,7 @@ class RepositoryDetailView(DetailView):
         context["newsletter_issues"] = self.object.newsletter_issues.filter(
             published_at__isnull=False,
         )[:5]
+        context["hide_side_ad_rails"] = True
         if self.request.user.is_superuser:
             subscription = (
                 NewsletterSubscription.objects.filter(
