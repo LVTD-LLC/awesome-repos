@@ -1514,6 +1514,18 @@ def test_package_manager_label_template_filter_formats_slugs():
     assert rendered == "Go modules"
 
 
+def test_repository_issues_label_template_filter_formats_issue_states():
+    template = Template("{% load repo_stack_tags %}{{ repo|repository_issues_label }}")
+
+    def render_issues_label(open_issues, raw):
+        return template.render(Context({"repo": SimpleNamespace(open_issues=open_issues, raw=raw)}))
+
+    assert render_issues_label(12, {"has_issues": True, "open_issues_count": 12}) == "12 open"
+    assert render_issues_label(0, {"has_issues": True, "open_issues_count": 0}) == "0 open"
+    assert render_issues_label(0, {"has_issues": False, "open_issues_count": 0}) == ("Disabled")
+    assert render_issues_label(0, {}) == "Unknown"
+
+
 def test_fetch_repository_tree_items_rejects_truncated_github_trees(monkeypatch):
     monkeypatch.setattr(
         "apps.repos.services.fetch_json",
@@ -5127,10 +5139,16 @@ def test_search_page_renders(client):
         url="https://github.com/django/django",
         description="The Web framework",
         language="Python",
+        license_name="BSD-3-Clause",
         topics=["django", "python"],
         generated_tags=["web-framework"],
+        detected_stacks=["django"],
+        package_managers=["pip"],
+        stack_signals=[{"slug": "django", "label": "Django"}],
         stars=80000,
         commit_count=90100,
+        open_issues=12,
+        raw={"has_issues": True, "open_issues_count": 12},
     )
     RepositorySnapshot.objects.create(
         repository=repo,
@@ -5173,7 +5191,16 @@ def test_search_page_renders(client):
     )
     assert b"Direction" in content
     assert_option_label_with_count(content, "django", 1)
+    assert b"Stack" in content
+    assert b"GitHub topics" in content
+    assert b"Generated tags" in content
+    assert b'href="/?language=Python"' in content
     assert b'href="/?topic=django"' in content
+    assert b'href="/?stack=django"' in content
+    assert b'href="/?package_manager=pip"' in content
+    assert b'href="/?generated_tag=web-framework"' in content
+    assert b"BSD-3-Clause" in content
+    assert b"12 open" in content
     assert_option_label_with_count(content, "web-framework", 1)
     assert b"data-page-ad-shell" in content
     assert b"data-page-content" in content
