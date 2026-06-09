@@ -1543,10 +1543,7 @@ def test_repository_issues_label_template_filter_formats_issue_states():
         )
         == "Disabled"
     )
-    assert (
-        template.render(Context({"repo": SimpleNamespace(open_issues=0, raw={})}))
-        == "Unknown"
-    )
+    assert template.render(Context({"repo": SimpleNamespace(open_issues=0, raw={})})) == "Unknown"
 
 
 def test_fetch_repository_tree_items_rejects_truncated_github_trees(monkeypatch):
