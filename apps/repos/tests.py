@@ -6501,6 +6501,37 @@ def test_repository_detail_page_renders_performance_history(client):
 
 
 @pytest.mark.django_db
+def test_repository_detail_page_uses_normalized_dependency_file_count(client):
+    dependency_files = [
+        {
+            "path": f"manifest-{index}.txt",
+            "ecosystem": "python",
+            "dependency_count": index,
+        }
+        for index in range(13)
+    ]
+    dependency_files.append("invalid-manifest-entry")
+    repo = Repository.objects.create(
+        full_name="django/django",
+        owner="django",
+        name="django",
+        url="https://github.com/django/django",
+        dependency_files=dependency_files,
+    )
+
+    response = client.get(
+        reverse("repos:repo_detail", kwargs={"owner": repo.owner, "name": repo.name})
+    )
+
+    assert response.status_code == 200
+    assert len(response.context["repository_dependency_files"]) == 13
+    assert response.context["repository_detail_summary"]["dependency_file_count"] == 13
+    content = response.content.decode()
+    assert "Showing 12 of 13 manifests." in content
+    assert "invalid-manifest-entry" not in content
+
+
+@pytest.mark.django_db
 def test_repository_badge_svg_renders_shareable_history(client):
     repo = Repository.objects.create(
         full_name="django/django",

@@ -148,10 +148,11 @@ def _json_positive_int(value) -> int:
     return max(number, 0)
 
 
-def _repository_detail_summary(repository, awesome_list_items) -> dict:
-    dependency_files = [
-        item for item in (repository.dependency_files or []) if isinstance(item, dict)
-    ]
+def _repository_dependency_files(repository) -> list[dict]:
+    return [item for item in (repository.dependency_files or []) if isinstance(item, dict)]
+
+
+def _repository_detail_summary(repository, awesome_list_items, dependency_files) -> dict:
     dependency_total = sum(
         _json_positive_int(item.get("dependency_count")) for item in dependency_files
     )
@@ -965,11 +966,14 @@ class RepositoryDetailView(DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         awesome_list_items = list(self.object.awesome_items.all())
+        dependency_files = _repository_dependency_files(self.object)
         performance = repository_performance_summary(self.object)
         context["awesome_list_items"] = awesome_list_items
+        context["repository_dependency_files"] = dependency_files
         context["repository_detail_summary"] = _repository_detail_summary(
             self.object,
             awesome_list_items,
+            dependency_files,
         )
         context["performance"] = performance
         if performance["has_history"]:
