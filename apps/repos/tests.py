@@ -6527,7 +6527,10 @@ def test_repository_detail_page_uses_normalized_dependency_file_count(client):
     assert len(response.context["repository_dependency_files"]) == 13
     assert response.context["repository_detail_summary"]["dependency_file_count"] == 13
     content = response.content.decode()
-    assert "Showing 12 of 13 manifests." in content
+    assert "13 manifests" in content
+    assert "5 more files" in content
+    assert "manifest-7.txt" in content
+    assert "manifest-8.txt" not in content
     assert "invalid-manifest-entry" not in content
 
 
@@ -6735,6 +6738,79 @@ def test_repository_detail_page_skips_chart_data_without_history(client, monkeyp
     assert b"/static/js/modules/repository-history-charts.js" not in response.content
     assert b"repository-history-data" not in response.content
     assert b"Stars history" not in response.content
+
+
+@pytest.mark.django_db
+def test_repository_detail_page_compacts_dependency_files(client):
+    dependency_files = [
+        {
+            "path": "pyproject.toml",
+            "ecosystem": "python",
+            "dependency_count": 12,
+        },
+        {
+            "path": "requirements.txt",
+            "ecosystem": "python",
+            "dependency_count": 8,
+        },
+        {
+            "path": "package.json",
+            "ecosystem": "javascript",
+            "dependency_count": 18,
+        },
+        {
+            "path": "package-lock.json",
+            "ecosystem": "javascript",
+            "dependency_count": 18,
+        },
+        {
+            "path": "Cargo.toml",
+            "ecosystem": "rust",
+            "dependency_count": 4,
+        },
+        {
+            "path": "go.mod",
+            "ecosystem": "go",
+            "dependency_count": 5,
+        },
+        {
+            "path": "Gemfile",
+            "ecosystem": "ruby",
+            "dependency_count": 7,
+        },
+        {
+            "path": "composer.json",
+            "ecosystem": "php",
+            "dependency_count": 3,
+        },
+        {
+            "path": "hidden.lock",
+            "ecosystem": "python",
+            "dependency_count": 1,
+        },
+    ]
+    Repository.objects.create(
+        full_name="django/django",
+        owner="django",
+        name="django",
+        url="https://github.com/django/django",
+        dependency_files=dependency_files,
+    )
+
+    response = client.get(
+        reverse("repos:repo_detail", kwargs={"owner": "django", "name": "django"})
+    )
+
+    assert response.status_code == 200
+    content = response.content.decode()
+    assert "Dependency files" in content
+    assert "9 manifests" in content
+    assert "pyproject.toml" in content
+    assert "12 dependencies" in content
+    assert "composer.json" in content
+    assert "1 more file" in content
+    assert "hidden.lock" not in content
+    assert "No dependency manifests detected." not in content
 
 
 @pytest.mark.django_db
