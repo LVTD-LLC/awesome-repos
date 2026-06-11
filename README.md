@@ -77,6 +77,7 @@ Useful checks:
 ```bash
 uv run python manage.py check
 uv run pytest -q
+make pyscn-check
 npm run lint
 ```
 
