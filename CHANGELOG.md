@@ -61,6 +61,7 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Awesome: added a recently-starred sort for personal GitHub starred repository search.
 - Awesome: added shareable SVG repository badges for star history, commit history, and 7/30-day star-growth and commit-velocity deltas.
 - Awesome: show a GitHub-star badge next to the liked heart when a repository is in the signed-in user's imported starred repos.
+- Awesome: added a multi-select repository file filter for AI/project instruction files such as `AGENTS.md`, `CLAUDE.md`, and `.github/copilot-instructions.md`.
 
 ### Changed
 - Awesome: split repository search-card tags into labeled stack, GitHub topic, and generated-tag rows, and added license/open-issue context.
@@ -73,6 +74,7 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Awesome: unified repository search filters across global search, awesome-list repository search, and personal starred-repository search.
 - Awesome: added Settings to the account navbar, simplified Settings around GitHub imports and future repository update preferences, and moved awesome-list requests into the Lists page flow.
 - Awesome: compacted repository-detail AI development signals into summary badges and bounded config-path lists.
+- Awesome: repository-detail AI development file paths now link to their GitHub blob URLs.
 - Awesome: GitHub signups now land on Settings so starred-repository imports stay off by default until the user clicks the import CTA.
 - Awesome: updated default contact email and production domain references to rasul@lvtd.dev and awesome.lvtd.dev.
 - Awesome: renamed product-facing copy and brand assets to the shorter product name.

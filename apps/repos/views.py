@@ -1,3 +1,5 @@
+from urllib.parse import quote
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -43,11 +45,13 @@ from apps.repos.search_services import (
 )
 from apps.repos.services import (
     RECENT_REPOSITORY_GROWTH_DAYS,
+    REPOSITORY_HAS_FILE_FILTER_OPTIONS,
     annotate_repository_recent_growth_metrics,
     awesome_list_directory_totals,
     awesome_list_history_chart_data,
     awesome_list_repository_queryset,
     minimum_age_cutoff,
+    repository_has_file_filters,
     repository_history_chart_data,
     repository_json_value_counts,
     repository_performance_summary,
@@ -69,11 +73,18 @@ AI_DEVELOPMENT_DETAIL_PATH_LIMIT = 24
 AI_DEVELOPMENT_VISIBLE_TOOL_LIMIT = 5
 
 
-def _ai_development_signal_summary(signals):
+def _repository_path_url(repository: Repository, path: str, kind: str) -> str:
+    branch = quote(repository.default_branch or "main", safe="/")
+    normalized_path = quote(path.lstrip("/"), safe="/")
+    path_type = "tree" if kind == "directory" else "blob"
+    return f"{repository.url.rstrip('/')}/{path_type}/{branch}/{normalized_path}"
+
+
+def _ai_development_signal_summary(repository: Repository):
     normalized_signals = []
     seen_paths = set()
 
-    for signal in signals or []:
+    for signal in repository.ai_development_signals or []:
         if not isinstance(signal, dict):
             continue
 
@@ -96,6 +107,7 @@ def _ai_development_signal_summary(signals):
                 "kind_label": "dir" if kind == "directory" else "file",
                 "tool": tool,
                 "signal": signal.get("signal") or "",
+                "url": _repository_path_url(repository, path, kind),
             }
         )
 
@@ -178,6 +190,7 @@ REPOSITORY_FILTER_PARAM_NAMES = (
     "framework",
     "stack",
     "package_manager",
+    "has_file",
     "min_stars",
     "updated_days",
     "unmaintained_days",
@@ -195,6 +208,7 @@ REPOSITORY_ADVANCED_FILTER_PARAM_NAMES = (
     "framework",
     "stack",
     "package_manager",
+    "has_file",
     "min_stars",
     "unmaintained_days",
     "min_age_years",
@@ -228,6 +242,7 @@ REPOSITORY_FILTER_LABELS = {
     "framework": "Framework",
     "stack": "Framework",
     "package_manager": "Package manager",
+    "has_file": "Has file",
     "min_stars": "Min stars",
     "updated_days": "Updated",
     "unmaintained_days": "Unmaintained",
@@ -511,9 +526,23 @@ def repository_advanced_filters_applied(params) -> bool:
     return any(params.get(name) for name in REPOSITORY_ADVANCED_FILTER_PARAM_NAMES)
 
 
-def repository_filter_remove_querystring(params, name: str) -> str:
+def repository_filter_remove_querystring(params, name: str, value: str | None = None) -> str:
     next_params = params.copy()
     next_params.pop("page", None)
+    if name == "has_file" and value is not None:
+        remaining_files = [
+            file_path
+            for file_path in repository_has_file_filters(next_params)
+            if file_path != value
+        ]
+        if hasattr(next_params, "setlist"):
+            next_params.setlist("has_file", remaining_files)
+        elif remaining_files:
+            next_params["has_file"] = remaining_files
+        else:
+            next_params.pop("has_file", None)
+        return next_params.urlencode()
+
     names_to_remove = {name}
     if name in {"framework", "stack"}:
         names_to_remove.update({"framework", "stack"})
@@ -556,6 +585,20 @@ def active_repository_filter_chips(
         if name == "stack" and params.get("framework"):
             continue
         if name == "min_liability_percent" and params.get("min_star_growth_percent"):
+            continue
+        if name == "has_file":
+            for file_path in repository_has_file_filters(params):
+                chips.append(
+                    {
+                        "label": REPOSITORY_FILTER_LABELS[name],
+                        "value": file_path,
+                        "remove_querystring": repository_filter_remove_querystring(
+                            params,
+                            name,
+                            file_path,
+                        ),
+                    }
+                )
             continue
         value = (params.get(name) or "").strip()
         if not value:
@@ -654,6 +697,8 @@ def repository_filter_context(
         "generated_tag_options": generated_tag_options,
         "stack_options": stack_options,
         "package_manager_options": package_manager_options,
+        "has_file_filter_options": REPOSITORY_HAS_FILE_FILTER_OPTIONS,
+        "selected_has_file_filters": repository_has_file_filters(params),
         "filter_id_prefix": filter_id_prefix,
         "search_field_class": search_field_class,
         "show_list_filter": show_list_filter,
@@ -979,9 +1024,7 @@ class RepositoryDetailView(DetailView):
         if performance["has_history"]:
             context["repository_history_chart_data"] = repository_history_chart_data(self.object)
         context["similar_repositories"] = similar_repositories_for_repository(self.object)
-        context["ai_development_signal_summary"] = _ai_development_signal_summary(
-            self.object.ai_development_signals
-        )
+        context["ai_development_signal_summary"] = _ai_development_signal_summary(self.object)
         context["newsletter_issues"] = self.object.newsletter_issues.filter(
             published_at__isnull=False,
         )[:5]

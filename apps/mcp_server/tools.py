@@ -77,6 +77,15 @@ def register_tools(server: FastMCP) -> None:  # noqa: C901
             str,
             Field(description="Detected package manager slug filter."),
         ] = "",
+        has_file: Annotated[
+            list[str] | None,
+            Field(
+                description=(
+                    "Detected repository file paths to require with AND logic, for example "
+                    "['AGENTS.md', 'CLAUDE.md']."
+                ),
+            ),
+        ] = None,
         min_stars: Annotated[int | None, Field(ge=0)] = None,
         updated_days: Annotated[int | None, Field(ge=1)] = None,
         unmaintained_days: Annotated[int | None, Field(ge=1)] = None,
@@ -134,6 +143,7 @@ def register_tools(server: FastMCP) -> None:  # noqa: C901
                 framework=framework,
                 stack=stack,
                 package_manager=package_manager,
+                has_file=has_file or [],
                 min_stars=min_stars,
                 updated_days=updated_days,
                 unmaintained_days=unmaintained_days,
@@ -273,6 +283,15 @@ def register_tools(server: FastMCP) -> None:  # noqa: C901
             str,
             Field(description="Detected package manager slug filter."),
         ] = "",
+        has_file: Annotated[
+            list[str] | None,
+            Field(
+                description=(
+                    "Detected repository file paths to require with AND logic, for example "
+                    "['AGENTS.md', 'CLAUDE.md']."
+                ),
+            ),
+        ] = None,
         min_stars: Annotated[int | None, Field(ge=0)] = None,
         updated_days: Annotated[int | None, Field(ge=1)] = None,
         unmaintained_days: Annotated[int | None, Field(ge=1)] = None,
@@ -333,6 +352,7 @@ def register_tools(server: FastMCP) -> None:  # noqa: C901
                     framework=framework,
                     stack=stack,
                     package_manager=package_manager,
+                    has_file=has_file or [],
                     min_stars=min_stars,
                     updated_days=updated_days,
                     unmaintained_days=unmaintained_days,

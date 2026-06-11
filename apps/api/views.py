@@ -47,6 +47,7 @@ api = NinjaAPI()
 REPOSITORY_SEARCH_PAGE_SIZE = DEFAULT_API_PAGE_SIZE
 AWESOME_LIST_SEARCH_PAGE_SIZE = DEFAULT_API_PAGE_SIZE
 AWESOME_LIST_REPOSITORY_PAGE_SIZE = 50
+HAS_FILE_QUERY = Query(None)
 
 
 @api.get("/healthcheck", auth=None, include_in_schema=False, tags=["private"])
@@ -146,6 +147,7 @@ def search_repositories(
     framework: str = "",
     stack: str = "",
     package_manager: str = "",
+    has_file: list[str] | None = HAS_FILE_QUERY,
     min_stars: int | None = None,
     updated_days: int | None = None,
     unmaintained_days: int | None = None,
@@ -171,6 +173,7 @@ def search_repositories(
         framework=framework,
         stack=stack,
         package_manager=package_manager,
+        has_file=has_file or [],
         min_stars=min_stars,
         updated_days=updated_days,
         unmaintained_days=unmaintained_days,
@@ -290,6 +293,7 @@ def search_awesome_list_repositories(
     framework: str = "",
     stack: str = "",
     package_manager: str = "",
+    has_file: list[str] | None = HAS_FILE_QUERY,
     min_stars: int | None = None,
     updated_days: int | None = None,
     unmaintained_days: int | None = None,
@@ -314,6 +318,7 @@ def search_awesome_list_repositories(
         framework=framework,
         stack=stack,
         package_manager=package_manager,
+        has_file=has_file or [],
         min_stars=min_stars,
         updated_days=updated_days,
         unmaintained_days=unmaintained_days,

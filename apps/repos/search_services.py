@@ -32,9 +32,19 @@ def visible_awesome_list_item_count():
     )
 
 
-def normalized_query_params(**params) -> dict[str, str]:
+def normalized_query_params(**params) -> dict[str, str | list[str]]:
     """Return string params compatible with the existing repo UI query helpers."""
-    return {name: str(value) for name, value in params.items() if value is not None and value != ""}
+    normalized = {}
+    for name, value in params.items():
+        if value is None or value == "":
+            continue
+        if isinstance(value, list | tuple):
+            values = [str(item) for item in value if item is not None and item != ""]
+            if values:
+                normalized[name] = values
+        else:
+            normalized[name] = str(value)
+    return normalized
 
 
 def paginate_queryset(
@@ -278,6 +288,7 @@ def search_repositories_payload(
     framework: str = "",
     stack: str = "",
     package_manager: str = "",
+    has_file: list[str] | None = None,
     min_stars: int | None = None,
     updated_days: int | None = None,
     unmaintained_days: int | None = None,
@@ -302,6 +313,7 @@ def search_repositories_payload(
         framework=framework,
         stack=stack,
         package_manager=package_manager,
+        has_file=has_file or [],
         min_stars=min_stars,
         updated_days=updated_days,
         unmaintained_days=unmaintained_days,
@@ -408,6 +420,7 @@ def search_awesome_list_repositories_payload(
     framework: str = "",
     stack: str = "",
     package_manager: str = "",
+    has_file: list[str] | None = None,
     min_stars: int | None = None,
     updated_days: int | None = None,
     unmaintained_days: int | None = None,
@@ -431,6 +444,7 @@ def search_awesome_list_repositories_payload(
         framework=framework,
         stack=stack,
         package_manager=package_manager,
+        has_file=has_file or [],
         min_stars=min_stars,
         updated_days=updated_days,
         unmaintained_days=unmaintained_days,

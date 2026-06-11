@@ -91,8 +91,13 @@ AI_DEVELOPMENT_ANYWHERE_FILE_SIGNALS = {
     "agent.md": ("Agent instructions", "agent_instructions"),
     "claude.md": ("Claude Code", "claude_memory"),
     "claude.local.md": ("Claude Code", "claude_local_memory"),
+    "design.md": ("Project docs", "project_design_doc"),
     "gemini.md": ("Gemini CLI", "gemini_context"),
     "codex.md": ("Codex", "codex_instructions"),
+    "product.md": ("Project docs", "project_product_doc"),
+    "structure.md": ("Project docs", "project_structure_doc"),
+    "tech.md": ("Project docs", "project_tech_doc"),
+    "vision.md": ("Project docs", "project_vision_doc"),
 }
 AI_DEVELOPMENT_EXACT_PATH_SIGNALS = {
     ".aider.conf.yml": ("Aider", "aider_config"),
@@ -145,6 +150,20 @@ REPOSITORY_JSON_FILTER_FIELDS = {
     "generated_tags",
     "package_managers",
     "topics",
+}
+REPOSITORY_HAS_FILE_FILTER_OPTIONS = (
+    "AGENTS.md",
+    "PRODUCT.md",
+    "TECH.md",
+    "STRUCTURE.md",
+    "VISION.md",
+    "DESIGN.md",
+    "CLAUDE.md",
+    "GEMINI.md",
+    ".github/copilot-instructions.md",
+)
+REPOSITORY_HAS_FILE_FILTER_LOOKUP = {
+    file_path.lower(): file_path for file_path in REPOSITORY_HAS_FILE_FILTER_OPTIONS
 }
 MAX_UPDATED_DAYS_FILTER = 36500
 MAX_AGE_YEARS_FILTER = 100
@@ -2263,6 +2282,36 @@ def _first_positive_int_param(params, *names: str) -> int | None:
     return None
 
 
+def repository_param_values(params, name: str) -> list[str]:
+    if hasattr(params, "getlist"):
+        values = params.getlist(name)
+    else:
+        value = params.get(name)
+        if value is None:
+            values = []
+        elif isinstance(value, str):
+            values = [value]
+        elif isinstance(value, Collection):
+            values = list(value)
+        else:
+            values = [value]
+    return [str(value) for value in values]
+
+
+def repository_has_file_filters(params) -> list[str]:
+    selected = []
+    seen = set()
+
+    for raw_value in repository_param_values(params, "has_file"):
+        for candidate in raw_value.split(","):
+            file_path = REPOSITORY_HAS_FILE_FILTER_LOOKUP.get(candidate.strip().lower())
+            if file_path and file_path not in seen:
+                selected.append(file_path)
+                seen.add(file_path)
+
+    return selected
+
+
 def minimum_age_cutoff(params, name: str = "min_age_years"):
     years = _positive_int_param(params, name)
     if not years or years > MAX_AGE_YEARS_FILTER:
@@ -2333,6 +2382,8 @@ def _apply_repository_taxonomy_filters(qs, params, *, allow_list_filter: bool):
     package_manager = normalize_repository_tag(params.get("package_manager") or "")
     if package_manager:
         qs = qs.filter(package_managers__contains=[package_manager])
+    for file_path in repository_has_file_filters(params):
+        qs = qs.filter(ai_development_signals__contains=[{"path": file_path}])
     return qs
 
 

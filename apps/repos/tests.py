@@ -1184,6 +1184,21 @@ def test_repository_filter_remove_querystring_resets_page_and_coupled_params():
     assert "sort_direction=asc" not in sort_querystring
     assert "q=django" in sort_querystring
 
+    file_params = QueryDict(
+        "page=2&q=django&has_file=AGENTS.md&has_file=CLAUDE.md&has_file=DESIGN.md"
+    )
+    file_querystring = repository_filter_remove_querystring(
+        file_params,
+        "has_file",
+        "CLAUDE.md",
+    )
+
+    assert "page=2" not in file_querystring
+    assert "has_file=CLAUDE.md" not in file_querystring
+    assert "has_file=AGENTS.md" in file_querystring
+    assert "has_file=DESIGN.md" in file_querystring
+    assert "q=django" in file_querystring
+
 
 def stub_repository_readme(monkeypatch, content="# Django\n"):
     monkeypatch.setattr(
@@ -1337,6 +1352,8 @@ def test_detect_ai_development_signals_identifies_common_agent_files():
     signals = detect_ai_development_signals(
         [
             {"path": "AGENTS.md", "type": "blob"},
+            {"path": "PRODUCT.md", "type": "blob"},
+            {"path": "DESIGN.md", "type": "blob"},
             {"path": "docs/CONTRIBUTING.md", "type": "blob"},
             {"path": ".github/copilot-instructions.md", "type": "blob"},
             {"path": ".github/instructions/python.instructions.md", "type": "blob"},
@@ -1353,6 +1370,8 @@ def test_detect_ai_development_signals_identifies_common_agent_files():
 
     signal_paths = {signal["path"] for signal in signals}
     assert "AGENTS.md" in signal_paths
+    assert "PRODUCT.md" in signal_paths
+    assert "DESIGN.md" in signal_paths
     assert ".github/copilot-instructions.md" in signal_paths
     assert ".github/instructions/python.instructions.md" in signal_paths
     assert ".cursor" in signal_paths
@@ -4016,6 +4035,70 @@ def test_repository_search_filters_and_sorts():
 
 
 @pytest.mark.django_db
+def test_repository_search_filters_by_required_files_with_and_logic():
+    matching = Repository.objects.create(
+        full_name="owner/matching",
+        owner="owner",
+        name="matching",
+        url="https://github.com/owner/matching",
+        stars=30,
+        uses_ai_for_development=True,
+        ai_development_signals=[
+            {
+                "path": "AGENTS.md",
+                "kind": "file",
+                "tool": "Agent instructions",
+                "signal": "agent_instructions",
+            },
+            {
+                "path": "CLAUDE.md",
+                "kind": "file",
+                "tool": "Claude Code",
+                "signal": "claude_memory",
+            },
+        ],
+    )
+    Repository.objects.create(
+        full_name="owner/agents-only",
+        owner="owner",
+        name="agents-only",
+        url="https://github.com/owner/agents-only",
+        stars=20,
+        uses_ai_for_development=True,
+        ai_development_signals=[
+            {
+                "path": "AGENTS.md",
+                "kind": "file",
+                "tool": "Agent instructions",
+                "signal": "agent_instructions",
+            }
+        ],
+    )
+    Repository.objects.create(
+        full_name="owner/copilot",
+        owner="owner",
+        name="copilot",
+        url="https://github.com/owner/copilot",
+        stars=10,
+        uses_ai_for_development=True,
+        ai_development_signals=[
+            {
+                "path": ".github/copilot-instructions.md",
+                "kind": "file",
+                "tool": "GitHub Copilot",
+                "signal": "copilot_repo_instructions",
+            }
+        ],
+    )
+
+    params = QueryDict("", mutable=True)
+    params.setlist("has_file", ["AGENTS.md", "CLAUDE.md"])
+
+    assert list(repository_search_queryset(params)) == [matching]
+    assert list(repository_search_queryset({"has_file": ["AGENTS.md", "CLAUDE.md"]})) == [matching]
+
+
+@pytest.mark.django_db
 def test_awesome_list_repository_queryset_skips_snapshot_metrics():
     awesome_list = AwesomeList.objects.create(
         name="Awesome Django",
@@ -5665,6 +5748,24 @@ def test_search_page_exposes_semantic_search_filter(client):
 
 
 @pytest.mark.django_db
+def test_search_page_exposes_has_file_filter(client):
+    response = client.get(
+        reverse("repos:search"),
+        {"has_file": ["AGENTS.md", "CLAUDE.md"]},
+    )
+
+    assert response.status_code == 200
+    content = response.content.decode()
+    assert 'name="has_file"' in content
+    assert 'value="AGENTS.md"' in content
+    assert 'value="PRODUCT.md"' in content
+    assert 'value=".github/copilot-instructions.md"' in content
+    assert "Has file: AGENTS.md" in content
+    assert "Has file: CLAUDE.md" in content
+    assert 'aria-label="Remove Has file filter: AGENTS.md"' in content
+
+
+@pytest.mark.django_db
 def test_search_page_humanizes_stars_and_hides_tracked_star_growth(client):
     repo = Repository.objects.create(
         full_name="django/django",
@@ -6854,6 +6955,7 @@ def test_repository_detail_page_hides_ai_development_detail_expander_when_all_pa
         owner="django",
         name="django",
         url="https://github.com/django/django",
+        default_branch="stable/6.0.x",
         uses_ai_for_development=True,
         ai_development_signals=[
             {
@@ -6875,6 +6977,9 @@ def test_repository_detail_page_hides_ai_development_detail_expander_when_all_pa
     assert len(summary["visible_signals"]) == 1
     assert summary["show_detail_signals"] is False
     assert b"AGENTS.md" in response.content
+    assert b'href="https://github.com/django/django/blob/stable/6.0.x/AGENTS.md"' in (
+        response.content
+    )
     assert b"Review config paths" not in response.content
 
 
