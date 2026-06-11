@@ -13,337 +13,468 @@
     {% endif %}
 {% endblock extra_head %}
 {% block content %}
-    <section class="mx-auto max-w-5xl px-4 py-12 sm:px-6 lg:px-8">
-        <a href="{% url 'repos:search' %}"
-           class="text-sm font-semibold text-green-700 hover:underline">← Back to search</a>
-        <div class="mt-6 rounded-3xl border border-gray-200 p-8 dark:border-gray-800">
-            <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                <div>
-                    <h1 class="text-4xl font-bold">{{ repository.full_name }}</h1>
-                    <p class="mt-3 text-lg text-gray-600 dark:text-gray-300">{{ repository.description|default:"No description." }}</p>
-                    {% if repository.topics or repository.generated_tags or repository.stack_signals %}
-                        <div class="mt-4 flex flex-wrap gap-2 text-xs">
-                            {% for signal in repository.stack_signals %}
-                                <span class="rounded-full bg-purple-50 px-3 py-1 text-purple-700 dark:bg-purple-950 dark:text-purple-200">{{ signal.label }}</span>
-                            {% endfor %}
-                            {% for topic in repository.topics %}
-                                <a href="{% url 'repos:search' %}?topic={{ topic|urlencode }}"
-                                   class="rounded-full bg-blue-50 px-3 py-1 text-blue-700 transition hover:bg-blue-100 hover:text-blue-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:bg-blue-950 dark:text-blue-200 dark:hover:bg-blue-900 dark:hover:text-blue-100">#{{ topic }}</a>
-                            {% endfor %}
-                            {% for tag in repository.generated_tags %}
-                                <span class="rounded-full bg-green-50 px-3 py-1 text-green-700 dark:bg-green-950 dark:text-green-200">{{ tag }}</span>
-                            {% endfor %}
-                        </div>
-                    {% endif %}
+    <section class="py-6">
+        <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <a href="{% url 'repos:search' %}"
+               class="inline-flex items-center text-sm font-semibold text-green-700 hover:underline focus:outline-none focus-visible:rounded-md focus-visible:ring-2 focus-visible:ring-green-500 dark:text-green-300">&larr; Back to search</a>
+            <div class="flex flex-wrap gap-2 text-xs font-semibold text-gray-600 dark:text-gray-300">
+                <span class="rounded-full bg-gray-100 px-2.5 py-1 dark:bg-gray-900">{{ repository.host|default:"github" }}</span>
+                {% if repository.is_archived %}
+                    <span class="rounded-full bg-yellow-100 px-2.5 py-1 text-yellow-900 dark:bg-yellow-900/40 dark:text-yellow-100">Archived</span>
+                {% else %}
+                    <span class="rounded-full bg-green-50 px-2.5 py-1 text-green-800 dark:bg-green-950 dark:text-green-200">Active</span>
+                {% endif %}
+                {% if repository.is_fork %}
+                    <span class="rounded-full bg-gray-100 px-2.5 py-1 dark:bg-gray-900">Fork</span>
+                {% endif %}
+                {% if repository.uses_ai_for_development %}
+                    <span class="rounded-full bg-green-50 px-2.5 py-1 text-green-800 dark:bg-green-950 dark:text-green-200">AI dev</span>
+                {% endif %}
+            </div>
+        </div>
+
+        <header class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-950 sm:p-6">
+            <div class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
+                <div class="min-w-0">
+                    <p class="text-xs font-black uppercase tracking-[0.2em] text-green-700 dark:text-green-300">Repository profile</p>
+                    <h1 class="mt-2 break-words text-3xl font-black tracking-tight text-gray-950 dark:text-white sm:text-4xl">
+                        {{ repository.full_name }}
+                    </h1>
+                    <p class="mt-3 max-w-4xl text-base leading-7 text-gray-600 dark:text-gray-300">
+                        {{ repository.description|default:"No description." }}
+                    </p>
+                    <div class="mt-4 flex flex-wrap gap-2 text-xs font-semibold text-gray-700 dark:text-gray-300">
+                        {% if repository.language %}
+                            <span class="rounded-full bg-gray-100 px-2.5 py-1 dark:bg-gray-900">{{ repository.language }}</span>
+                        {% endif %}
+                        {% if repository.license_name %}
+                            <span class="rounded-full bg-gray-100 px-2.5 py-1 dark:bg-gray-900">{{ repository.license_name }}</span>
+                        {% endif %}
+                        {% if repository.default_branch %}
+                            <span class="rounded-full bg-gray-100 px-2.5 py-1 font-mono dark:bg-gray-900">{{ repository.default_branch }}</span>
+                        {% endif %}
+                        {% if repository.stack_detected_at %}
+                            <span class="rounded-full bg-green-50 px-2.5 py-1 text-green-800 dark:bg-green-950 dark:text-green-200">Stack scanned</span>
+                        {% endif %}
+                        {% if repository.readme_path %}
+                            <span class="rounded-full bg-gray-100 px-2.5 py-1 font-mono dark:bg-gray-900">{{ repository.readme_path }}</span>
+                        {% endif %}
+                    </div>
                 </div>
-                <div class="flex flex-wrap gap-2 md:justify-end">
-                    <div class="flex items-center gap-2 md:justify-end">
+                <div class="flex flex-col gap-3 lg:min-w-64 lg:items-end">
+                    <div class="flex items-center gap-2 lg:justify-end">
                         {% include "repos/_repository_like_button.html" with repository=repository %}
                         {% include "repos/_repository_starred_badge.html" with repository=repository %}
                     </div>
-                    {% if user.is_superuser %}
-                        <form method="post"
-                              action="{% url 'repos:repo_rescan' owner=repository.owner name=repository.name %}">
-                            {% csrf_token %}
-                            <button type="submit"
-                                    class="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-green-200 bg-white px-4 text-sm font-semibold text-green-700 transition hover:bg-green-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-green-900 dark:bg-gray-950 dark:text-green-300 dark:hover:bg-green-950 dark:focus-visible:ring-offset-gray-950">
-                                <svg class="h-4 w-4"
-                                     xmlns="http://www.w3.org/2000/svg"
-                                     fill="none"
-                                     viewBox="0 0 24 24"
-                                     stroke="currentColor"
-                                     aria-hidden="true">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v6h6M20 20v-6h-6M5 19a9 9 0 0 0 14-3M19 5a9 9 0 0 0-14 3" />
-                                </svg>
-                                Rescan repo
-                            </button>
-                        </form>
-                    {% endif %}
-                    {% if repository.homepage_url and repository.homepage_url != repository.url %}
-                        <a href="{{ repository.homepage_url }}"
+                    <div class="flex flex-wrap gap-2 lg:justify-end">
+                        {% if user.is_superuser %}
+                            <form method="post"
+                                  action="{% url 'repos:repo_rescan' owner=repository.owner name=repository.name %}">
+                                {% csrf_token %}
+                                <button type="submit"
+                                        class="inline-flex min-h-11 items-center justify-center rounded-xl border border-green-200 bg-white px-4 text-sm font-semibold text-green-700 transition hover:bg-green-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-green-900 dark:bg-gray-950 dark:text-green-300 dark:hover:bg-green-950 dark:focus-visible:ring-offset-gray-950">
+                                    Rescan repo
+                                </button>
+                            </form>
+                        {% endif %}
+                        {% if repository.homepage_url and repository.homepage_url != repository.url %}
+                            <a href="{{ repository.homepage_url }}"
+                               target="_blank"
+                               rel="noopener"
+                               class="app-button-secondary">Open website</a>
+                        {% endif %}
+                        <a href="{{ repository.url }}"
                            target="_blank"
                            rel="noopener"
-                           class="inline-flex min-h-12 items-center justify-center rounded-xl border border-blue-200 px-5 text-sm font-semibold text-blue-700 transition hover:bg-blue-50 dark:border-blue-900 dark:text-blue-300 dark:hover:bg-blue-950">Open website</a>
-                    {% endif %}
-                    <a href="{{ repository.url }}"
-                       target="_blank"
-                       rel="noopener"
-                       class="inline-flex min-h-12 items-center justify-center rounded-xl bg-green-600 px-5 text-sm font-semibold text-white hover:bg-green-700">Open GitHub</a>
+                           class="app-button-primary">Open GitHub</a>
+                    </div>
                 </div>
             </div>
-            <dl class="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-                <div class="rounded-2xl bg-gray-50 p-4 dark:bg-gray-900">
-                    <dt class="text-sm text-gray-500">Stars</dt>
-                    <dd class="text-2xl font-bold">
+
+            <dl class="mt-6 grid gap-px overflow-hidden rounded-2xl border border-gray-200 bg-gray-200 dark:border-gray-800 dark:bg-gray-800 sm:grid-cols-2 lg:grid-cols-6">
+                <div class="bg-white p-4 dark:bg-gray-950">
+                    <dt class="text-xs font-medium text-gray-500 dark:text-gray-400">Stars</dt>
+                    <dd class="mt-1 text-2xl font-black tabular-nums text-gray-950 dark:text-white">
                         {{ repository.stars|intcomma }}
                     </dd>
                 </div>
-                <div class="rounded-2xl bg-gray-50 p-4 dark:bg-gray-900">
-                    <dt class="text-sm text-gray-500">Forks</dt>
-                    <dd class="text-2xl font-bold">
+                <div class="bg-white p-4 dark:bg-gray-950">
+                    <dt class="text-xs font-medium text-gray-500 dark:text-gray-400">Forks</dt>
+                    <dd class="mt-1 text-2xl font-black tabular-nums text-gray-950 dark:text-white">
                         {{ repository.forks|intcomma }}
                     </dd>
                 </div>
-                <div class="rounded-2xl bg-gray-50 p-4 dark:bg-gray-900">
-                    <dt class="text-sm text-gray-500">Commits</dt>
-                    <dd class="text-2xl font-bold">
-                        {{ repository.commit_count|default_if_none:"—" }}
+                <div class="bg-white p-4 dark:bg-gray-950">
+                    <dt class="text-xs font-medium text-gray-500 dark:text-gray-400">Watchers</dt>
+                    <dd class="mt-1 text-2xl font-black tabular-nums text-gray-950 dark:text-white">
+                        {{ repository.watchers|intcomma }}
                     </dd>
                 </div>
-                <div class="rounded-2xl bg-gray-50 p-4 dark:bg-gray-900">
-                    <dt class="text-sm text-gray-500">Language</dt>
-                    <dd class="text-2xl font-bold">
-                        {{ repository.language|default:"—" }}
+                <div class="bg-white p-4 dark:bg-gray-950">
+                    <dt class="text-xs font-medium text-gray-500 dark:text-gray-400">Issues</dt>
+                    <dd class="mt-1 text-2xl font-black tabular-nums text-gray-950 dark:text-white">
+                        {{ repository.open_issues|intcomma }}
                     </dd>
                 </div>
-                <div class="rounded-2xl bg-gray-50 p-4 dark:bg-gray-900">
-                    <dt class="text-sm text-gray-500">Awesome lists</dt>
-                    <dd class="text-2xl font-bold">
-                        {{ repository.awesome_list_count }}
+                <div class="bg-white p-4 dark:bg-gray-950">
+                    <dt class="text-xs font-medium text-gray-500 dark:text-gray-400">Commits</dt>
+                    <dd class="mt-1 text-2xl font-black tabular-nums text-gray-950 dark:text-white">
+                        {% if repository.commit_count != None %}
+                            {{ repository.commit_count|intcomma }}
+                        {% else %}
+                            n/a
+                        {% endif %}
+                    </dd>
+                </div>
+                <div class="bg-white p-4 dark:bg-gray-950">
+                    <dt class="text-xs font-medium text-gray-500 dark:text-gray-400">Awesome lists</dt>
+                    <dd class="mt-1 text-2xl font-black tabular-nums text-gray-950 dark:text-white">
+                        {{ repository_detail_summary.awesome_list_count|intcomma }}
                     </dd>
                 </div>
             </dl>
-            {% if user.is_superuser %}
-                <section class="mt-8 rounded-2xl border border-green-200 bg-green-50 p-5 dark:border-green-900/70 dark:bg-green-950/20"
-                         aria-labelledby="newsletter-admin-heading">
-                    <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                        <div>
-                            <h2 id="newsletter-admin-heading"
-                                class="text-lg font-bold text-gray-950 dark:text-white">Newsletter tracking</h2>
-                            <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">
-                                {% if repository.newsletter_tracking_enabled %}
-                                    Tracking since {{ repository.newsletter_tracking_started_at|date:"Y-m-d H:i"|default:"—" }}.
-                                    {% if repository.newsletter_tracking_last_polled_at %}
-                                        Last poll {{ repository.newsletter_tracking_last_polled_at|date:"Y-m-d H:i" }}.
-                                    {% endif %}
-                                {% else %}
-                                    Not tracking.
+        </header>
+
+        {% if user.is_superuser %}
+            <section class="mt-6 rounded-2xl border border-green-200 bg-green-50 p-5 dark:border-green-900/70 dark:bg-green-950/20"
+                     aria-labelledby="newsletter-admin-heading">
+                <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(28rem,auto)] lg:items-end">
+                    <div>
+                        <h2 id="newsletter-admin-heading"
+                            class="text-lg font-bold text-gray-950 dark:text-white">Newsletter tracking</h2>
+                        <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">
+                            {% if repository.newsletter_tracking_enabled %}
+                                Tracking since {{ repository.newsletter_tracking_started_at|date:"Y-m-d H:i"|default:"n/a" }}.
+                                {% if repository.newsletter_tracking_last_polled_at %}
+                                    Last poll {{ repository.newsletter_tracking_last_polled_at|date:"Y-m-d H:i" }}.
                                 {% endif %}
-                            </p>
-                            {% if repository.newsletter_tracking_last_error %}
-                                <p class="mt-2 text-sm font-medium text-red-700 dark:text-red-300">{{ repository.newsletter_tracking_last_error }}</p>
+                            {% else %}
+                                Not tracking.
                             {% endif %}
-                        </div>
-                        <form method="post"
-                              action="{% url 'repos:repo_newsletter_subscribe' owner=repository.owner name=repository.name %}"
-                              class="grid gap-3 sm:grid-cols-[minmax(220px,1fr)_160px_auto]">
-                            {% csrf_token %}
-                            <label class="sr-only" for="id_email">Delivery email</label>
-                            <input id="id_email"
-                                   name="email"
-                                   type="email"
-                                   value="{{ newsletter_form.email.value|default_if_none:'' }}"
-                                   class="min-h-11 rounded-xl border border-green-200 bg-white px-3 text-sm text-gray-900 focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500 dark:border-green-900 dark:bg-gray-950 dark:text-gray-100"
-                                   placeholder="email@example.com"
-                                   required>
-                            <label class="sr-only" for="id_cadence">Cadence</label>
-                            <select id="id_cadence"
-                                    name="cadence"
-                                    class="min-h-11 rounded-xl border border-green-200 bg-white px-3 text-sm text-gray-900 focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500 dark:border-green-900 dark:bg-gray-950 dark:text-gray-100">
-                                {% for value,label in newsletter_form.fields.cadence.choices %}
-                                    <option value="{{ value }}"
-                                            {% if newsletter_form.cadence.value == value %}selected{% endif %}>
-                                        {{ label }}
-                                    </option>
-                                {% endfor %}
-                            </select>
-                            <button type="submit"
-                                    class="inline-flex min-h-11 items-center justify-center rounded-xl bg-green-600 px-4 text-sm font-semibold text-white hover:bg-green-700">
-                                {% if newsletter_subscription %}
-                                    Update
-                                {% else %}
-                                    Subscribe
-                                {% endif %}
-                            </button>
-                        </form>
+                        </p>
+                        {% if repository.newsletter_tracking_last_error %}
+                            <p class="mt-2 text-sm font-medium text-red-700 dark:text-red-300">{{ repository.newsletter_tracking_last_error }}</p>
+                        {% endif %}
                     </div>
-                    {% if repository.newsletter_tracking_enabled %}
-                        <form method="post"
-                              action="{% url 'repos:repo_newsletter_disable' owner=repository.owner name=repository.name %}"
-                              class="mt-4">
-                            {% csrf_token %}
-                            <button type="submit"
-                                    class="text-sm font-semibold text-red-700 hover:underline dark:text-red-300">
-                                Stop tracking
-                            </button>
-                        </form>
+                    <form method="post"
+                          action="{% url 'repos:repo_newsletter_subscribe' owner=repository.owner name=repository.name %}"
+                          class="grid gap-3 sm:grid-cols-[minmax(220px,1fr)_160px_auto]">
+                        {% csrf_token %}
+                        <label class="sr-only" for="id_email">Delivery email</label>
+                        <input id="id_email"
+                               name="email"
+                               type="email"
+                               value="{{ newsletter_form.email.value|default_if_none:'' }}"
+                               class="min-h-11 rounded-xl border border-green-200 bg-white px-3 text-sm text-gray-900 focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500 dark:border-green-900 dark:bg-gray-950 dark:text-gray-100"
+                               placeholder="email@example.com"
+                               required>
+                        <label class="sr-only" for="id_cadence">Cadence</label>
+                        <select id="id_cadence"
+                                name="cadence"
+                                class="min-h-11 rounded-xl border border-green-200 bg-white px-3 text-sm text-gray-900 focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500 dark:border-green-900 dark:bg-gray-950 dark:text-gray-100">
+                            {% for value,label in newsletter_form.fields.cadence.choices %}
+                                <option value="{{ value }}"
+                                        {% if newsletter_form.cadence.value == value %}selected{% endif %}>
+                                    {{ label }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                        <button type="submit" class="app-button-primary">
+                            {% if newsletter_subscription %}
+                                Update
+                            {% else %}
+                                Subscribe
+                            {% endif %}
+                        </button>
+                    </form>
+                </div>
+                {% if repository.newsletter_tracking_enabled %}
+                    <form method="post"
+                          action="{% url 'repos:repo_newsletter_disable' owner=repository.owner name=repository.name %}"
+                          class="mt-4">
+                        {% csrf_token %}
+                        <button type="submit"
+                                class="text-sm font-semibold text-red-700 hover:underline dark:text-red-300">
+                            Stop tracking
+                        </button>
+                    </form>
+                {% endif %}
+            </section>
+        {% endif %}
+
+        <div class="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem] xl:items-start">
+            <div class="min-w-0 space-y-6">
+                <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-950"
+                         aria-labelledby="repository-growth-heading">
+                    <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                        <div>
+                            <h2 id="repository-growth-heading"
+                                class="text-xl font-black tracking-tight text-gray-950 dark:text-white">Activity and growth</h2>
+                            <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">
+                                Tracked growth, recent movement, and commit velocity from stored repository snapshots.
+                            </p>
+                        </div>
+                        {% if performance.has_history %}
+                            <p class="text-sm text-gray-500 dark:text-gray-400">
+                                Latest capture {{ performance.latest_snapshot.captured_at|date:"Y-m-d H:i" }}
+                            </p>
+                        {% endif %}
+                    </div>
+
+                    <dl class="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                        <div class="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
+                            <dt class="text-xs font-medium text-gray-500 dark:text-gray-400">Star growth, last {{ repository.growth_window_days|default:7 }} days</dt>
+                            <dd class="mt-1 flex flex-wrap items-baseline gap-2">
+                                {% if repository.stars_growth_7d != None %}
+                                    <span class="text-2xl font-black tabular-nums {% if repository.stars_growth_7d > 0 %}text-green-700 dark:text-green-300{% elif repository.stars_growth_7d < 0 %}text-red-700 dark:text-red-300{% else %}text-gray-950 dark:text-white{% endif %}">
+                                        {{ repository.stars_growth_7d|signed_intcomma }}
+                                    </span>
+                                    <span class="text-xs font-semibold text-gray-600 dark:text-gray-300">{{ repository.stars_growth_7d_percent|signed_percent }}</span>
+                                {% else %}
+                                    <span class="text-sm font-semibold text-gray-500 dark:text-gray-400">No 7-day history</span>
+                                {% endif %}
+                            </dd>
+                        </div>
+                        <div class="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
+                            <dt class="text-xs font-medium text-gray-500 dark:text-gray-400">Commit velocity, last {{ repository.growth_window_days|default:7 }} days</dt>
+                            <dd class="mt-1 flex flex-wrap items-baseline gap-2">
+                                {% if repository.commits_growth_7d != None %}
+                                    <span class="text-2xl font-black tabular-nums {% if repository.commits_growth_7d > 0 %}text-green-700 dark:text-green-300{% elif repository.commits_growth_7d < 0 %}text-red-700 dark:text-red-300{% else %}text-gray-950 dark:text-white{% endif %}">
+                                        {{ repository.commits_growth_7d|signed_intcomma }}
+                                    </span>
+                                    <span class="text-xs font-semibold text-gray-600 dark:text-gray-300">{{ repository.commits_growth_7d_percent|signed_percent }}</span>
+                                {% else %}
+                                    <span class="text-sm font-semibold text-gray-500 dark:text-gray-400">No 7-day history</span>
+                                {% endif %}
+                            </dd>
+                        </div>
+                        <div class="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
+                            <dt class="text-xs font-medium text-gray-500 dark:text-gray-400">Stars since baseline</dt>
+                            <dd class="mt-1 text-2xl font-black tabular-nums {% if performance.stars_since_first > 0 %}text-green-700 dark:text-green-300{% elif performance.stars_since_first < 0 %}text-red-700 dark:text-red-300{% else %}text-gray-950 dark:text-white{% endif %}">
+                                {{ performance.stars_since_first_label }}
+                            </dd>
+                        </div>
+                        <div class="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
+                            <dt class="text-xs font-medium text-gray-500 dark:text-gray-400">Snapshot coverage</dt>
+                            <dd class="mt-1 text-2xl font-black tabular-nums text-gray-950 dark:text-white">
+                                {% if performance.has_history %}
+                                    {{ performance.snapshot_count|intcomma }}
+                                {% else %}
+                                    0
+                                {% endif %}
+                            </dd>
+                        </div>
+                    </dl>
+
+                    {% if performance.has_history %}
+                        {{ repository_history_chart_data|json_script:"repository-history-data" }}
+                        <div class="mt-6 border-t border-gray-200 pt-5 dark:border-gray-800">
+                            <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                                <div>
+                                    <h3 class="text-lg font-bold text-gray-950 dark:text-white">Tracked growth</h3>
+                                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                                        {{ performance.snapshot_count }} capture{{ performance.snapshot_count|pluralize }} since {{ performance.first_snapshot.captured_at|date:"Y-m-d" }}
+                                    </p>
+                                </div>
+                                <p class="text-sm text-gray-500 dark:text-gray-400">
+                                    Stars from baseline {{ performance.stars_since_first_label }}
+                                </p>
+                            </div>
+                            <div class="mt-5 grid gap-4 lg:grid-cols-2">
+                                <section class="rounded-xl border border-gray-200 p-4 dark:border-gray-800"
+                                         data-repository-history-chart
+                                         data-history-source="repository-history-data"
+                                         data-metric="stars"
+                                         data-label="Stars">
+                                    <div class="flex items-baseline justify-between gap-3">
+                                        <h4 class="text-sm font-semibold text-gray-950 dark:text-white">Stars history</h4>
+                                        <span class="text-xs font-medium text-gray-500 dark:text-gray-400">Total stars</span>
+                                    </div>
+                                    <div class="mt-4 h-64 w-full" data-chart-plot></div>
+                                </section>
+                                <section class="rounded-xl border border-gray-200 p-4 dark:border-gray-800"
+                                         data-repository-history-chart
+                                         data-history-source="repository-history-data"
+                                         data-metric="commit_count"
+                                         data-label="Commits">
+                                    <div class="flex items-baseline justify-between gap-3">
+                                        <h4 class="text-sm font-semibold text-gray-950 dark:text-white">Commits history</h4>
+                                        <span class="text-xs font-medium text-gray-500 dark:text-gray-400">Default branch commits</span>
+                                    </div>
+                                    <div class="mt-4 h-64 w-full" data-chart-plot></div>
+                                </section>
+                            </div>
+                        </div>
                     {% endif %}
                 </section>
-            {% endif %}
-            {% if newsletter_issues %}
-                <section class="mt-8 border-t border-gray-200 pt-8 dark:border-gray-800"
-                         aria-labelledby="repository-newsletters-heading">
+
+                <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-950"
+                         aria-labelledby="repository-stack-heading">
                     <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
                         <div>
-                            <h2 id="repository-newsletters-heading" class="text-lg font-bold">Newsletters</h2>
-                            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Latest generated repository updates.</p>
-                        </div>
-                        <a class="text-sm font-semibold text-green-700 hover:underline dark:text-green-300"
-                           href="{% url 'repos:newsletter_issue_list' owner=repository.owner name=repository.name %}">View all</a>
-                    </div>
-                    <div class="mt-5 grid gap-4 md:grid-cols-2">
-                        {% for issue in newsletter_issues %}
-                            <article class="rounded-2xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-900">
-                                <div class="text-xs font-semibold uppercase tracking-wide text-green-700 dark:text-green-300">
-                                    {{ issue.get_cadence_display }} · {{ issue.period_start|date:"M d, Y" }}
-                                </div>
-                                <h3 class="mt-2 font-semibold text-gray-950 dark:text-white">
-                                    <a class="hover:text-green-700 hover:underline"
-                                       href="{{ issue.get_absolute_url }}">{{ issue.title }}</a>
-                                </h3>
-                                <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">
-                                    {{ issue.commit_count }} commit{{ issue.commit_count|pluralize }}
-                                </p>
-                            </article>
-                        {% endfor %}
-                    </div>
-                </section>
-            {% endif %}
-            {% if similar_repositories %}
-                <div class="mt-8 border-t border-gray-200 pt-8 dark:border-gray-800">
-                    <h2 class="text-lg font-bold">Similar repositories</h2>
-                    <div class="mt-5 grid gap-4 md:grid-cols-2">
-                        {% for similar_repo in similar_repositories %}
-                            <article class="rounded-2xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-900">
-                                <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                                    <div>
-                                        <h3 class="font-semibold text-gray-950 dark:text-white">
-                                            <a class="hover:text-green-700 hover:underline"
-                                               href="{{ similar_repo.get_absolute_url }}">{{ similar_repo.full_name }}</a>
-                                        </h3>
-                                        <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">{{ similar_repo.description|default:"No description." }}</p>
-                                    </div>
-                                    <div class="shrink-0 rounded-full bg-white px-3 py-1 text-xs font-semibold text-gray-600 ring-1 ring-gray-200 dark:bg-gray-950 dark:text-gray-300 dark:ring-gray-800">
-                                        {{ similar_repo.stars }} stars
-                                    </div>
-                                </div>
-                                <div class="mt-4 flex flex-wrap gap-2 text-xs text-gray-500 dark:text-gray-400">
-                                    {% if similar_repo.language %}
-                                        <span class="rounded-full bg-white px-3 py-1 ring-1 ring-gray-200 dark:bg-gray-950 dark:ring-gray-800">{{ similar_repo.language }}</span>
-                                    {% endif %}
-                                    <span class="rounded-full bg-white px-3 py-1 ring-1 ring-gray-200 dark:bg-gray-950 dark:ring-gray-800">{{ similar_repo.awesome_count }} awesome list{{ similar_repo.awesome_count|pluralize }}</span>
-                                    {% for tag in similar_repo.generated_tags|slice:":3" %}
-                                        <span class="rounded-full bg-green-50 px-3 py-1 text-green-700 dark:bg-green-950 dark:text-green-200">{{ tag }}</span>
-                                    {% endfor %}
-                                </div>
-                            </article>
-                        {% endfor %}
-                    </div>
-                </div>
-            {% endif %}
-            {% if performance.has_history %}
-                {{ repository_history_chart_data|json_script:"repository-history-data" }}
-                <div class="mt-8 border-t border-gray-200 pt-8 dark:border-gray-800">
-                    <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-                        <div>
-                            <h2 class="text-lg font-bold">Tracked growth</h2>
-                            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                                {{ performance.snapshot_count }} capture{{ performance.snapshot_count|pluralize }} since {{ performance.first_snapshot.captured_at|date:"Y-m-d" }}
+                            <h2 id="repository-stack-heading"
+                                class="text-xl font-black tracking-tight text-gray-950 dark:text-white">Detected stack</h2>
+                            <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">
+                                Frameworks, package managers, ecosystems, and dependency manifests found during catalog scans.
                             </p>
                         </div>
-                        <div class="text-sm text-gray-500 dark:text-gray-400">
-                            Latest capture {{ performance.latest_snapshot.captured_at|date:"Y-m-d H:i" }}
+                        {% if repository.stack_detected_at %}
+                            <p class="text-sm text-gray-500 dark:text-gray-400">Scanned {{ repository.stack_detected_at|date:"Y-m-d H:i" }}</p>
+                        {% endif %}
+                    </div>
+
+                    <dl class="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                        <div class="rounded-xl bg-gray-50 p-4 dark:bg-gray-900">
+                            <dt class="text-xs font-medium text-gray-500 dark:text-gray-400">Stack signals</dt>
+                            <dd class="mt-1 text-2xl font-black tabular-nums text-gray-950 dark:text-white">{{ repository_detail_summary.stack_signal_count }}</dd>
                         </div>
-                    </div>
-                    <div class="mt-6 grid gap-4 lg:grid-cols-2">
-                        <section class="rounded-2xl border border-gray-200 p-4 dark:border-gray-800"
-                                 data-repository-history-chart
-                                 data-history-source="repository-history-data"
-                                 data-metric="stars"
-                                 data-label="Stars">
-                            <div class="flex items-baseline justify-between gap-3">
-                                <h3 class="text-sm font-semibold text-gray-950 dark:text-white">Stars history</h3>
-                                <span class="text-xs font-medium text-gray-500 dark:text-gray-400">Total stars</span>
-                            </div>
-                            <div class="mt-4 h-64 w-full" data-chart-plot></div>
-                        </section>
-                        <section class="rounded-2xl border border-gray-200 p-4 dark:border-gray-800"
-                                 data-repository-history-chart
-                                 data-history-source="repository-history-data"
-                                 data-metric="commit_count"
-                                 data-label="Commits">
-                            <div class="flex items-baseline justify-between gap-3">
-                                <h3 class="text-sm font-semibold text-gray-950 dark:text-white">Commits history</h3>
-                                <span class="text-xs font-medium text-gray-500 dark:text-gray-400">Default branch commits</span>
-                            </div>
-                            <div class="mt-4 h-64 w-full" data-chart-plot></div>
-                        </section>
-                    </div>
-                </div>
-            {% endif %}
-            {% if repository.stack_signals or repository.dependency_files or repository.stack_detection_last_error %}
-                <div class="mt-8 border-t border-gray-200 pt-8 dark:border-gray-800">
-                    <h2 class="text-lg font-bold">Detected stack</h2>
+                        <div class="rounded-xl bg-gray-50 p-4 dark:bg-gray-900">
+                            <dt class="text-xs font-medium text-gray-500 dark:text-gray-400">Package managers</dt>
+                            <dd class="mt-1 text-2xl font-black tabular-nums text-gray-950 dark:text-white">{{ repository_detail_summary.package_manager_count }}</dd>
+                        </div>
+                        <div class="rounded-xl bg-gray-50 p-4 dark:bg-gray-900">
+                            <dt class="text-xs font-medium text-gray-500 dark:text-gray-400">Manifest files</dt>
+                            <dd class="mt-1 text-2xl font-black tabular-nums text-gray-950 dark:text-white">{{ repository_detail_summary.dependency_file_count }}</dd>
+                        </div>
+                        <div class="rounded-xl bg-gray-50 p-4 dark:bg-gray-900">
+                            <dt class="text-xs font-medium text-gray-500 dark:text-gray-400">Dependencies</dt>
+                            <dd class="mt-1 text-2xl font-black tabular-nums text-gray-950 dark:text-white">{{ repository_detail_summary.dependency_total|intcomma }}</dd>
+                        </div>
+                    </dl>
+
                     <div class="mt-5 grid gap-6 lg:grid-cols-2">
-                        <div>
-                            <h3 class="text-sm font-semibold text-gray-950 dark:text-white">Frameworks and tools</h3>
+                        <div class="min-w-0">
+                            <h3 class="text-sm font-bold text-gray-950 dark:text-white">Frameworks and tools</h3>
                             <ul class="mt-3 space-y-2 text-sm text-gray-600 dark:text-gray-300">
                                 {% for signal in repository.stack_signals %}
-                                    <li>
+                                    <li class="grid gap-1 rounded-xl border border-gray-200 p-3 dark:border-gray-800">
                                         <span class="font-semibold text-gray-950 dark:text-white">{{ signal.label }}</span>
-                                        <span class="text-gray-500 dark:text-gray-400">· {{ signal.category }} · {{ signal.confidence }} confidence</span>
+                                        <span class="text-xs text-gray-500 dark:text-gray-400">{{ signal.category }} &middot; {{ signal.confidence }} confidence</span>
                                     </li>
                                 {% empty %}
-                                    <li class="text-gray-500">No framework dependencies detected.</li>
+                                    <li class="rounded-xl border border-dashed border-gray-300 p-3 text-gray-500 dark:border-gray-700 dark:text-gray-400">No framework dependencies detected.</li>
                                 {% endfor %}
                             </ul>
-                            {% if repository.package_managers %}
-                                <div class="mt-4 flex flex-wrap gap-2 text-xs">
+                            {% if repository.package_managers or repository.dependency_ecosystems %}
+                                <div class="mt-4 flex flex-wrap gap-2 text-xs font-semibold text-gray-700 dark:text-gray-300">
                                     {% for manager in repository.package_managers %}
-                                        <span class="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-800">{{ manager|package_manager_label }}</span>
+                                        <a href="{% url 'repos:search' %}?package_manager={{ manager|urlencode }}"
+                                           class="rounded-full bg-gray-100 px-2.5 py-1 transition hover:bg-gray-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 dark:bg-gray-900 dark:hover:bg-gray-800">{{ manager|package_manager_label }}</a>
+                                    {% endfor %}
+                                    {% for ecosystem in repository.dependency_ecosystems %}
+                                        <span class="rounded-full bg-gray-100 px-2.5 py-1 dark:bg-gray-900">{{ ecosystem }}</span>
                                     {% endfor %}
                                 </div>
                             {% endif %}
                         </div>
-                        <div>
-                            <h3 class="text-sm font-semibold text-gray-950 dark:text-white">Dependency files</h3>
+                        <div class="min-w-0">
+                            <h3 class="text-sm font-bold text-gray-950 dark:text-white">Dependency files</h3>
                             <ul class="mt-3 space-y-2 text-sm text-gray-600 dark:text-gray-300">
-                                {% for dependency_file in repository.dependency_files|slice:":10" %}
-                                    <li>
-                                        <code class="break-all rounded bg-gray-100 px-1.5 py-0.5 text-xs dark:bg-gray-900">{{ dependency_file.path }}</code>
-                                        <span class="text-gray-500 dark:text-gray-400">· {{ dependency_file.ecosystem }} · {{ dependency_file.dependency_count }} dependencies</span>
+                                {% for dependency_file in repository_dependency_files|slice:":12" %}
+                                    <li class="grid gap-1 rounded-xl border border-gray-200 p-3 dark:border-gray-800">
+                                        <code class="break-all font-mono text-xs font-semibold text-gray-950 dark:text-white">{{ dependency_file.path }}</code>
+                                        <span class="text-xs text-gray-500 dark:text-gray-400">{{ dependency_file.ecosystem }} &middot; {{ dependency_file.dependency_count }} dependencies</span>
                                     </li>
                                 {% empty %}
-                                    <li class="text-gray-500">No dependency manifests detected.</li>
+                                    <li class="rounded-xl border border-dashed border-gray-300 p-3 text-gray-500 dark:border-gray-700 dark:text-gray-400">No dependency manifests detected.</li>
                                 {% endfor %}
                             </ul>
+                            {% if repository_dependency_files|length > 12 %}
+                                <p class="mt-3 text-xs text-gray-500 dark:text-gray-400">
+                                    Showing 12 of {{ repository_detail_summary.dependency_file_count }} manifests.
+                                </p>
+                            {% endif %}
                             {% if repository.stack_detection_last_error %}
-                                <p class="mt-3 text-sm text-red-600 dark:text-red-400">{{ repository.stack_detection_last_error }}</p>
+                                <p class="mt-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/20 dark:text-red-300">{{ repository.stack_detection_last_error }}</p>
                             {% endif %}
                         </div>
                     </div>
-                </div>
-            {% endif %}
-            <div class="mt-8 grid gap-6 lg:grid-cols-3">
-                <div>
-                    <h2 class="text-lg font-bold">Metadata</h2>
-                    <ul class="mt-3 space-y-2 text-gray-600 dark:text-gray-300">
-                        <li>Created: {{ repository.github_created_at|date:"Y-m-d"|default:"—" }}</li>
-                        <li>First commit: {{ repository.first_commit_at|date:"Y-m-d"|default:"—" }}</li>
-                        <li>Last pushed: {{ repository.github_pushed_at|date:"Y-m-d"|default:"—" }}</li>
-                        {% if repository.homepage_url and repository.homepage_url != repository.url %}
-                            <li>
-                                Website: <a href="{{ repository.homepage_url }}"
-    target="_blank"
-    rel="noopener"
-    class="break-all text-green-700 hover:underline dark:text-green-300">{{ repository.homepage_url }}</a>
-                            </li>
-                        {% endif %}
-                        <li>Archived: {{ repository.is_archived|yesno:"yes,no" }}</li>
-                        <li>Stack detected: {{ repository.stack_detected_at|date:"Y-m-d H:i"|default:"—" }}</li>
-                        <li>License: {{ repository.license_name|default:"—" }}</li>
-                    </ul>
-                </div>
-                <div class="min-w-0">
-                    <h2 class="text-lg font-bold">AI development signals</h2>
+                </section>
+
+                <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-950"
+                         aria-labelledby="repository-classification-heading">
+                    <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                        <div>
+                            <h2 id="repository-classification-heading"
+                                class="text-xl font-black tracking-tight text-gray-950 dark:text-white">Classification</h2>
+                            <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">
+                                Searchable topics, generated tags, and stack labels that explain where this repository fits.
+                            </p>
+                        </div>
+                        <dl class="grid grid-cols-3 gap-2 text-center text-xs">
+                            <div class="rounded-xl bg-gray-50 px-3 py-2 dark:bg-gray-900">
+                                <dt class="text-gray-500 dark:text-gray-400">Topics</dt>
+                                <dd class="font-black tabular-nums text-gray-950 dark:text-white">{{ repository_detail_summary.topic_count }}</dd>
+                            </div>
+                            <div class="rounded-xl bg-gray-50 px-3 py-2 dark:bg-gray-900">
+                                <dt class="text-gray-500 dark:text-gray-400">Tags</dt>
+                                <dd class="font-black tabular-nums text-gray-950 dark:text-white">{{ repository_detail_summary.generated_tag_count }}</dd>
+                            </div>
+                            <div class="rounded-xl bg-gray-50 px-3 py-2 dark:bg-gray-900">
+                                <dt class="text-gray-500 dark:text-gray-400">Stacks</dt>
+                                <dd class="font-black tabular-nums text-gray-950 dark:text-white">{{ repository_detail_summary.stack_signal_count }}</dd>
+                            </div>
+                        </dl>
+                    </div>
+                    <div class="mt-5 grid gap-5 lg:grid-cols-3">
+                        <div class="min-w-0">
+                            <h3 class="text-sm font-bold text-gray-950 dark:text-white">Topics</h3>
+                            <div class="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
+                                {% for topic in repository.topics %}
+                                    <a href="{% url 'repos:search' %}?topic={{ topic|urlencode }}"
+                                       class="rounded-full bg-blue-50 px-2.5 py-1 text-blue-800 transition hover:bg-blue-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:bg-blue-950 dark:text-blue-100 dark:hover:bg-blue-900">#{{ topic }}</a>
+                                {% empty %}
+                                    <span class="text-sm text-gray-500 dark:text-gray-400">No topics indexed.</span>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        <div class="min-w-0">
+                            <h3 class="text-sm font-bold text-gray-950 dark:text-white">Generated tags</h3>
+                            <div class="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
+                                {% for tag in repository.generated_tags %}
+                                    <a href="{% url 'repos:search' %}?generated_tag={{ tag|urlencode }}"
+                                       class="rounded-full bg-green-50 px-2.5 py-1 text-green-800 transition hover:bg-green-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 dark:bg-green-950 dark:text-green-100 dark:hover:bg-green-900">{{ tag }}</a>
+                                {% empty %}
+                                    <span class="text-sm text-gray-500 dark:text-gray-400">No generated tags yet.</span>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        <div class="min-w-0">
+                            <h3 class="text-sm font-bold text-gray-950 dark:text-white">Stack labels</h3>
+                            <div class="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
+                                {% for signal in repository.stack_signals %}
+                                    <a href="{% url 'repos:search' %}?stack={{ signal.slug|urlencode }}"
+                                       class="rounded-full bg-purple-50 px-2.5 py-1 text-purple-800 transition hover:bg-purple-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 dark:bg-purple-950 dark:text-purple-100 dark:hover:bg-purple-900">{{ signal.label }}</a>
+                                {% empty %}
+                                    <span class="text-sm text-gray-500 dark:text-gray-400">No stack labels yet.</span>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-950"
+                         aria-labelledby="repository-ai-heading">
+                    <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                        <div>
+                            <h2 id="repository-ai-heading"
+                                class="text-xl font-black tracking-tight text-gray-950 dark:text-white">AI development signals</h2>
+                            <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">
+                                Agent instructions and tool configuration paths found in the repository tree.
+                            </p>
+                        </div>
+                        <div class="rounded-xl bg-gray-50 px-3 py-2 text-xs text-gray-600 dark:bg-gray-900 dark:text-gray-300">
+                            {{ ai_development_signal_summary.total_count }} path{{ ai_development_signal_summary.total_count|pluralize }}
+                        </div>
+                    </div>
                     {% if ai_development_signal_summary.has_signals %}
-                        <div class="mt-3 rounded-2xl border border-green-200 bg-green-50/70 p-4 dark:border-green-900/60 dark:bg-green-950/20">
+                        <div class="mt-4 rounded-2xl border border-green-200 bg-green-50/70 p-4 dark:border-green-900/60 dark:bg-green-950/20">
                             <p class="text-sm font-semibold text-gray-950 dark:text-white">AI agent config detected</p>
                             <div class="mt-2 flex flex-wrap gap-2 text-xs text-gray-600 dark:text-gray-300">
                                 <span>{{ ai_development_signal_summary.total_count }} config path{{ ai_development_signal_summary.total_count|pluralize }}</span>
-                                <span aria-hidden="true">·</span>
+                                <span aria-hidden="true">&middot;</span>
                                 <span>{{ ai_development_signal_summary.file_count }} file{{ ai_development_signal_summary.file_count|pluralize }}</span>
-                                <span aria-hidden="true">·</span>
+                                <span aria-hidden="true">&middot;</span>
                                 <span>{{ ai_development_signal_summary.directory_count }} director{{ ai_development_signal_summary.directory_count|pluralize:"y,ies" }}</span>
                             </div>
                             <div class="mt-3 flex flex-wrap gap-2">
@@ -359,7 +490,7 @@
                             </div>
                             <div class="mt-4 border-t border-green-200/70 pt-3 dark:border-green-900/60">
                                 <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Key config paths</p>
-                                <ul class="mt-2 space-y-1.5">
+                                <ul class="mt-2 grid gap-2 md:grid-cols-2">
                                     {% for signal in ai_development_signal_summary.visible_signals %}
                                         <li class="flex min-w-0 items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
                                             <span class="shrink-0 rounded-full bg-white px-2 py-0.5 font-semibold text-gray-500 ring-1 ring-gray-200 dark:bg-gray-950 dark:text-gray-400 dark:ring-gray-800">{{ signal.kind_label }}</span>
@@ -379,10 +510,10 @@
                                     <summary class="cursor-pointer font-semibold text-green-700 marker:text-green-700 hover:text-green-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 dark:text-green-300 dark:marker:text-green-300 dark:hover:text-green-200">
                                         Review config paths
                                     </summary>
-                                    <ul class="mt-2 max-h-48 space-y-1.5 overflow-y-auto rounded-xl border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-950">
+                                    <ul class="mt-2 max-h-56 space-y-1.5 overflow-y-auto rounded-xl border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-950">
                                         {% for signal in ai_development_signal_summary.detail_signals %}
                                             <li class="flex min-w-0 items-center gap-2">
-                                                <span class="w-24 shrink-0 truncate font-semibold text-gray-500 dark:text-gray-400"
+                                                <span class="w-28 shrink-0 truncate font-semibold text-gray-500 dark:text-gray-400"
                                                       title="{{ signal.tool }}">{{ signal.tool }}</span>
                                                 <code class="min-w-0 flex-1 truncate rounded bg-gray-100 px-1.5 py-0.5 font-mono text-xs text-gray-700 dark:bg-gray-900 dark:text-gray-200"
                                                       title="{{ signal.path }}">{{ signal.path }}</code>
@@ -398,25 +529,189 @@
                             {% endif %}
                         </div>
                     {% else %}
-                        <div class="mt-3 rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400">
+                        <div class="mt-4 rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400">
                             No AI development config files detected.
                         </div>
                     {% endif %}
-                </div>
-                <div>
-                    <h2 class="text-lg font-bold">Appears in</h2>
-                    <ul class="mt-3 space-y-2">
-                        {% for item in repository.awesome_items.all %}
+                </section>
+
+                {% if newsletter_issues %}
+                    <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-950"
+                             aria-labelledby="repository-newsletters-heading">
+                        <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                            <div>
+                                <h2 id="repository-newsletters-heading"
+                                    class="text-xl font-black tracking-tight text-gray-950 dark:text-white">Newsletters</h2>
+                                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Latest generated repository updates.</p>
+                            </div>
+                            <a class="text-sm font-semibold text-green-700 hover:underline dark:text-green-300"
+                               href="{% url 'repos:newsletter_issue_list' owner=repository.owner name=repository.name %}">View all</a>
+                        </div>
+                        <div class="mt-5 grid gap-4 md:grid-cols-2">
+                            {% for issue in newsletter_issues %}
+                                <article class="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-900">
+                                    <div class="text-xs font-semibold uppercase tracking-wide text-green-700 dark:text-green-300">
+                                        {{ issue.get_cadence_display }} &middot; {{ issue.period_start|date:"M d, Y" }}
+                                    </div>
+                                    <h3 class="mt-2 font-semibold text-gray-950 dark:text-white">
+                                        <a class="hover:text-green-700 hover:underline"
+                                           href="{{ issue.get_absolute_url }}">{{ issue.title }}</a>
+                                    </h3>
+                                    <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">
+                                        {{ issue.commit_count }} commit{{ issue.commit_count|pluralize }}
+                                    </p>
+                                </article>
+                            {% endfor %}
+                        </div>
+                    </section>
+                {% endif %}
+
+                {% if similar_repositories %}
+                    <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-950"
+                             aria-labelledby="repository-similar-heading">
+                        <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                            <div>
+                                <h2 id="repository-similar-heading"
+                                    class="text-xl font-black tracking-tight text-gray-950 dark:text-white">Similar repositories</h2>
+                                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Nearest indexed repositories by embedding similarity.</p>
+                            </div>
+                        </div>
+                        <div class="mt-5 grid gap-4 md:grid-cols-2">
+                            {% for similar_repo in similar_repositories %}
+                                <article class="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-900">
+                                    <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                        <div class="min-w-0">
+                                            <h3 class="truncate font-semibold text-gray-950 dark:text-white">
+                                                <a class="hover:text-green-700 hover:underline"
+                                                   href="{{ similar_repo.get_absolute_url }}">{{ similar_repo.full_name }}</a>
+                                            </h3>
+                                            <p class="mt-2 line-clamp-2 text-sm text-gray-600 dark:text-gray-300">{{ similar_repo.description|default:"No description." }}</p>
+                                        </div>
+                                        <div class="shrink-0 rounded-full bg-white px-3 py-1 text-xs font-semibold text-gray-600 ring-1 ring-gray-200 dark:bg-gray-950 dark:text-gray-300 dark:ring-gray-800">
+                                            {{ similar_repo.stars|intcomma }} stars
+                                        </div>
+                                    </div>
+                                    <div class="mt-4 flex flex-wrap gap-2 text-xs text-gray-500 dark:text-gray-400">
+                                        {% if similar_repo.language %}
+                                            <span class="rounded-full bg-white px-3 py-1 ring-1 ring-gray-200 dark:bg-gray-950 dark:ring-gray-800">{{ similar_repo.language }}</span>
+                                        {% endif %}
+                                        <span class="rounded-full bg-white px-3 py-1 ring-1 ring-gray-200 dark:bg-gray-950 dark:ring-gray-800">{{ similar_repo.awesome_count }} awesome list{{ similar_repo.awesome_count|pluralize }}</span>
+                                        {% for tag in similar_repo.generated_tags|slice:":3" %}
+                                            <span class="rounded-full bg-green-50 px-3 py-1 text-green-700 dark:bg-green-950 dark:text-green-200">{{ tag }}</span>
+                                        {% endfor %}
+                                    </div>
+                                </article>
+                            {% endfor %}
+                        </div>
+                    </section>
+                {% endif %}
+            </div>
+
+            <aside class="space-y-6 xl:sticky xl:top-24">
+                <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-950"
+                         aria-labelledby="repository-metadata-heading">
+                    <h2 id="repository-metadata-heading"
+                        class="text-lg font-black tracking-tight text-gray-950 dark:text-white">Metadata</h2>
+                    <dl class="mt-4 divide-y divide-gray-200 text-sm dark:divide-gray-800">
+                        <div class="flex items-start justify-between gap-4 py-2.5">
+                            <dt class="text-gray-500 dark:text-gray-400">Language</dt>
+                            <dd class="text-right font-semibold text-gray-950 dark:text-white">{{ repository.language|default:"n/a" }}</dd>
+                        </div>
+                        <div class="flex items-start justify-between gap-4 py-2.5">
+                            <dt class="text-gray-500 dark:text-gray-400">License</dt>
+                            <dd class="text-right font-semibold text-gray-950 dark:text-white">{{ repository.license_name|default:"n/a" }}</dd>
+                        </div>
+                        <div class="flex items-start justify-between gap-4 py-2.5">
+                            <dt class="text-gray-500 dark:text-gray-400">Default branch</dt>
+                            <dd class="max-w-40 truncate text-right font-mono text-xs font-semibold text-gray-950 dark:text-white">{{ repository.default_branch|default:"n/a" }}</dd>
+                        </div>
+                        <div class="flex items-start justify-between gap-4 py-2.5">
+                            <dt class="text-gray-500 dark:text-gray-400">Created</dt>
+                            <dd class="text-right font-semibold text-gray-950 dark:text-white">{{ repository.github_created_at|date:"Y-m-d"|default:"n/a" }}</dd>
+                        </div>
+                        <div class="flex items-start justify-between gap-4 py-2.5">
+                            <dt class="text-gray-500 dark:text-gray-400">First commit</dt>
+                            <dd class="text-right font-semibold text-gray-950 dark:text-white">{{ repository.first_commit_at|date:"Y-m-d"|default:"n/a" }}</dd>
+                        </div>
+                        <div class="flex items-start justify-between gap-4 py-2.5">
+                            <dt class="text-gray-500 dark:text-gray-400">Last pushed</dt>
+                            <dd class="text-right font-semibold text-gray-950 dark:text-white">{{ repository.github_pushed_at|date:"Y-m-d"|default:"n/a" }}</dd>
+                        </div>
+                        <div class="flex items-start justify-between gap-4 py-2.5">
+                            <dt class="text-gray-500 dark:text-gray-400">GitHub updated</dt>
+                            <dd class="text-right font-semibold text-gray-950 dark:text-white">{{ repository.github_updated_at|date:"Y-m-d"|default:"n/a" }}</dd>
+                        </div>
+                        <div class="flex items-start justify-between gap-4 py-2.5">
+                            <dt class="text-gray-500 dark:text-gray-400">Last synced</dt>
+                            <dd class="text-right font-semibold text-gray-950 dark:text-white">{{ repository.last_synced_at|date:"Y-m-d H:i"|default:"n/a" }}</dd>
+                        </div>
+                        <div class="flex items-start justify-between gap-4 py-2.5">
+                            <dt class="text-gray-500 dark:text-gray-400">Stack detected</dt>
+                            <dd class="text-right font-semibold text-gray-950 dark:text-white">{{ repository.stack_detected_at|date:"Y-m-d H:i"|default:"n/a" }}</dd>
+                        </div>
+                        <div class="flex items-start justify-between gap-4 py-2.5">
+                            <dt class="text-gray-500 dark:text-gray-400">Archived</dt>
+                            <dd class="text-right font-semibold text-gray-950 dark:text-white">{{ repository.is_archived|yesno:"yes,no" }}</dd>
+                        </div>
+                    </dl>
+                </section>
+
+                <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-950"
+                         aria-labelledby="repository-links-heading">
+                    <h2 id="repository-links-heading"
+                        class="text-lg font-black tracking-tight text-gray-950 dark:text-white">Links and files</h2>
+                    <div class="mt-4 space-y-3 text-sm">
+                        <a href="{{ repository.url }}"
+                           target="_blank"
+                           rel="noopener"
+                           class="flex items-center justify-between gap-3 rounded-xl border border-gray-200 px-3 py-2 font-semibold text-green-700 transition hover:bg-green-50 dark:border-gray-800 dark:text-green-300 dark:hover:bg-green-950/30">
+                            <span>GitHub</span>
+                            <span aria-hidden="true">&rarr;</span>
+                        </a>
+                        {% if repository.homepage_url and repository.homepage_url != repository.url %}
+                            <a href="{{ repository.homepage_url }}"
+                               target="_blank"
+                               rel="noopener"
+                               class="flex items-center justify-between gap-3 rounded-xl border border-gray-200 px-3 py-2 font-semibold text-blue-700 transition hover:bg-blue-50 dark:border-gray-800 dark:text-blue-300 dark:hover:bg-blue-950/30">
+                                <span class="truncate">Website</span>
+                                <span aria-hidden="true">&rarr;</span>
+                            </a>
+                            <p class="break-all rounded-xl bg-gray-50 p-3 text-xs text-gray-600 dark:bg-gray-900 dark:text-gray-300">{{ repository.homepage_url }}</p>
+                        {% endif %}
+                        {% if repository.readme_url %}
+                            <a href="{{ repository.readme_url }}"
+                               target="_blank"
+                               rel="noopener"
+                               class="flex items-center justify-between gap-3 rounded-xl border border-gray-200 px-3 py-2 font-semibold text-gray-800 transition hover:bg-gray-50 dark:border-gray-800 dark:text-gray-100 dark:hover:bg-gray-900">
+                                <span class="truncate">README</span>
+                                <span aria-hidden="true">&rarr;</span>
+                            </a>
+                        {% endif %}
+                        {% if repository.readme_last_error %}
+                            <p class="rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700 dark:border-red-900/60 dark:bg-red-950/20 dark:text-red-300">{{ repository.readme_last_error }}</p>
+                        {% endif %}
+                    </div>
+                </section>
+
+                <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-950"
+                         aria-labelledby="repository-appears-in-heading">
+                    <div class="flex items-baseline justify-between gap-3">
+                        <h2 id="repository-appears-in-heading"
+                            class="text-lg font-black tracking-tight text-gray-950 dark:text-white">Appears in</h2>
+                        <span class="text-sm font-semibold tabular-nums text-gray-500 dark:text-gray-400">{{ repository_detail_summary.awesome_list_count }}</span>
+                    </div>
+                    <ul class="mt-4 space-y-2 text-sm">
+                        {% for item in awesome_list_items %}
                             <li>
-                                <a class="text-green-700 hover:underline"
+                                <a class="block rounded-xl border border-gray-200 px-3 py-2 font-semibold text-green-700 transition hover:bg-green-50 dark:border-gray-800 dark:text-green-300 dark:hover:bg-green-950/30"
                                    href="{{ item.awesome_list.get_absolute_url }}">{{ item.awesome_list.name }}</a>
                             </li>
                         {% empty %}
-                            <li class="text-gray-500">No awesome list links recorded.</li>
+                            <li class="rounded-xl border border-dashed border-gray-300 p-3 text-gray-500 dark:border-gray-700 dark:text-gray-400">No awesome list links recorded.</li>
                         {% endfor %}
                     </ul>
-                </div>
-            </div>
+                </section>
+            </aside>
         </div>
     </section>
 {% endblock content %}
