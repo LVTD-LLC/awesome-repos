@@ -376,6 +376,7 @@
                                     </span>
                                 {% endif %}
                             </div>
+                            {# Keep the compact limit below in sync across slice, guard, and overflow count. #}
                             <ul class="mt-3 flex flex-wrap gap-1.5 text-xs text-gray-600 dark:text-gray-300">
                                 {% for dependency_file in repository_dependency_files|slice:":8" %}
                                     <li class="min-w-0 max-w-full"
