@@ -6606,8 +6606,6 @@ def test_repository_badge_svg_supports_commit_metric_and_escapes_metadata(client
     )
 
     assert response.status_code == 200
-    assert len(response.context["repository_visible_dependency_files"]) == 8
-    assert response.context["repository_hidden_dependency_file_count"] == 1
     content = response.content.decode()
     assert "Commit history" in content
     assert "commits" in content
@@ -6681,6 +6679,8 @@ def test_repository_badge_svg_renders_commit_velocity_periods(client):
     )
 
     assert response.status_code == 200
+    assert len(response.context["repository_visible_dependency_files"]) == 8
+    assert response.context["repository_hidden_dependency_file_count"] == 1
     content = response.content.decode()
     assert "30-day commit velocity" in content
     assert "+45" in content
