@@ -1199,6 +1199,22 @@ def test_repository_filter_remove_querystring_resets_page_and_coupled_params():
     assert "has_file=DESIGN.md" in file_querystring
     assert "q=django" in file_querystring
 
+    dict_querystring = repository_filter_remove_querystring(
+        {
+            "page": "2",
+            "q": "django",
+            "has_file": ["AGENTS.md", "CLAUDE.md", "DESIGN.md"],
+        },
+        "has_file",
+        "CLAUDE.md",
+    )
+
+    assert "page=2" not in dict_querystring
+    assert "has_file=CLAUDE.md" not in dict_querystring
+    assert "has_file=AGENTS.md" in dict_querystring
+    assert "has_file=DESIGN.md" in dict_querystring
+    assert "q=django" in dict_querystring
+
 
 def stub_repository_readme(monkeypatch, content="# Django\n"):
     monkeypatch.setattr(

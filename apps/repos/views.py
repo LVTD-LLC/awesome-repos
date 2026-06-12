@@ -1,4 +1,4 @@
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -526,6 +526,12 @@ def repository_advanced_filters_applied(params) -> bool:
     return any(params.get(name) for name in REPOSITORY_ADVANCED_FILTER_PARAM_NAMES)
 
 
+def _repository_params_urlencode(params) -> str:
+    if hasattr(params, "urlencode"):
+        return params.urlencode()
+    return urlencode(params, doseq=True)
+
+
 def repository_filter_remove_querystring(params, name: str, value: str | None = None) -> str:
     next_params = params.copy()
     next_params.pop("page", None)
@@ -541,7 +547,7 @@ def repository_filter_remove_querystring(params, name: str, value: str | None = 
             next_params["has_file"] = remaining_files
         else:
             next_params.pop("has_file", None)
-        return next_params.urlencode()
+        return _repository_params_urlencode(next_params)
 
     names_to_remove = {name}
     if name in {"framework", "stack"}:
@@ -553,7 +559,7 @@ def repository_filter_remove_querystring(params, name: str, value: str | None = 
 
     for remove_name in names_to_remove:
         next_params.pop(remove_name, None)
-    return next_params.urlencode()
+    return _repository_params_urlencode(next_params)
 
 
 def _repository_filter_chip_value(
