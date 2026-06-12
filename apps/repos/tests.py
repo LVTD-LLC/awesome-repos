@@ -1370,6 +1370,7 @@ def test_detect_ai_development_signals_identifies_common_agent_files():
             {"path": "AGENTS.md", "type": "blob"},
             {"path": "PRODUCT.md", "type": "blob"},
             {"path": "DESIGN.md", "type": "blob"},
+            {"path": "docs/design.md", "type": "blob"},
             {"path": "docs/CONTRIBUTING.md", "type": "blob"},
             {"path": ".github/copilot-instructions.md", "type": "blob"},
             {"path": ".github/instructions/python.instructions.md", "type": "blob"},
@@ -1398,6 +1399,7 @@ def test_detect_ai_development_signals_identifies_common_agent_files():
     assert ".clinerules/testing.md" in signal_paths
     assert ".aider.conf.yml" in signal_paths
     assert "docs/CONTRIBUTING.md" not in signal_paths
+    assert "docs/design.md" not in signal_paths
     assert ".coderabbit.yml" not in signal_paths
     assert len(signal_paths) == len(signals)
 
@@ -4106,12 +4108,28 @@ def test_repository_search_filters_by_required_files_with_and_logic():
             }
         ],
     )
-    lowercase_subdirectory = Repository.objects.create(
-        full_name="owner/lowercase-subdirectory",
+    lowercase_root = Repository.objects.create(
+        full_name="owner/lowercase-root",
         owner="owner",
-        name="lowercase-subdirectory",
-        url="https://github.com/owner/lowercase-subdirectory",
+        name="lowercase-root",
+        url="https://github.com/owner/lowercase-root",
         stars=5,
+        uses_ai_for_development=True,
+        ai_development_signals=[
+            {
+                "path": "design.md",
+                "kind": "file",
+                "tool": "Project docs",
+                "signal": "project_design_doc",
+            }
+        ],
+    )
+    Repository.objects.create(
+        full_name="owner/subdirectory-doc",
+        owner="owner",
+        name="subdirectory-doc",
+        url="https://github.com/owner/subdirectory-doc",
+        stars=3,
         uses_ai_for_development=True,
         ai_development_signals=[
             {
@@ -4128,7 +4146,7 @@ def test_repository_search_filters_by_required_files_with_and_logic():
 
     assert list(repository_search_queryset(params)) == [matching]
     assert list(repository_search_queryset({"has_file": ["AGENTS.md", "CLAUDE.md"]})) == [matching]
-    assert list(repository_search_queryset({"has_file": ["DESIGN.md"]})) == [lowercase_subdirectory]
+    assert list(repository_search_queryset({"has_file": ["DESIGN.md"]})) == [lowercase_root]
 
 
 @pytest.mark.django_db

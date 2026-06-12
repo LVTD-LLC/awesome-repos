@@ -91,13 +91,8 @@ AI_DEVELOPMENT_ANYWHERE_FILE_SIGNALS = {
     "agent.md": ("Agent instructions", "agent_instructions"),
     "claude.md": ("Claude Code", "claude_memory"),
     "claude.local.md": ("Claude Code", "claude_local_memory"),
-    "design.md": ("Project docs", "project_design_doc"),
     "gemini.md": ("Gemini CLI", "gemini_context"),
     "codex.md": ("Codex", "codex_instructions"),
-    "product.md": ("Project docs", "project_product_doc"),
-    "structure.md": ("Project docs", "project_structure_doc"),
-    "tech.md": ("Project docs", "project_tech_doc"),
-    "vision.md": ("Project docs", "project_vision_doc"),
 }
 AI_DEVELOPMENT_EXACT_PATH_SIGNALS = {
     ".aider.conf.yml": ("Aider", "aider_config"),
@@ -114,7 +109,12 @@ AI_DEVELOPMENT_EXACT_PATH_SIGNALS = {
     ".gemini/settings.json": ("Gemini CLI", "gemini_project_settings"),
     ".github/copilot-instructions.md": ("GitHub Copilot", "copilot_repo_instructions"),
     ".windsurfrules": ("Windsurf", "windsurf_legacy_rules"),
+    "design.md": ("Project docs", "project_design_doc"),
     "greptile.json": ("Greptile", "greptile_config"),
+    "product.md": ("Project docs", "project_product_doc"),
+    "structure.md": ("Project docs", "project_structure_doc"),
+    "tech.md": ("Project docs", "project_tech_doc"),
+    "vision.md": ("Project docs", "project_vision_doc"),
 }
 AI_DEVELOPMENT_DIRECTORY_SIGNALS = {
     ".agents": ("Agent workspace", "agent_directory"),
@@ -164,6 +164,11 @@ REPOSITORY_HAS_FILE_FILTER_OPTIONS = (
 )
 REPOSITORY_HAS_FILE_FILTER_LOOKUP = {
     file_path.lower(): file_path for file_path in REPOSITORY_HAS_FILE_FILTER_OPTIONS
+}
+REPOSITORY_BASENAME_FILE_FILTERS = {
+    "agents.md",
+    "claude.md",
+    "gemini.md",
 }
 MAX_UPDATED_DAYS_FILTER = 36500
 MAX_AGE_YEARS_FILTER = 100
@@ -2319,12 +2324,12 @@ def _apply_repository_has_file_filter(qs, file_path: str):
     )
     normalized_file_path = file_path.lower()
     signal_path = "lower(signal.value ->> 'path')"
-    if "/" in normalized_file_path:
-        match_sql = f"{signal_path} = %s"
-        params = [normalized_file_path]
-    else:
+    if normalized_file_path in REPOSITORY_BASENAME_FILE_FILTERS:
         match_sql = f"({signal_path} = %s OR {signal_path} LIKE %s)"
         params = [normalized_file_path, f"%/{normalized_file_path}"]
+    else:
+        match_sql = f"{signal_path} = %s"
+        params = [normalized_file_path]
 
     return qs.extra(
         where=[
