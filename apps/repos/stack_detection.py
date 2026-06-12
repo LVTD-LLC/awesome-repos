@@ -268,7 +268,352 @@ def _candidate(
     }
 
 
-def classify_dependency_file(item: dict) -> dict | None:  # noqa: C901
+DependencyFileSpec = dict[str, str | bool | None]
+
+DEPENDENCY_FILE_SPECS_BY_BASENAME: dict[str, DependencyFileSpec] = {
+    "package.json": {
+        "ecosystem": "javascript",
+        "package_manager": "npm",
+        "kind": "manifest",
+        "parser": "package_json",
+    },
+    "package-lock.json": {
+        "ecosystem": "javascript",
+        "package_manager": "npm",
+        "kind": "lockfile",
+        "parser": "package_lock_json",
+    },
+    "npm-shrinkwrap.json": {
+        "ecosystem": "javascript",
+        "package_manager": "npm",
+        "kind": "lockfile",
+        "parser": "package_lock_json",
+    },
+    "pnpm-lock.yaml": {
+        "ecosystem": "javascript",
+        "package_manager": "pnpm",
+        "kind": "lockfile",
+        "parser": "pnpm_lock",
+    },
+    "yarn.lock": {
+        "ecosystem": "javascript",
+        "package_manager": "yarn",
+        "kind": "lockfile",
+        "parser": "yarn_lock",
+    },
+    "bun.lock": {
+        "ecosystem": "javascript",
+        "package_manager": "bun",
+        "kind": "lockfile",
+        "parser": "bun_lock",
+    },
+    "bun.lockb": {
+        "ecosystem": "javascript",
+        "package_manager": "bun",
+        "kind": "lockfile",
+        "parser": None,
+        "fetch_content": False,
+    },
+    "pyproject.toml": {
+        "ecosystem": "python",
+        "package_manager": "pep517",
+        "kind": "manifest",
+        "parser": "pyproject",
+    },
+    "requirements.txt": {
+        "ecosystem": "python",
+        "package_manager": "pip",
+        "kind": "manifest",
+        "parser": "requirements",
+    },
+    "constraints.txt": {
+        "ecosystem": "python",
+        "package_manager": "pip",
+        "kind": "manifest",
+        "parser": "requirements",
+    },
+    "pipfile": {
+        "ecosystem": "python",
+        "package_manager": "pipenv",
+        "kind": "manifest",
+        "parser": "pipfile",
+    },
+    "pipfile.lock": {
+        "ecosystem": "python",
+        "package_manager": "pipenv",
+        "kind": "lockfile",
+        "parser": "pipfile_lock",
+    },
+    "poetry.lock": {
+        "ecosystem": "python",
+        "package_manager": "poetry",
+        "kind": "lockfile",
+        "parser": "poetry_lock",
+    },
+    "uv.lock": {
+        "ecosystem": "python",
+        "package_manager": "uv",
+        "kind": "lockfile",
+        "parser": "poetry_lock",
+    },
+    "pdm.lock": {
+        "ecosystem": "python",
+        "package_manager": "pdm",
+        "kind": "lockfile",
+        "parser": "poetry_lock",
+    },
+    "setup.py": {
+        "ecosystem": "python",
+        "package_manager": "pip",
+        "kind": "manifest",
+        "parser": "python_setup",
+    },
+    "setup.cfg": {
+        "ecosystem": "python",
+        "package_manager": "pip",
+        "kind": "manifest",
+        "parser": "python_setup",
+    },
+    "cargo.toml": {
+        "ecosystem": "rust",
+        "package_manager": "cargo",
+        "kind": "manifest",
+        "parser": "cargo_toml",
+    },
+    "cargo.lock": {
+        "ecosystem": "rust",
+        "package_manager": "cargo",
+        "kind": "lockfile",
+        "parser": "cargo_lock",
+    },
+    "go.mod": {
+        "ecosystem": "go",
+        "package_manager": "go-modules",
+        "kind": "manifest",
+        "parser": "go_mod",
+    },
+    "go.sum": {
+        "ecosystem": "go",
+        "package_manager": "go-modules",
+        "kind": "lockfile",
+        "parser": "go_sum",
+    },
+    "gemfile": {
+        "ecosystem": "ruby",
+        "package_manager": "bundler",
+        "kind": "manifest",
+        "parser": "gemfile",
+    },
+    "gems.rb": {
+        "ecosystem": "ruby",
+        "package_manager": "bundler",
+        "kind": "manifest",
+        "parser": "gemfile",
+    },
+    "gemfile.lock": {
+        "ecosystem": "ruby",
+        "package_manager": "bundler",
+        "kind": "lockfile",
+        "parser": "gemfile_lock",
+    },
+    "gems.locked": {
+        "ecosystem": "ruby",
+        "package_manager": "bundler",
+        "kind": "lockfile",
+        "parser": "gemfile_lock",
+    },
+    "composer.json": {
+        "ecosystem": "php",
+        "package_manager": "composer",
+        "kind": "manifest",
+        "parser": "composer_json",
+    },
+    "composer.lock": {
+        "ecosystem": "php",
+        "package_manager": "composer",
+        "kind": "lockfile",
+        "parser": "composer_lock",
+    },
+    "pom.xml": {
+        "ecosystem": "java",
+        "package_manager": "maven",
+        "kind": "manifest",
+        "parser": "pom_xml",
+    },
+    "build.gradle": {
+        "ecosystem": "java",
+        "package_manager": "gradle",
+        "kind": "manifest",
+        "parser": "gradle",
+    },
+    "build.gradle.kts": {
+        "ecosystem": "java",
+        "package_manager": "gradle",
+        "kind": "manifest",
+        "parser": "gradle",
+    },
+    "settings.gradle": {
+        "ecosystem": "java",
+        "package_manager": "gradle",
+        "kind": "workspace",
+        "parser": "gradle",
+    },
+    "settings.gradle.kts": {
+        "ecosystem": "java",
+        "package_manager": "gradle",
+        "kind": "workspace",
+        "parser": "gradle",
+    },
+    "gradle.lockfile": {
+        "ecosystem": "java",
+        "package_manager": "gradle",
+        "kind": "workspace",
+        "parser": "gradle",
+    },
+    "directory.packages.props": {
+        "ecosystem": "dotnet",
+        "package_manager": "dotnet",
+        "kind": "workspace",
+        "parser": "dotnet_project",
+    },
+    "packages.config": {
+        "ecosystem": "dotnet",
+        "package_manager": "dotnet",
+        "kind": "workspace",
+        "parser": "dotnet_project",
+    },
+    "global.json": {
+        "ecosystem": "dotnet",
+        "package_manager": "dotnet",
+        "kind": "workspace",
+        "parser": "dotnet_project",
+    },
+    "mix.exs": {
+        "ecosystem": "elixir",
+        "package_manager": "elixir-mix",
+        "kind": "manifest",
+        "parser": "mix_exs",
+    },
+    "mix.lock": {
+        "ecosystem": "elixir",
+        "package_manager": "elixir-mix",
+        "kind": "lockfile",
+        "parser": "mix_lock",
+    },
+    "pubspec.yaml": {
+        "ecosystem": "dart",
+        "package_manager": "dart-pub",
+        "kind": "manifest",
+        "parser": "pubspec",
+    },
+    "pubspec.lock": {
+        "ecosystem": "dart",
+        "package_manager": "dart-pub",
+        "kind": "lockfile",
+        "parser": "pubspec_lock",
+    },
+    "package.swift": {
+        "ecosystem": "swift",
+        "package_manager": "spm",
+        "kind": "manifest",
+        "parser": "package_swift",
+    },
+    "package.resolved": {
+        "ecosystem": "swift",
+        "package_manager": "spm",
+        "kind": "lockfile",
+        "parser": "package_swift",
+    },
+    "podfile": {
+        "ecosystem": "swift",
+        "package_manager": "cocoapods",
+        "kind": "manifest",
+        "parser": "podfile",
+    },
+    "cmakelists.txt": {
+        "ecosystem": "c-cpp",
+        "package_manager": "cmake",
+        "kind": "manifest",
+        "parser": "cmake",
+    },
+    "conanfile.txt": {
+        "ecosystem": "c-cpp",
+        "package_manager": "conan",
+        "kind": "manifest",
+        "parser": "conan",
+    },
+    "conanfile.py": {
+        "ecosystem": "c-cpp",
+        "package_manager": "conan",
+        "kind": "manifest",
+        "parser": "conan",
+    },
+    "vcpkg.json": {
+        "ecosystem": "c-cpp",
+        "package_manager": "vcpkg",
+        "kind": "manifest",
+        "parser": "vcpkg_json",
+    },
+    "meson.build": {
+        "ecosystem": "c-cpp",
+        "package_manager": "meson",
+        "kind": "manifest",
+        "parser": "meson",
+    },
+}
+
+REQUIREMENTS_FILE_SPEC: DependencyFileSpec = {
+    "ecosystem": "python",
+    "package_manager": "pip",
+    "kind": "manifest",
+    "parser": "requirements",
+}
+RUBY_GEMSPEC_FILE_SPEC: DependencyFileSpec = {
+    "ecosystem": "ruby",
+    "package_manager": "bundler",
+    "kind": "manifest",
+    "parser": "gemfile",
+}
+DOTNET_PROJECT_FILE_SPEC: DependencyFileSpec = {
+    "ecosystem": "dotnet",
+    "package_manager": "dotnet",
+    "kind": "manifest",
+    "parser": "dotnet_project",
+}
+DOTNET_SOLUTION_FILE_SPEC: DependencyFileSpec = {
+    "ecosystem": "dotnet",
+    "package_manager": "dotnet",
+    "kind": "workspace",
+    "parser": "dotnet_project",
+}
+
+
+def _candidate_from_spec(item: dict, spec: DependencyFileSpec) -> dict:
+    return _candidate(
+        item,
+        ecosystem=str(spec["ecosystem"]),
+        package_manager=str(spec["package_manager"]),
+        manifest_kind=str(spec["kind"]),
+        parser=spec["parser"] if isinstance(spec["parser"], str) else None,
+        fetch_content=bool(spec.get("fetch_content", True)),
+    )
+
+
+def _dependency_file_spec(lower_path: str, basename: str) -> DependencyFileSpec | None:
+    if spec := DEPENDENCY_FILE_SPECS_BY_BASENAME.get(basename):
+        return spec
+    if lower_path.startswith(("requirements/", "requirements-")) and basename.endswith(".txt"):
+        return REQUIREMENTS_FILE_SPEC
+    if basename.endswith(".gemspec"):
+        return RUBY_GEMSPEC_FILE_SPEC
+    if basename.endswith((".csproj", ".fsproj", ".vbproj")):
+        return DOTNET_PROJECT_FILE_SPEC
+    if basename.endswith(".sln"):
+        return DOTNET_SOLUTION_FILE_SPEC
+    return None
+
+
+def classify_dependency_file(item: dict) -> dict | None:
     if item.get("type") != "blob":
         return None
 
@@ -278,341 +623,11 @@ def classify_dependency_file(item: dict) -> dict | None:  # noqa: C901
 
     lower_path = path.lower()
     basename = lower_path.rsplit("/", 1)[-1]
+    spec = _dependency_file_spec(lower_path, basename)
+    if spec is None:
+        return None
 
-    if basename == "package.json":
-        return _candidate(
-            item,
-            ecosystem="javascript",
-            package_manager="npm",
-            manifest_kind="manifest",
-            parser="package_json",
-        )
-    if basename in {"package-lock.json", "npm-shrinkwrap.json"}:
-        return _candidate(
-            item,
-            ecosystem="javascript",
-            package_manager="npm",
-            manifest_kind="lockfile",
-            parser="package_lock_json",
-        )
-    if basename == "pnpm-lock.yaml":
-        return _candidate(
-            item,
-            ecosystem="javascript",
-            package_manager="pnpm",
-            manifest_kind="lockfile",
-            parser="pnpm_lock",
-        )
-    if basename == "yarn.lock":
-        return _candidate(
-            item,
-            ecosystem="javascript",
-            package_manager="yarn",
-            manifest_kind="lockfile",
-            parser="yarn_lock",
-        )
-    if basename == "bun.lock":
-        return _candidate(
-            item,
-            ecosystem="javascript",
-            package_manager="bun",
-            manifest_kind="lockfile",
-            parser="bun_lock",
-        )
-    if basename == "bun.lockb":
-        return _candidate(
-            item,
-            ecosystem="javascript",
-            package_manager="bun",
-            manifest_kind="lockfile",
-            parser=None,
-            fetch_content=False,
-        )
-
-    if basename == "pyproject.toml":
-        return _candidate(
-            item,
-            ecosystem="python",
-            package_manager="pep517",
-            manifest_kind="manifest",
-            parser="pyproject",
-        )
-    if basename in {"requirements.txt", "constraints.txt"}:
-        return _candidate(
-            item,
-            ecosystem="python",
-            package_manager="pip",
-            manifest_kind="manifest",
-            parser="requirements",
-        )
-    if lower_path.startswith(("requirements/", "requirements-")) and basename.endswith(".txt"):
-        return _candidate(
-            item,
-            ecosystem="python",
-            package_manager="pip",
-            manifest_kind="manifest",
-            parser="requirements",
-        )
-    if basename == "pipfile":
-        return _candidate(
-            item,
-            ecosystem="python",
-            package_manager="pipenv",
-            manifest_kind="manifest",
-            parser="pipfile",
-        )
-    if basename == "pipfile.lock":
-        return _candidate(
-            item,
-            ecosystem="python",
-            package_manager="pipenv",
-            manifest_kind="lockfile",
-            parser="pipfile_lock",
-        )
-    if basename == "poetry.lock":
-        return _candidate(
-            item,
-            ecosystem="python",
-            package_manager="poetry",
-            manifest_kind="lockfile",
-            parser="poetry_lock",
-        )
-    if basename == "uv.lock":
-        # uv and PDM lock files expose package entries as TOML [[package]]
-        # records, which is the same shape we need from Poetry lock files.
-        return _candidate(
-            item,
-            ecosystem="python",
-            package_manager="uv",
-            manifest_kind="lockfile",
-            parser="poetry_lock",
-        )
-    if basename == "pdm.lock":
-        # uv and PDM lock files expose package entries as TOML [[package]]
-        # records, which is the same shape we need from Poetry lock files.
-        return _candidate(
-            item,
-            ecosystem="python",
-            package_manager="pdm",
-            manifest_kind="lockfile",
-            parser="poetry_lock",
-        )
-    if basename in {"setup.py", "setup.cfg"}:
-        return _candidate(
-            item,
-            ecosystem="python",
-            package_manager="pip",
-            manifest_kind="manifest",
-            parser="python_setup",
-        )
-
-    if basename == "cargo.toml":
-        return _candidate(
-            item,
-            ecosystem="rust",
-            package_manager="cargo",
-            manifest_kind="manifest",
-            parser="cargo_toml",
-        )
-    if basename == "cargo.lock":
-        return _candidate(
-            item,
-            ecosystem="rust",
-            package_manager="cargo",
-            manifest_kind="lockfile",
-            parser="cargo_lock",
-        )
-
-    if basename == "go.mod":
-        return _candidate(
-            item,
-            ecosystem="go",
-            package_manager="go-modules",
-            manifest_kind="manifest",
-            parser="go_mod",
-        )
-    if basename == "go.sum":
-        return _candidate(
-            item,
-            ecosystem="go",
-            package_manager="go-modules",
-            manifest_kind="lockfile",
-            parser="go_sum",
-        )
-
-    if basename in {"gemfile", "gems.rb"} or basename.endswith(".gemspec"):
-        return _candidate(
-            item,
-            ecosystem="ruby",
-            package_manager="bundler",
-            manifest_kind="manifest",
-            parser="gemfile",
-        )
-    if basename in {"gemfile.lock", "gems.locked"}:
-        return _candidate(
-            item,
-            ecosystem="ruby",
-            package_manager="bundler",
-            manifest_kind="lockfile",
-            parser="gemfile_lock",
-        )
-
-    if basename == "composer.json":
-        return _candidate(
-            item,
-            ecosystem="php",
-            package_manager="composer",
-            manifest_kind="manifest",
-            parser="composer_json",
-        )
-    if basename == "composer.lock":
-        return _candidate(
-            item,
-            ecosystem="php",
-            package_manager="composer",
-            manifest_kind="lockfile",
-            parser="composer_lock",
-        )
-
-    if basename == "pom.xml":
-        return _candidate(
-            item,
-            ecosystem="java",
-            package_manager="maven",
-            manifest_kind="manifest",
-            parser="pom_xml",
-        )
-    if basename in {"build.gradle", "build.gradle.kts"}:
-        return _candidate(
-            item,
-            ecosystem="java",
-            package_manager="gradle",
-            manifest_kind="manifest",
-            parser="gradle",
-        )
-    if basename in {"settings.gradle", "settings.gradle.kts", "gradle.lockfile"}:
-        return _candidate(
-            item,
-            ecosystem="java",
-            package_manager="gradle",
-            manifest_kind="workspace",
-            parser="gradle",
-        )
-
-    if basename.endswith((".csproj", ".fsproj", ".vbproj")):
-        return _candidate(
-            item,
-            ecosystem="dotnet",
-            package_manager="dotnet",
-            manifest_kind="manifest",
-            parser="dotnet_project",
-        )
-    if basename in {
-        "directory.packages.props",
-        "packages.config",
-        "global.json",
-    } or basename.endswith(".sln"):
-        return _candidate(
-            item,
-            ecosystem="dotnet",
-            package_manager="dotnet",
-            manifest_kind="workspace",
-            parser="dotnet_project",
-        )
-
-    if basename == "mix.exs":
-        return _candidate(
-            item,
-            ecosystem="elixir",
-            package_manager="elixir-mix",
-            manifest_kind="manifest",
-            parser="mix_exs",
-        )
-    if basename == "mix.lock":
-        return _candidate(
-            item,
-            ecosystem="elixir",
-            package_manager="elixir-mix",
-            manifest_kind="lockfile",
-            parser="mix_lock",
-        )
-
-    if basename == "pubspec.yaml":
-        return _candidate(
-            item,
-            ecosystem="dart",
-            package_manager="dart-pub",
-            manifest_kind="manifest",
-            parser="pubspec",
-        )
-    if basename == "pubspec.lock":
-        return _candidate(
-            item,
-            ecosystem="dart",
-            package_manager="dart-pub",
-            manifest_kind="lockfile",
-            parser="pubspec_lock",
-        )
-
-    if basename == "package.swift":
-        return _candidate(
-            item,
-            ecosystem="swift",
-            package_manager="spm",
-            manifest_kind="manifest",
-            parser="package_swift",
-        )
-    if basename == "package.resolved":
-        return _candidate(
-            item,
-            ecosystem="swift",
-            package_manager="spm",
-            manifest_kind="lockfile",
-            parser="package_swift",
-        )
-    if basename == "podfile":
-        return _candidate(
-            item,
-            ecosystem="swift",
-            package_manager="cocoapods",
-            manifest_kind="manifest",
-            parser="podfile",
-        )
-
-    if basename == "cmakelists.txt":
-        return _candidate(
-            item,
-            ecosystem="c-cpp",
-            package_manager="cmake",
-            manifest_kind="manifest",
-            parser="cmake",
-        )
-    if basename in {"conanfile.txt", "conanfile.py"}:
-        return _candidate(
-            item,
-            ecosystem="c-cpp",
-            package_manager="conan",
-            manifest_kind="manifest",
-            parser="conan",
-        )
-    if basename == "vcpkg.json":
-        return _candidate(
-            item,
-            ecosystem="c-cpp",
-            package_manager="vcpkg",
-            manifest_kind="manifest",
-            parser="vcpkg_json",
-        )
-    if basename == "meson.build":
-        return _candidate(
-            item,
-            ecosystem="c-cpp",
-            package_manager="meson",
-            manifest_kind="manifest",
-            parser="meson",
-        )
-
-    return None
+    return _candidate_from_spec(item, spec)
 
 
 def dependency_file_candidates(tree_items: list[dict]) -> list[dict]:

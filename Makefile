@@ -24,7 +24,7 @@ test:
 	docker compose -f docker-compose-local.yml run --rm backend uv run --no-sync pytest $(filter-out $@,$(MAKECMDGOALS))
 
 pyscn-check:
-	uvx pyscn@$(PYSCN_VERSION) check --skip-clones $(PYSCN_PATHS)
+	uvx pyscn@$(PYSCN_VERSION) check $(PYSCN_PATHS)
 
 pyscn-analyze:
 	uvx pyscn@$(PYSCN_VERSION) analyze --no-open $(PYSCN_PATHS)

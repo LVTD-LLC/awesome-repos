@@ -81,6 +81,8 @@ exclude_patterns = [
     "**/migrations/**",
     "**/tests/**",
     "**/tests.py",
+    "apps/*/tests.py",
+    "tests.py",
     "**/test_*.py",
     "**/*_test.py",
     "**/__pycache__/**",
@@ -90,7 +92,7 @@ exclude_patterns = [
 ]
 
 [tool.pyscn.complexity]
-max_complexity = 45
+max_complexity = 15
 
 [tool.pyscn.clones]
 min_lines = 20
