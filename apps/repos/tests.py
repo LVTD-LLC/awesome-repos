@@ -6679,8 +6679,6 @@ def test_repository_badge_svg_renders_commit_velocity_periods(client):
     )
 
     assert response.status_code == 200
-    assert len(response.context["repository_visible_dependency_files"]) == 8
-    assert response.context["repository_hidden_dependency_file_count"] == 1
     content = response.content.decode()
     assert "30-day commit velocity" in content
     assert "+45" in content
@@ -6806,6 +6804,8 @@ def test_repository_detail_page_compacts_dependency_files(client):
     )
 
     assert response.status_code == 200
+    assert len(response.context["repository_visible_dependency_files"]) == 8
+    assert response.context["repository_hidden_dependency_file_count"] == 1
     content = response.content.decode()
     assert "Dependency files" in content
     assert "9 manifests" in content
