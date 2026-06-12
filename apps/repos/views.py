@@ -71,6 +71,7 @@ AWESOME_LIST_REQUEST_RATE_LIMIT_WINDOW_SECONDS = 60 * 60
 AI_DEVELOPMENT_VISIBLE_PATH_LIMIT = 6
 AI_DEVELOPMENT_DETAIL_PATH_LIMIT = 24
 AI_DEVELOPMENT_VISIBLE_TOOL_LIMIT = 5
+REPOSITORY_DEPENDENCY_FILE_PREVIEW_LIMIT = 8
 
 
 def _repository_path_url(repository: Repository, path: str, kind: str) -> str:
@@ -162,6 +163,10 @@ def _json_positive_int(value) -> int:
 
 def _repository_dependency_files(repository) -> list[dict]:
     return [item for item in (repository.dependency_files or []) if isinstance(item, dict)]
+
+
+def _repository_visible_dependency_files(dependency_files: list[dict]) -> list[dict]:
+    return dependency_files[:REPOSITORY_DEPENDENCY_FILE_PREVIEW_LIMIT]
 
 
 def _repository_detail_summary(repository, awesome_list_items, dependency_files) -> dict:
@@ -1018,9 +1023,15 @@ class RepositoryDetailView(DetailView):
         context = super().get_context_data(**kwargs)
         awesome_list_items = list(self.object.awesome_items.all())
         dependency_files = _repository_dependency_files(self.object)
+        visible_dependency_files = _repository_visible_dependency_files(dependency_files)
         performance = repository_performance_summary(self.object)
         context["awesome_list_items"] = awesome_list_items
         context["repository_dependency_files"] = dependency_files
+        context["repository_visible_dependency_files"] = visible_dependency_files
+        context["repository_hidden_dependency_file_count"] = max(
+            len(dependency_files) - len(visible_dependency_files),
+            0,
+        )
         context["repository_detail_summary"] = _repository_detail_summary(
             self.object,
             awesome_list_items,

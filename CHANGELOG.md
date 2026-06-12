@@ -74,6 +74,7 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Awesome: unified repository search filters across global search, awesome-list repository search, and personal starred-repository search.
 - Awesome: added Settings to the account navbar, simplified Settings around GitHub imports and future repository update preferences, and moved awesome-list requests into the Lists page flow.
 - Awesome: compacted repository-detail AI development signals into summary badges and bounded config-path lists.
+- Awesome: compacted repository-detail dependency files into wrapping chips with an overflow count.
 - Awesome: repository-detail AI development file paths now link to their GitHub blob URLs.
 - Awesome: GitHub signups now land on Settings so starred-repository imports stay off by default until the user clicks the import CTA.
 - Awesome: updated default contact email and production domain references to rasul@lvtd.dev and awesome.lvtd.dev.
