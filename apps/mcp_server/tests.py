@@ -93,6 +93,15 @@ def test_mcp_search_repositories_tool_uses_shared_search_service(client, profile
         stars=90000,
         topics=["django", "web"],
         detected_stacks=["django"],
+        uses_ai_for_development=True,
+        ai_development_signals=[
+            {
+                "path": "AGENTS.md",
+                "kind": "file",
+                "tool": "Agent instructions",
+                "signal": "agent_instructions",
+            }
+        ],
     )
     Repository.objects.create(
         full_name="expressjs/express",
@@ -120,6 +129,7 @@ def test_mcp_search_repositories_tool_uses_shared_search_service(client, profile
                         "language": "Python",
                         "topic": "django",
                         "framework": "django",
+                        "has_file": ["AGENTS.md"],
                         "sort": "star_growth",
                     },
                 },

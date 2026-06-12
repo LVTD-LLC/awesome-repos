@@ -494,8 +494,11 @@
                                     {% for signal in ai_development_signal_summary.visible_signals %}
                                         <li class="flex min-w-0 items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
                                             <span class="shrink-0 rounded-full bg-white px-2 py-0.5 font-semibold text-gray-500 ring-1 ring-gray-200 dark:bg-gray-950 dark:text-gray-400 dark:ring-gray-800">{{ signal.kind_label }}</span>
-                                            <code class="min-w-0 flex-1 truncate rounded bg-white px-1.5 py-0.5 font-mono text-xs text-gray-700 ring-1 ring-gray-200 dark:bg-gray-950 dark:text-gray-200 dark:ring-gray-800"
-                                                  title="{{ signal.path }}">{{ signal.path }}</code>
+                                            <a href="{{ signal.url }}"
+                                               target="_blank"
+                                               rel="noopener noreferrer"
+                                               class="min-w-0 flex-1 truncate rounded bg-white px-1.5 py-0.5 font-mono text-xs text-green-700 ring-1 ring-gray-200 hover:underline dark:bg-gray-950 dark:text-green-300 dark:ring-gray-800"
+                                               title="{{ signal.path }}">{{ signal.path }}</a>
                                         </li>
                                     {% endfor %}
                                 </ul>
@@ -515,8 +518,11 @@
                                             <li class="flex min-w-0 items-center gap-2">
                                                 <span class="w-28 shrink-0 truncate font-semibold text-gray-500 dark:text-gray-400"
                                                       title="{{ signal.tool }}">{{ signal.tool }}</span>
-                                                <code class="min-w-0 flex-1 truncate rounded bg-gray-100 px-1.5 py-0.5 font-mono text-xs text-gray-700 dark:bg-gray-900 dark:text-gray-200"
-                                                      title="{{ signal.path }}">{{ signal.path }}</code>
+                                                <a href="{{ signal.url }}"
+                                                   target="_blank"
+                                                   rel="noopener noreferrer"
+                                                   class="min-w-0 flex-1 truncate rounded bg-gray-100 px-1.5 py-0.5 font-mono text-xs text-green-700 hover:underline dark:bg-gray-900 dark:text-green-300"
+                                                   title="{{ signal.path }}">{{ signal.path }}</a>
                                             </li>
                                         {% endfor %}
                                     </ul>

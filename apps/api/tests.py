@@ -125,6 +125,15 @@ def test_repository_search_api_uses_existing_filters(client, profile):
         generated_tags=["web-framework"],
         detected_stacks=["django"],
         package_managers=["poetry"],
+        uses_ai_for_development=True,
+        ai_development_signals=[
+            {
+                "path": "AGENTS.md",
+                "kind": "file",
+                "tool": "Agent instructions",
+                "signal": "agent_instructions",
+            }
+        ],
         dependency_ecosystems=["python"],
         stack_signals=[
             {
@@ -173,6 +182,7 @@ def test_repository_search_api_uses_existing_filters(client, profile):
             "topic": "django",
             "framework": "django",
             "package_manager": "poetry",
+            "has_file": ["AGENTS.md"],
             "sort": "stars",
             "sort_direction": "desc",
         },

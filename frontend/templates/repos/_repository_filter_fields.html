@@ -155,13 +155,13 @@
             <summary class="flex cursor-pointer list-none items-center justify-between gap-4 px-4 py-3 text-left marker:hidden">
                 <span>
                     <span class="block text-base font-bold text-gray-950 dark:text-white">More filters</span>
-                    <span class="mt-0.5 block text-sm text-gray-500 dark:text-gray-400">Topics, generated tags, stack, age, archive status, and growth.</span>
+                    <span class="mt-0.5 block text-sm text-gray-500 dark:text-gray-400">Topics, generated tags, stack, files, age, archive status, and growth.</span>
                 </span>
                 <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-gray-200 text-lg font-semibold text-gray-600 transition group-open:rotate-45 dark:border-gray-700 dark:text-gray-300"
                       aria-hidden="true">+</span>
             </summary>
             <div class="border-t border-gray-200 px-4 py-4 dark:border-gray-800">
-                <div class="grid gap-6 xl:grid-cols-3">
+                <div class="grid gap-6 xl:grid-cols-4">
                     <fieldset class="space-y-4">
                         <legend class="text-sm font-bold text-gray-950 dark:text-white">Ecosystem</legend>
                         <div>
@@ -224,6 +224,24 @@
                                     </option>
                                 {% endfor %}
                             </select>
+                        </div>
+                    </fieldset>
+                    <fieldset class="space-y-4 border-t border-gray-200 pt-5 dark:border-gray-800 xl:border-l xl:border-t-0 xl:pl-6 xl:pt-0">
+                        <legend class="text-sm font-bold text-gray-950 dark:text-white">Files</legend>
+                        <div>
+                            <div class="{{ label_class }}">Has file</div>
+                            <div class="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
+                                {% for file_path in has_file_filter_options %}
+                                    <label class="flex min-h-10 cursor-pointer items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 transition hover:border-green-300 hover:text-green-800 has-[:checked]:border-green-500 has-[:checked]:bg-green-50 has-[:checked]:text-green-800 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300 dark:hover:border-green-800 dark:hover:text-green-200 dark:has-[:checked]:border-green-700 dark:has-[:checked]:bg-green-950/40 dark:has-[:checked]:text-green-200">
+                                        <input type="checkbox"
+                                               name="has_file"
+                                               value="{{ file_path }}"
+                                               class="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500 dark:border-gray-700 dark:bg-gray-900"
+                                               {% if file_path in selected_has_file_filters %}checked{% endif %} />
+                                        <span class="min-w-0 break-all font-mono text-xs">{{ file_path }}</span>
+                                    </label>
+                                {% endfor %}
+                            </div>
                         </div>
                     </fieldset>
                     <fieldset class="space-y-4 border-t border-gray-200 pt-5 dark:border-gray-800 xl:border-l xl:border-t-0 xl:pl-6 xl:pt-0">

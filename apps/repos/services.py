@@ -109,7 +109,12 @@ AI_DEVELOPMENT_EXACT_PATH_SIGNALS = {
     ".gemini/settings.json": ("Gemini CLI", "gemini_project_settings"),
     ".github/copilot-instructions.md": ("GitHub Copilot", "copilot_repo_instructions"),
     ".windsurfrules": ("Windsurf", "windsurf_legacy_rules"),
+    "design.md": ("Project docs", "project_design_doc"),
     "greptile.json": ("Greptile", "greptile_config"),
+    "product.md": ("Project docs", "project_product_doc"),
+    "structure.md": ("Project docs", "project_structure_doc"),
+    "tech.md": ("Project docs", "project_tech_doc"),
+    "vision.md": ("Project docs", "project_vision_doc"),
 }
 AI_DEVELOPMENT_DIRECTORY_SIGNALS = {
     ".agents": ("Agent workspace", "agent_directory"),
@@ -145,6 +150,25 @@ REPOSITORY_JSON_FILTER_FIELDS = {
     "generated_tags",
     "package_managers",
     "topics",
+}
+REPOSITORY_HAS_FILE_FILTER_OPTIONS = (
+    "AGENTS.md",
+    "PRODUCT.md",
+    "TECH.md",
+    "STRUCTURE.md",
+    "VISION.md",
+    "DESIGN.md",
+    "CLAUDE.md",
+    "GEMINI.md",
+    ".github/copilot-instructions.md",
+)
+REPOSITORY_HAS_FILE_FILTER_LOOKUP = {
+    file_path.lower(): file_path for file_path in REPOSITORY_HAS_FILE_FILTER_OPTIONS
+}
+REPOSITORY_BASENAME_FILE_FILTERS = {
+    "agents.md",
+    "claude.md",
+    "gemini.md",
 }
 MAX_UPDATED_DAYS_FILTER = 36500
 MAX_AGE_YEARS_FILTER = 100
@@ -2263,6 +2287,70 @@ def _first_positive_int_param(params, *names: str) -> int | None:
     return None
 
 
+def repository_param_values(params, name: str) -> list[str]:
+    if hasattr(params, "getlist"):
+        values = params.getlist(name)
+    else:
+        value = params.get(name)
+        if value is None:
+            values = []
+        elif isinstance(value, str):
+            values = [value]
+        elif isinstance(value, Collection):
+            values = list(value)
+        else:
+            values = [value]
+    return [str(value) for value in values]
+
+
+def repository_has_file_filters(params) -> list[str]:
+    selected = []
+    seen = set()
+
+    for raw_value in repository_param_values(params, "has_file"):
+        for candidate in raw_value.split(","):
+            file_path = REPOSITORY_HAS_FILE_FILTER_LOOKUP.get(candidate.strip().lower())
+            if file_path and file_path not in seen:
+                selected.append(file_path)
+                seen.add(file_path)
+
+    return selected
+
+
+def _apply_repository_has_file_filter(qs, file_path: str):
+    table_name = connection.ops.quote_name(Repository._meta.db_table)
+    column_name = connection.ops.quote_name(
+        Repository._meta.get_field("ai_development_signals").column
+    )
+    normalized_file_path = file_path.lower()
+    signal_path = "lower(signal.value ->> 'path')"
+    if normalized_file_path in REPOSITORY_BASENAME_FILE_FILTERS:
+        match_sql = f"({signal_path} = %s OR {signal_path} LIKE %s)"
+        params = [normalized_file_path, f"%/{normalized_file_path}"]
+    else:
+        match_sql = f"{signal_path} = %s"
+        params = [normalized_file_path]
+
+    return qs.extra(
+        where=[
+            f"""
+            EXISTS (
+                SELECT 1
+                FROM jsonb_array_elements(
+                    CASE
+                        WHEN jsonb_typeof({table_name}.{column_name}) = 'array'
+                        THEN {table_name}.{column_name}
+                        ELSE '[]'::jsonb
+                    END
+                ) AS signal(value)
+                WHERE {match_sql}
+            )
+            """
+        ],
+        params=params,
+    )
+
+
 def minimum_age_cutoff(params, name: str = "min_age_years"):
     years = _positive_int_param(params, name)
     if not years or years > MAX_AGE_YEARS_FILTER:
@@ -2333,6 +2421,8 @@ def _apply_repository_taxonomy_filters(qs, params, *, allow_list_filter: bool):
     package_manager = normalize_repository_tag(params.get("package_manager") or "")
     if package_manager:
         qs = qs.filter(package_managers__contains=[package_manager])
+    for file_path in repository_has_file_filters(params):
+        qs = _apply_repository_has_file_filter(qs, file_path)
     return qs
 
 
