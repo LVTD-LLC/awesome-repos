@@ -95,6 +95,7 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Awesome: repository generated-tag prompts now include known language, GitHub topics, and AI-development signals.
 
 ### Fixed
+- Awesome: explicitly keep shared side sponsor rails enabled on repository detail pages.
 - Awesome: keep authenticated pages rendering if a user record is temporarily missing its profile.
 - Awesome: fixed the sponsor ad checkout form so it includes a CSRF token when rendered from side-ad rails.
 - Awesome: keep personal Starred and Liked nav links hidden from anonymous visitors.

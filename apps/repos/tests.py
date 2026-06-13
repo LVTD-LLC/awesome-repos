@@ -123,6 +123,27 @@ def assert_repository_detail_link(content: str, full_name: str) -> None:
     )
 
 
+def assert_side_ad_rails(content: bytes) -> None:
+    assert b"data-page-ad-shell" in content
+    assert b"data-page-content" in content
+    assert b"max-w-none" in content
+    assert b"xl:col-start-3" in content
+    assert b"xl:col-start-5" in content
+    assert b'data-ad-rail="left"' in content
+    assert b'data-ad-rail="right"' in content
+    assert b"grid-rows-5" in content
+    assert content.count(b'data-ad-slot="global-left-') == 5
+    assert content.count(b'data-ad-slot="global-right-') == 5
+    assert content.count(b"data-ad-slot=") == 10
+    assert content.count(b"data-ad-empty-slot=") == 1
+    assert b'data-ad-empty-slot="global-right-5"' in content
+    assert b"Get sponsored" in content
+    assert content.count(b"utm_source=awesome_repos") == 9
+    assert content.count(b"utm_medium=side_ad") == 9
+    assert b"data-sponsor-modal-open" in content
+    assert b'action="/sponsor/checkout/"' in content
+
+
 @pytest.fixture(autouse=True)
 def disable_repository_tagging(settings, monkeypatch):
     settings.REPOSITORY_TAGGING_ENABLED = False
@@ -5336,24 +5357,7 @@ def test_search_page_renders(client):
     assert b"BSD-3-Clause" in content
     assert b"12 open" in content
     assert_option_label_with_count(content, "web-framework", 1)
-    assert b"data-page-ad-shell" in content
-    assert b"data-page-content" in content
-    assert b"max-w-none" in content
-    assert b"xl:col-start-3" in content
-    assert b"xl:col-start-5" in content
-    assert b'data-ad-rail="left"' in content
-    assert b'data-ad-rail="right"' in content
-    assert b"grid-rows-5" in content
-    assert content.count(b'data-ad-slot="global-left-') == 5
-    assert content.count(b'data-ad-slot="global-right-') == 5
-    assert content.count(b"data-ad-slot=") == 10
-    assert content.count(b"data-ad-empty-slot=") == 1
-    assert b'data-ad-empty-slot="global-right-5"' in content
-    assert b"Get sponsored" in content
-    assert content.count(b"utm_source=awesome_repos") == 9
-    assert content.count(b"utm_medium=side_ad") == 9
-    assert b"data-sponsor-modal-open" in content
-    assert b'action="/sponsor/checkout/"' in content
+    assert_side_ad_rails(content)
     assert response.context["total_lists"] == 1
     assert [awesome_list.id for awesome_list in response.context["awesome_lists"]] == [
         active_list.id
@@ -6634,6 +6638,8 @@ def test_repository_detail_page_renders_performance_history(client):
     )
 
     assert response.status_code == 200
+    assert response.context["hide_side_ad_rails"] is False
+    assert_side_ad_rails(response.content)
     assert b"Tracked growth" in response.content
     assert b"123,456" in response.content
     assert b"32,000" in response.content

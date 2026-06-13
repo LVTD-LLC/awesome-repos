@@ -1045,7 +1045,7 @@ class RepositoryDetailView(DetailView):
         context["newsletter_issues"] = self.object.newsletter_issues.filter(
             published_at__isnull=False,
         )[:5]
-        context["hide_side_ad_rails"] = True
+        context["hide_side_ad_rails"] = False
         if self.request.user.is_superuser:
             subscription = (
                 NewsletterSubscription.objects.filter(
